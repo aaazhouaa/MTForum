@@ -94,7 +94,7 @@ object DiscuzUserActionManager {
                         "home.php?mod=spacecp&ac=pm&op=send&mobile=2"
             }
 
-            var formhash = form.select("input[name=formhash]").attr("value")
+            var formhash: String? = form.select("input[name=formhash]").attr("value")
             if (TextUtils.isEmpty(formhash)) formhash = ForumParser.parseFormhash(page)
             if (TextUtils.isEmpty(formhash)) return false
 
@@ -240,7 +240,7 @@ object DiscuzUserActionManager {
             val params = HashMap<String, String>()
             params["username"] = username!!
             params["blacklistsubmit"] = "true"
-            params["formhash"] = formhash
+            params["formhash"] = formhash!!
             val result = client.postWithReferer(
                 HttpClient.BASE_URL +
                         "home.php?mod=spacecp&ac=friend&op=blacklist" +

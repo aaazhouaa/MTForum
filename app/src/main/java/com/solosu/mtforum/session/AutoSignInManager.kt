@@ -87,12 +87,12 @@ object AutoSignInManager {
                     message = "登录状态已失效"
                 } else {
                     val data = ForumParser.parseCommunityPage(html)
-                    val signText = data.getSignInText()
+                    val signText = data.signInText
 
                     // 第五步:本地判断是否已签到
                     // 优先检查页面文本中是否包含"已签到"关键词(兜底:按钮文本 + 页面全文)
                     val pageShowsSignedIn = isAlreadySigned(signText)
-                            || data.isAlreadySignedIn()
+                            || data.alreadySignedIn
                             || html.contains("今日已签")
                             || html.contains("已签到")
                     if (pageShowsSignedIn) {
@@ -100,13 +100,13 @@ object AutoSignInManager {
                         message = "今日已签到"
                         // 同步本地签到记录,防止下次重复请求
                         UserSessionManager.getInstance().saveSignInDate(appContext)
-                    } else if (data.isLoginRequired()) {
+                    } else if (data.loginRequired) {
                         message = "请先登录"
                     } else if (!isNotSigned(signText)) {
                         message = "无法确认当前签到状态"
                     } else {
                         // 未签到 -> 执行自动签到
-                        var formhash: String? = data.getFormhash()
+                        var formhash: String? = data.formhash
                         if (TextUtils.isEmpty(formhash)) formhash = ForumParser.parseFormhash(html)
                         if (TextUtils.isEmpty(formhash)) {
                             message = "无法获取签到凭证"

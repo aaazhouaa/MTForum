@@ -583,7 +583,7 @@ class NativeProfileFormActivity : AppCompatActivity() {
                 // ★ 关键：构建 multipart 请求体
                 val requestBody = okhttp3.MultipartBody.Builder()
                     .setType(okhttp3.MultipartBody.FORM)
-                    .addFormDataPart("formhash", fh)
+                    .addFormDataPart("formhash", fh!!)
                     .addFormDataPart("avatarsubmit", "yes")
                     .addFormDataPart("upload", "1")
                     .addFormDataPart("Filedata", imageFile.name, fileBody)
