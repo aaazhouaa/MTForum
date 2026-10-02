@@ -223,3 +223,85 @@ rect.set(bounds.left.toFloat(), bounds.top.toFloat(), ...)
 - ❌ 不要合并或拆分类
 - ❌ 不要用顶层函数替代静态方法
 - ❌ 不要顺手重构逻辑
+
+## 追加规则（批次 2 实测，全部会导致编译失败）
+
+### 14. `@JvmName` 只对 Java 调用方生效
+
+给属性加 `@get:JvmName("isFollowed")` 后，**Kotlin 代码里看不到 `isFollowed` / `setFollowed`**，
+只能用属性名：
+
+```kotlin
+// ❌ Unresolved reference 'setFollowed'
+thread.setFollowed(true)
+thread.isFollowed()
+
+// ✓ Kotlin 侧用属性语法
+thread.followed = true
+thread.followed
+```
+
+**规则**：转换 `.kt` 文件时，若调用的是另一个已转 Kotlin 的类，
+必须改用属性语法；调用纯 Java 类时才用 `getXxx()/setXxx()`。
+
+### 15. `String.replaceAll` 不存在
+
+Kotlin 的 `String` 没有 `replaceAll`：
+
+```kotlin
+// ❌ Unresolved reference 'replaceAll'
+s.replaceAll("<[^>]+>", "")
+
+// ✓
+s.replace(Regex("<[^>]+>"), "")
+
+// 带分组引用时用 lambda（Kotlin 的 "$1" 需转义，容易出错）
+Regex("<!\\[CDATA\\[(.*?)\\]\\]>").replace(s) { m -> m.groupValues[1] }
+```
+
+### 16. getter 方法 → 属性
+
+```kotlin
+e.getMessage()   // ❌ Unresolved reference 'getMessage'
+e.message        // ✓
+s.toLowerCase()  // ⚠ deprecated 告警 → s.lowercase()
+```
+
+### 17. 字符串拼接：`+` 不能放在下一行行首
+
+```kotlin
+// ❌ Unresolved reference 'unaryPlus' for operator '+'
+val url = HttpClient.BASE_URL
+        + "plugin.php"
+
+// ✓ 把 + 放上一行行尾
+val url = HttpClient.BASE_URL +
+        "plugin.php"
+```
+
+### 18. 可空参数：Java 可传 null 的 String 在 Kotlin 必须标 `String?`
+
+原 Java 方法形参是 `String uid`（无注解，可传 null），
+调用点若传可空值，Kotlin 侧不标 `?` 会报
+`Argument type mismatch: actual type is 'String?', but 'String' was expected`。
+
+**判断方法**：看方法体首行是否有 `TextUtils.isEmpty(x)` / `x == null` 判断 —— 有则参数应标 `?`。
+
+### 19. `TextUtils.isEmpty` 无法让编译器推断非空
+
+```kotlin
+fun setState(uid: String?) {
+    if (TextUtils.isEmpty(uid)) return
+    set.add(uid)   // ❌ 编译器仍认为 uid 可空
+}
+```
+
+因为 `TextUtils.isEmpty` 是 Java 方法，Kotlin 不做契约推断。需显式绑定：
+
+```kotlin
+fun setState(uid: String?) {
+    if (TextUtils.isEmpty(uid)) return
+    val safe = uid!!      // 或 if (uid.isNullOrEmpty()) return 后用 uid
+    set.add(safe)
+}
+```
