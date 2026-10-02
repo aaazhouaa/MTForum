@@ -1,0 +1,233 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">MT论坛</string>
+    <string name="tab_home">首页</string>
+    <string name="tab_community">社区</string>
+    <string name="tab_message">消息</string>
+    <string name="tab_profile">我的</string>
+    <string name="tab_circle">版块</string>
+    <string name="tab_discover">发现</string>
+    <string name="tab_post">发布</string>
+    <string name="profile_uid">UID</string>
+    <string name="profile_likes">获赞</string>
+    <string name="profile_works">作品</string>
+    <string name="profile_view_all">全部</string>
+    <string name="profile_vip">开通VIP</string>
+    <string name="profile_edit">编辑资料</string>
+    <string name="msg_likes">赞</string>
+    <string name="msg_system">系统</string>
+    <string name="msg_private">私信</string>
+    <string name="msg_input_hint">输入消息...</string>
+    <string name="circle_recommend">推荐版块</string>
+    <string name="circle_hot">最热</string>
+    <string name="circle_new">最新</string>
+    <string name="action_post_options">权限设置</string>
+    <string name="post_public">公开</string>
+    <string name="post_private">仅作者可见</string>
+    <string name="post_need_reply">回复可见</string>
+    <string name="post_reward">打赏</string>
+    <string name="item_views">浏览</string>
+    <string name="item_replies">回复</string>
+    <string name="item_likes">赞</string>
+    <string name="title_login">登录</string>
+    <string name="title_register">注册</string>
+    <string name="title_post">发帖</string>
+    <string name="title_thread_detail">帖子详情</string>
+    <string name="action_post">发帖</string>
+    <string name="action_login">登录</string>
+    <string name="action_logout">退出登录</string>
+    <string name="action_submit">提交</string>
+    <string name="action_search">搜索</string>
+    <string name="action_refresh">刷新</string>
+    <string name="hint_username">帐号</string>
+    <string name="hint_password">密码</string>
+    <string name="hint_search">搜索帖子</string>
+
+    <!-- 搜索页面 -->
+    <string name="title_search">搜索</string>
+    <string name="search_hint">输入关键词搜索</string>
+    <string name="search_no_results">没有找到相关帖子</string>
+    <string name="search_empty_hint">输入关键词搜索帖子</string>
+    <string name="search_failed">搜索失败，请稍后重试</string>
+    <string name="search_login_required">搜索需要先登录，请登录后再试</string>
+    <string name="search_sort_lastpost">最新回复</string>
+    <string name="search_sort_dateline">最新发布</string>
+    <string name="search_sort_replies">最多回复</string>
+
+    <string name="hint_title">标题</string>
+    <string name="hint_content">内容</string>
+    <string name="hint_select_forum">选择版块</string>
+    <string name="loading">加载中…</string>
+    <string name="load_more">加载更多</string>
+    <string name="no_more_data">没有更多了</string>
+    <string name="network_error">网络错误，请稍后重试</string>
+    <string name="login_required">请先登录</string>
+    <string name="login_success">登录成功</string>
+    <string name="post_success">发帖成功</string>
+    <string name="tab_guide">导读</string>
+    <string name="tab_guide_new">最新</string>
+    <string name="tab_guide_hot">热门</string>
+    <string name="tab_guide_digest">精华</string>
+    <string name="action_sign_in">签到</string>
+    <string name="profile_posts">帖子</string>
+    <string name="profile_replies">回复</string>
+    <string name="profile_friends">好友</string>
+    <string name="profile_following">关注</string>
+    <string name="profile_followers">粉丝</string>
+    <string name="profile_credits">积分</string>
+    <string name="settings">设置</string>
+    <string name="about">关于</string>
+    <string name="clear_cache">清除缓存</string>
+    <!-- 帖子详情页 -->
+    <string name="title_reply">回复消息</string>
+    <string name="reply_hint">写回复...</string>
+    <string name="reply_hint_empty">回复内容不能为空</string>
+    <string name="action_send">发送</string>
+    <string name="action_follow">关注</string>
+    <string name="action_followed">已关注</string>
+    <string name="action_unfollow">取消关注</string>
+    <string name="action_follow_success">关注成功</string>
+    <string name="action_unfollow_success">已取消关注</string>
+    <string name="action_like">点赞</string>
+    <string name="action_favorite">收藏</string>
+    <string name="action_share">分享</string>
+    <string name="action_reply">回复</string>
+    <string name="reply_success">回复成功</string>
+    <string name="reply_failed">回复失败，请重试</string>
+    <string name="login_required_hint">请先登录后再操作</string>
+    <string name="hidden_content_prompt">游客，如果您要查看本帖隐藏内容请回复</string>
+    <string name="view_hidden_content">查看隐藏内容</string>
+    <string name="reward_title">打赏</string>
+    <string name="reward_hint">选择打赏金额</string>
+    <string name="reward_amount_1">1</string>
+    <string name="reward_amount_5">5</string>
+    <string name="reward_amount_10">10</string>
+    <string name="reward_amount_50">50</string>
+    <string name="reward_amount_100">100</string>
+    <string name="reward_dialog_title">选择打赏金额</string>
+    <string name="kick_title">踢帖</string>
+    <string name="kick_hint">确定要踢掉此帖吗？</string>
+    <string name="kick_confirm">确定</string>
+    <string name="kick_cancel">取消</string>
+    <string name="kick_quota_full">每日踢帖次数已达上限</string>
+    <string name="kick_dialog_title">确认踢帖</string>
+    <string name="kick_dialog_message">确定要踢掉此帖吗？此操作不可撤销。</string>
+    <string name="label_floor_sofa">沙发</string>
+    <string name="label_floor_chair">椅子</string>
+    <string name="label_floor_carpet">地毯</string>
+    <string name="label_floor_newspaper">报纸</string>
+    <string name="label_op">楼主</string>
+    <string name="all_replies">全部评论</string>
+    <string name="liked_by">赞过</string>
+    <string name="view_more">查看全部</string>
+    <string name="load_more_replies">加载更多回复</string>
+    <string name="reply_only_op">只看楼主</string>
+    <string name="reply_all_users">查看全部</string>
+    <string name="reply_order_desc">时间倒序</string>
+    <string name="reply_order_asc">时间正序</string>
+
+    <string name="no_more_replies">没有更多回复了</string>
+    <string name="no_replies">暂无回复</string>
+
+    <!-- 长按操作 -->
+    <string name="text_copied">文本已复制到剪贴板</string>
+    <string name="image_saved">图片已保存到相册</string>
+    <string name="image_save_failed">图片保存失败</string>
+    <string name="save_image">保存图片</string>
+
+    <!-- 设置菜单 -->
+    <string name="action_js_plugins">JavaScript 插件</string>
+    <string name="action_open_in_browser">浏览器打开</string>
+    <string name="action_edit">编辑</string>
+
+    <!-- JS 插件管理 -->
+    <string name="title_js_plugins">JS 插件管理</string>
+    <string name="add_plugin">添加插件</string>
+    <string name="edit_plugin">编辑插件</string>
+    <string name="delete_plugin">删除插件</string>
+    <string name="plugin_name_hint">插件名称</string>
+    <string name="plugin_code_hint">JavaScript 代码</string>
+    <string name="plugin_enabled">已启用</string>
+    <string name="plugin_disabled">已禁用</string>
+    <string name="plugin_saved">插件已保存</string>
+    <string name="plugin_deleted">插件已删除</string>
+    <string name="confirm_delete_plugin">确定要删除此插件吗？</string>
+    <string name="no_plugins">暂无自定义插件，点击右上角添加</string>
+    <string name="builtin_plugin">内置</string>
+    <string name="custom_plugin">自定义</string>
+
+    <!-- 浏览器选择 -->
+    <string name="choose_browser">选择浏览器打开</string>
+    <string name="open_in_browser">在浏览器中打开</string>
+
+    <!-- 网页菜单 -->
+    <string name="action_page_refresh">刷新页面</string>
+
+    <!-- 发布页面 -->
+    <string name="post_title_hint">添加标题让更多人看见</string>
+    <string name="post_title_count">0/30</string>
+    <string name="post_circle_required">版块必选</string>
+    <string name="post_add_image">添加图片</string>
+    <string name="post_content_hint">此刻的想法、见闻或故事，输入@艾特好友</string>
+    <string name="post_co_creator_label">共创者</string>
+    <string name="post_add_co_creator">添加共创者</string>
+    <string name="post_permission">权限设置</string>
+    <string name="post_permission_author">楼</string>
+    <string name="post_permission_reply_visible">评</string>
+    <string name="post_permission_paid">付费查看</string>
+    <string name="post_permission_comment_visible">评论可见</string>
+    <string name="post_paid_hint">读者付费后才能看全文</string>
+    <string name="post_comment_visible_hint">评论后才能查看全部</string>
+    <string name="post_product">商品</string>
+    <string name="post_link">链接</string>
+    <string name="post_anonymous">选择匿名</string>
+    <string name="post_add_topic">添加话题</string>
+    <string name="post_publish">发布</string>
+    <string name="post_paid_price_hint">设置付费金额</string>
+
+    <!-- 版块详情页 -->
+    <string name="forum_all">全部</string>
+    <string name="forum_latest">最新发表</string>
+    <string name="forum_hot">热门动态</string>
+    <string name="forum_replies">最近回复</string>
+    <string name="forum_digest">精华</string>
+    <string name="forum_members">成员</string>
+    <string name="forum_join">+ 加入</string>
+    <string name="forum_joined">已加入</string>
+    <string name="forum_posts_count">帖子</string>
+    <string name="forum_threads_count">主题</string>
+    <string name="forum_empty">暂无帖子</string>
+    <string name="forum_empty_login">该版块暂无内容,或需登录后查看</string>
+    <string name="title_forum_detail">版块详情</string>
+
+    <!-- 社区版块页面签到 & 统计 -->
+    <string name="sign_in_today">今日已签到</string>
+    <string name="stats_today">今日</string>
+    <string name="stats_yesterday">昨日</string>
+    <string name="stats_posts">帖子总数</string>
+    <string name="stats_members">会员总数</string>
+
+    <!-- 打赏 -->
+    <string name="title_reward">打赏</string>
+    <string name="label_reward_coins">金币</string>
+    <string name="reward_message_hint">说两句鼓励一下吧...</string>
+    <string name="label_notify_author">通知作者</string>
+    <string name="action_reward">打赏</string>
+    <string name="reward_success">打赏成功,已送出 %d 金币</string>
+    <string name="reward_failed">打赏失败</string>
+
+    <!-- 踢帖 -->
+    <string name="title_kick">踢帖</string>
+    <string name="kick_rules_title">可对以下情况使用本功能:</string>
+    <string name="kick_rules_content">1. 存在广告/引流/色情的内容;
+2. 涉及政治及宗教敏感的内容;
+3. 价值过低却设置收费的内容;
+4. 扰乱论坛秩序,辱骂,引战;
+5. 其它违规且需要立即屏蔽的内容;</string>
+    <string name="kick_reason_label">踢帖理由:(实名踢帖,认真填写,恶意者严肃处罚)</string>
+    <string name="kick_reason_hint">请输入踢帖理由...</string>
+    <string name="kick_success">踢帖请求已提交</string>
+    <string name="kick_failed">踢帖失败</string>
+    <string name="action_cancel">取消</string>
+    <string name="action_confirm">确定</string>
+</resources>

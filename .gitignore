@@ -1,0 +1,33 @@
+# 构建产物
+build/
+*/build/
+build_out/
+*.apk
+*.aab
+*.ap_
+# Gradle 缓存
+.gradle/
+
+# 本机配置(每台机器不同,不入库)
+local.properties
+# Android Studio / IDEA
+.idea/
+*.iml
+*.ipr
+*.iws
+.cxx/
+.externalNativeBuild/
+# 签名(默认忽略,防止误传私钥;本项目为演示 keystore 已附,正式分发请自换)
+# *.jks
+# *.keystore
+# 系统垃圾
+.DS_Store
+Thumbs.db
+# Kotlin/Java 编译
+*.class
+*.jar
+# 例外：gradle wrapper 的 jar 必须入库，否则 clone 后 ./gradlew 无法运行
+!gradle/wrapper/gradle-wrapper.jar
+*.war
+*.ear
+*.log

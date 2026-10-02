@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- 外圈阴影 -->
+    <item>
+        <shape android:shape="oval">
+            <solid android:color="@color/scrim_heavy" />
+            <size android:width="52dp" android:height="52dp" />
+        </shape>
+    </item>
+    <!-- 内圈渐变背景 -->
+    <item
+        android:bottom="2dp"
+        android:left="2dp"
+        android:right="2dp"
+        android:top="2dp">
+        <shape android:shape="oval">
+            <solid android:color="@color/accent_primary" />
+            <size android:width="48dp" android:height="48dp" />
+        </shape>
+    </item>
+</layer-list>

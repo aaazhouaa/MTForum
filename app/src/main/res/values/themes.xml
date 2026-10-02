@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- 主主题 - 科技蓝风格 -->
+    <style name="Theme.AppTheme" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <!-- Primary brand color. -->
+        <item name="colorPrimary">@color/primary</item>
+        <item name="colorPrimaryVariant">@color/primary_dark</item>
+        <item name="colorOnPrimary">@color/text_white</item>
+        <!-- Secondary brand color. -->
+        <item name="colorSecondary">@color/primary_light</item>
+        <item name="colorSecondaryVariant">@color/primary</item>
+        <item name="colorOnSecondary">@color/text_white</item>
+        <!-- 状态栏:与背景同色,图标深色 -->
+        <item name="android:statusBarColor" tools:targetApi="21">@color/background</item>
+        <item name="android:windowLightStatusBar" tools:targetApi="23">true</item>
+        <!-- 导航栏:与背景同色 -->
+        <item name="android:navigationBarColor" tools:targetApi="21">@color/background</item>
+        <!-- Background colors -->
+        <item name="android:windowBackground">@color/background</item>
+        <item name="android:colorBackground">@color/background</item>
+        <!-- Customize your theme here. -->
+        <item name="windowActionBar">false</item>
+        <item name="windowNoTitle">true</item>
+        <item name="materialCardViewStyle">@style/CardView.NewStyle</item>
+    </style>
+
+    <style name="Theme.AppTheme.NoActionBar">
+        <item name="windowActionBar">false</item>
+        <item name="windowNoTitle">true</item>
+    </style>
+
+    <!-- 卡片样式 -->
+    <style name="CardView.NewStyle" parent="Widget.MaterialComponents.CardView">
+        <item name="cardCornerRadius">12dp</item>
+        <item name="cardElevation">2dp</item>
+        <item name="cardBackgroundColor">@color/card_frosted</item>
+        <item name="strokeWidth">0dp</item>
+        <item name="cardPreventCornerOverlap">false</item>
+    </style>
+
+    <!-- 形状样式 -->
+    <style name="ShapeAppearanceOverlay.App.CornerSize50Percent" parent="">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">50%</item>
+    </style>
+
+    <!-- 圆形头像背景 -->
+    <style name="CircleAvatarBg">
+        <item name="android:background">@drawable/circle_avatar_bg</item>
+    </style>
+
+    <!-- 全屏预览主题(隐藏状态栏) -->
+    <style name="Theme.AppTheme.FullScreen" parent="Theme.AppTheme">
+        <item name="android:windowFullscreen">true</item>
+        <item name="android:windowContentOverlay">@null</item>
+    </style>
+</resources>

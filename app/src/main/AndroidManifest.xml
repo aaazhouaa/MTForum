@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+    <application
+        android:name=".MyApplication"
+        android:allowBackup="false"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.AppTheme"
+        tools:targetApi="34">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:windowSoftInputMode="adjustResize">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <activity
+            android:name=".ui.post.PostActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
+
+        <activity
+            android:name=".ui.detail.ThreadDetailActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
+
+        <activity
+            android:name=".ui.detail.ImagePreviewActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize"
+            android:theme="@style/Theme.AppTheme.FullScreen" />
+
+        <activity
+             android:name=".ui.search.SearchActivity"
+             android:exported="false"
+             android:windowSoftInputMode="adjustResize" />
+
+        <activity
+            android:name=".ui.forum.ForumDetailActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
+
+        <activity
+            android:name=".ui.message.NoticeActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
+
+        <activity
+            android:name=".ui.message.NoticeDetailActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
+
+        <activity
+            android:name=".ui.message.ChatActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
+
+        <!-- === 个人资料页功能菜单 原生Activity === -->
+        <activity
+            android:name=".ui.space.SpaceThreadListActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
+
+        <activity
+            android:name=".ui.space.FriendListActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
+
+        <activity
+            android:name=".ui.space.CreditDetailActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
+
+        <activity
+            android:name=".ui.space.EditProfileActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
+
+        <activity
+            android:name=".ui.space.SettingsActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
+
+        <!-- 用户资料详情（原生，查看任意用户） -->
+        <activity
+            android:name=".ui.space.UserProfileActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
+
+        <!-- 原生编辑资料表单（完全原生化，无 WebView 套壳） -->
+        <activity
+            android:name=".ui.space.NativeProfileFormActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
+
+        <!-- AI 配置 -->
+        <activity
+            android:name=".ai.AiConfigActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
+
+        <!-- AI 助手对话 -->
+        <activity
+            android:name=".ai.AiSessionListActivity"
+            android:exported="false"
+            android:theme="@style/Theme.AppTheme" />
+        <activity
+            android:name=".ai.AiChatActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
+        <!-- AI 一键总结帖子 -->
+        <activity
+            android:name=".ai.AiSummarizeActivity"
+            android:exported="false"
+            android:theme="@style/Theme.AppTheme" />
+
+        <activity
+            android:name="com.solosu.mtforum.ui.BlacklistActivity"
+            android:exported="false"
+            android:label="个人小黑屋" />
+    </application>
+</manifest>

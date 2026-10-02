@@ -1,0 +1,186 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/background"
+    android:fitsSystemWindows="true">
+
+    <!-- Toolbar -->
+    <com.google.android.material.appbar.MaterialToolbar
+        android:id="@+id/toolbar"
+        android:layout_width="match_parent"
+        android:layout_height="?attr/actionBarSize"
+        android:background="@color/background"
+        app:titleTextColor="@color/text_primary"
+        app:navigationIconTint="@color/text_primary"
+        app:title="@string/title_search" />
+
+    <!-- 分割线 -->
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="0.5dp"
+        android:background="@color/divider" />
+
+    <!-- 搜索输入区域 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingHorizontal="16dp"
+        android:paddingVertical="12dp">
+
+        <EditText
+            android:id="@+id/et_search"
+            android:layout_width="0dp"
+            android:layout_height="48dp"
+            android:layout_weight="1"
+            android:layout_marginEnd="12dp"
+            android:background="@drawable/edittext_background"
+            android:paddingHorizontal="16dp"
+            android:paddingVertical="12dp"
+            android:textSize="14sp"
+            android:textColor="@color/text_primary"
+            android:textColorHint="@color/text_hint"
+            android:hint="@string/search_hint"
+            android:imeOptions="actionSearch"
+            android:inputType="text"
+            android:maxLines="1"
+            android:ellipsize="end"
+            android:singleLine="true" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_search"
+            android:layout_width="wrap_content"
+            android:layout_height="48dp"
+            android:text="@string/action_search"
+            android:textSize="14sp"
+            android:textColor="@color/text_white"
+            app:cornerRadius="8dp"
+            app:backgroundTint="@color/primary" />
+    </LinearLayout>
+
+    <!-- 分割线 -->
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="0.5dp"
+        android:background="@color/divider" />
+
+    <!-- 排序切换栏 -->
+    <LinearLayout
+        android:id="@+id/layout_sort_bar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center"
+        android:paddingHorizontal="16dp"
+        android:paddingVertical="8dp"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/btn_sort_lastpost"
+            android:layout_width="wrap_content"
+            android:layout_height="32dp"
+            android:paddingHorizontal="16dp"
+            android:gravity="center"
+            android:text="@string/search_sort_lastpost"
+            android:textSize="13sp"
+            android:textColor="@color/text_white"
+            android:background="@drawable/edittext_background"
+            android:tag="active" />
+
+        <View
+            android:layout_width="8dp"
+            android:layout_height="0dp" />
+
+        <TextView
+            android:id="@+id/btn_sort_dateline"
+            android:layout_width="wrap_content"
+            android:layout_height="32dp"
+            android:paddingHorizontal="16dp"
+            android:gravity="center"
+            android:text="@string/search_sort_dateline"
+            android:textSize="13sp"
+            android:textColor="@color/text_hint"
+            android:background="@drawable/edittext_background" />
+
+        <View
+            android:layout_width="8dp"
+            android:layout_height="0dp" />
+
+        <TextView
+            android:id="@+id/btn_sort_replies"
+            android:layout_width="wrap_content"
+            android:layout_height="32dp"
+            android:paddingHorizontal="16dp"
+            android:gravity="center"
+            android:text="@string/search_sort_replies"
+            android:textSize="13sp"
+            android:textColor="@color/text_hint"
+            android:background="@drawable/edittext_background" />
+    </LinearLayout>
+
+    <!-- 分割线 -->
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="0.5dp"
+        android:background="@color/divider" />
+
+    <!-- 加载指示器 -->
+    <ProgressBar
+        android:id="@+id/progress_bar"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:layout_gravity="center"
+        android:layout_marginTop="48dp"
+        android:visibility="gone"
+        android:indeterminateTint="@color/primary" />
+
+    <!-- 搜索结果列表 -->
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/recycler_view"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:clipToPadding="false"
+        android:paddingTop="4dp"
+        android:paddingBottom="8dp"
+        android:visibility="gone" />
+
+    <!-- 加载更多指示器 -->
+    <ProgressBar
+        android:id="@+id/progress_load_more"
+        android:layout_width="32dp"
+        android:layout_height="32dp"
+        android:layout_gravity="center"
+        android:layout_marginVertical="12dp"
+        android:visibility="gone"
+        android:indeterminateTint="@color/primary" />
+
+    <!-- 空状态提示（初始/无结果） -->
+    <TextView
+        android:id="@+id/tv_empty"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:layout_marginTop="64dp"
+        android:textSize="14sp"
+        android:textColor="@color/text_hint"
+        android:text="@string/search_empty_hint"
+        android:visibility="visible" />
+
+    <!-- 错误提示 -->
+    <TextView
+        android:id="@+id/tv_error"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:layout_marginTop="64dp"
+        android:textSize="14sp"
+        android:textColor="@color/error"
+        android:text="@string/search_failed"
+        android:visibility="gone" />
+
+</LinearLayout>

@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- 选中状态:毛玻璃蓝(夜间更亮些) -->
+    <item android:state_checked="true">
+        <shape android:shape="rectangle">
+            <corners android:radius="999dp" />
+            <solid android:color="#5A5BB0FF" />
+            <stroke
+                android:width="0.5dp"
+                android:color="#3A5BB0FF" />
+        </shape>
+    </item>
+    <!-- 未选中状态:夜间用半透明白,可见 -->
+    <item>
+        <shape android:shape="rectangle">
+            <corners android:radius="999dp" />
+            <solid android:color="#35FFFFFF" />
+            <stroke
+                android:width="0.5dp"
+                android:color="#1AFFFFFF" />
+        </shape>
+    </item>
+</selector>

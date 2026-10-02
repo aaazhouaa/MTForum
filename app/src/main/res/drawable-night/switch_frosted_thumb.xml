@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- 选中状态:夜间毛玻璃滑块 -->
+    <item android:state_checked="true">
+        <shape android:shape="oval">
+            <solid android:color="#FFFFFF" />
+            <stroke
+                android:width="2dp"
+                android:color="#805BB0FF" />
+        </shape>
+    </item>
+    <!-- 未选中状态:夜间滑块可见 -->
+    <item>
+        <shape android:shape="oval">
+            <solid android:color="#EEEEEE" />
+            <stroke
+                android:width="1dp"
+                android:color="#60FFFFFF" />
+        </shape>
+    </item>
+</selector>

@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 主色调(暗色模式 - 提亮蓝色) -->
+    <color name="primary">#60A5FA</color>
+    <color name="primary_dark">#3B82F6</color>
+    <color name="primary_light">#93C5FD</color>
+
+    <!-- 背景色 - 深蓝灰(比纯黑柔和) -->
+    <color name="background">#1A1D23</color>
+    <color name="background_primary">#1A1D23</color>
+    <color name="background_secondary">#22262E</color>
+    <color name="surface">#22262E</color>
+    <color name="card_frosted">#2A2F38</color>
+    <color name="divider">#383D47</color>
+    <!-- 代码块背景(暗色) -->
+    <color name="code_block_bg">#2A2F38</color>
+    <!-- 代码块文字(暗色) -->
+    <color name="code_block_text">#D6DCE3</color>
+
+    <!-- 文字颜色 - 高对比 -->
+    <color name="text_primary">#F1F3F5</color>
+    <color name="text_secondary">#B0B8C4</color>
+    <color name="text_hint">#6B7280</color>
+    <color name="text_white">#FFFFFF</color>
+
+    <!-- 导航栏颜色 -->
+    <color name="nav_icon_default">#6B7280</color>
+    <color name="nav_icon_active">#60A5FA</color>
+    <color name="nav_text_default">#6B7280</color>
+    <color name="nav_text_active">#60A5FA</color>
+
+    <!-- 强调色 -->
+    <color name="success">#34D399</color>
+    <color name="warning">#FBBF24</color>
+    <color name="error">#F87171</color>
+    <color name="link_color">#60A5FA</color>
+    <color name="info">#60A5FA</color>
+
+    <!-- accent_primary -->
+    <color name="accent_primary">#60A5FA</color>
+
+    <!-- 渐变 -->
+    <color name="gradient_start">#3B82F6</color>
+    <color name="gradient_end">#93C5FD</color>
+
+    <!-- 暗色背景(兼容旧引用) -->
+    <color name="background_dark">#1A1D23</color>
+    <color name="surface_dark">#22262E</color>
+
+    <!-- 回复/引用区域(夜间) - 低对比暖色 -->
+    <color name="reply_quote_background">#2A2518</color>
+    <color name="reply_quote_border">#4A3D28</color>
+    <color name="reply_quote_title">#D4A84A</color>
+    <color name="reply_quote_content">#A08840</color>
+    <color name="reply_op_badge_background">#1E2A3A</color>
+    <color name="follow_bg">#2A2F38</color>
+</resources>

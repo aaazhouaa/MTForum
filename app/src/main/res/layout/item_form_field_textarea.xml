@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:layout_marginBottom="12dp"
+    android:padding="12dp"
+    android:background="@drawable/edittext_background">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+
+        <TextView
+            android:id="@+id/tv_field_label"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:textSize="14sp"
+            android:textColor="@color/text_primary"
+            android:text="字段名" />
+
+        <Spinner
+            android:id="@+id/sp_privacy"
+            android:layout_width="90dp"
+            android:layout_height="36dp"
+            android:background="@drawable/rounded_btn_outline"
+            android:paddingHorizontal="6dp" />
+    </LinearLayout>
+
+    <EditText
+        android:id="@+id/et_field_textarea"
+        android:layout_width="match_parent"
+        android:layout_height="80dp"
+        android:layout_marginTop="8dp"
+        android:textSize="14sp"
+        android:textColor="@color/text_primary"
+        android:background="@null"
+        android:gravity="top"
+        android:padding="4dp"
+        android:inputType="textMultiLine"
+        android:lines="4" />
+
+</LinearLayout>
