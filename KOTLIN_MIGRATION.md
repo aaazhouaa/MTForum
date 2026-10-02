@@ -305,3 +305,18 @@ fun setState(uid: String?) {
     set.add(safe)
 }
 ```
+
+## 批次 24-26 新增规则（大文件迁移实测）
+
+20. **`CharSequence.indexOf(Int)` 会被解析成私有扩展**：Java 的 `html.indexOf(60, i)`（char 码点重载）在 Kotlin 里必须写 `html.indexOf(60.toChar(), i)`；`lastIndexOf` 同理。否则报 `Cannot access 'fun CharSequence.indexOf(...)': it is private in file`。
+21. **Java 的 `fun interface` 才能用 SAM 简写**：Kotlin 非 `fun interface` 的接口（如 `LikeUsersAdapter.OnUserClickListener`）必须用 `object : X { override fun ... }`，不能写 `LikeUsersAdapter { uid, name -> }`。
+22. **`ScrollView.LayoutParams` 在 Kotlin 里不存在**：应改用 `android.widget.FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT)`。
+23. **`SpannedString.valueOf(String)` 是 Java 静态方法**，Kotlin 里没有该形式；用 `android.text.SpannedString(s)` 构造。
+24. **ReplacementSpan 的几何参数是 Float**：`dpToPx(n)` 返回 Int，传给自定义 span 构造的 float 形参要 `.toFloat()`。
+25. **`Html.ImageGetter` 是 Java 单方法接口**，Kotlin 可 SAM 简写 `Html.ImageGetter { source -> ... }`，但返回类型不能是可空（`Drawable?` 要修成非空或改 `CustomTarget<Drawable>`）。
+26. **`Regex.replace` 不支持 `replaceAll` 语义差异**：Java `str.replaceAll(regex, repl)` 全部替换，Kotlin `Regex(...).replace(str, repl)` 行为一致，但参数顺序是 `(input, replacement)`；注意别写成 `(replacement, input)`。
+27. **`Lamda 尾随参数 + 可空函数类型`**：`addActionRow(container, icon, label, danger, { ... }, dialog)` 中 lambda 在中间位置必须带花括号显式传参，不能尾随。
+
+## 完成状态
+
+全部 76 个 `.kt`，**0 个 `.java`**。release / debug APK 均构建通过。
