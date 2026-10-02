@@ -101,6 +101,26 @@ sdk.dir=/path/to/android-sdk
 OkHttp（网络）、Jsoup（HTML 解析）、Glide（图片）、Material Components（UI）、
 ViewPager2、DrawerLayout、SwipeRefreshLayout、RecyclerView。
 
+## 语言
+
+Java + Kotlin 混编。仅 **样板收益高** 的部分迁到了 Kotlin：
+
+| 已转（样板减少 41~61%） | 说明 |
+|---|---|
+| `model/` 全部 8 个数据模型 | getter/setter 占比 41~45%，Kotlin 属性完全消除 |
+| `session/AccountManager` | 同上的多账号管理 |
+
+其余 67 个文件保留 Java：主要是解析与 UI 逻辑，getter/setter 样板极少
+（如 `ForumParser` 3216 行仅 27 个访问器），迁移收益低而回归风险高。
+
+### Kotlin/Java 互操作要点
+
+- Kotlin 只对 `is` 开头的属性名生成 `isXxx()`，其余生成 `getXxx()`。
+  故 `hasImage` / `followed` / `likedStateKnown` 等需 `@get:JvmName`
+  固定方法名，否则既有 Java 调用点（`isHasImage()`）会编译失败。
+- `object` 成员方法加 `@JvmStatic`，Java 侧才能用 `AccountManager.list()`。
+- 不用 `data class`：其 `equals`/`hashCode` 值语义与「解析器逐字段填充」的用法不符。
+
 ## 注意
 
 - 代码基线为 build83 (v2.2)。
