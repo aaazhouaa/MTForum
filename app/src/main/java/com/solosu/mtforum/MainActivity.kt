@@ -303,13 +303,15 @@ class MainActivity : AppCompatActivity() {
             runReply.setOnClickListener {
                 drawerLayout!!.closeDrawer(drawerPanel!!)
                 Toast.makeText(this, "开始执行一轮自动回复…", Toast.LENGTH_SHORT).show()
-                AutoReplyEngine.runOnce(this) { replied, skipped, detail ->
-                    Toast.makeText(
-                        this,
-                        "本轮：回复 " + replied + " 条，跳过 " + skipped + " 条\n" + detail,
-                        Toast.LENGTH_LONG
-                    ).show()
-                }
+                AutoReplyEngine.runOnce(this, object : AutoReplyEngine.Callback {
+                    override fun onFinished(replied: Int, skipped: Int, detail: String?) {
+                        Toast.makeText(
+                            this@MainActivity,
+                            "本轮：回复 " + replied + " 条，跳过 " + skipped + " 条\n" + detail,
+                            Toast.LENGTH_LONG
+                        ).show()
+                    }
+                })
             }
         }
 

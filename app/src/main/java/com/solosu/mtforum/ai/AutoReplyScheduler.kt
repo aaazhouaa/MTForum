@@ -53,11 +53,13 @@ object AutoReplyScheduler {
         }
         if (AutoReplyEngine.isRunning()) return
 
-        AutoReplyEngine.runOnce(ctx) { replied, skipped, detail ->
-            if (replied > 0 || skipped > 0) {
-                Log.i(TAG, "replied=" + replied + " skipped=" + skipped + " " + detail)
+        AutoReplyEngine.runOnce(ctx, object : AutoReplyEngine.Callback {
+            override fun onFinished(replied: Int, skipped: Int, detail: String?) {
+                if (replied > 0 || skipped > 0) {
+                    Log.i(TAG, "replied=" + replied + " skipped=" + skipped + " " + detail)
+                }
             }
-        }
+        })
     }
 
     private fun scheduleNext() {
