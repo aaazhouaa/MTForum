@@ -1,5 +1,6 @@
 [versions]
 agp = "8.13.0"
+kotlin = "2.2.21"
 core = "1.17.0"
 appcompat = "1.7.1"
 material = "1.13.0"
@@ -14,8 +15,10 @@ drawerlayout = "1.2.0"
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
+kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 
 [libraries]
+kotlin-stdlib = { group = "org.jetbrains.kotlin", name = "kotlin-stdlib", version.ref = "kotlin" }
 androidx-core = { group = "androidx.core", name = "core", version.ref = "core" }
 androidx-appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "appcompat" }
 material = { group = "com.google.android.material", name = "material", version.ref = "material" }
