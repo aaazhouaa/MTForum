@@ -154,8 +154,9 @@ class ReplyAdapter(rawReplies: List<ReplyItem>?) :
         val row = displayList[position]
         holder.bind(row)
         val totalCount = displayList.size
-        // 浏览到当前批次中第 15 条（即离当前展示末尾还剩 5~6 条以内）时触发预加载下 20 条
-        if (totalCount >= 15 && position >= totalCount - 6) {
+        // 浏览到接近列表末尾（剩余 4 条或总数较少时最后 1~2 条）触发预加载后续页面
+        val threshold = if (totalCount <= 15) maxOf(0, totalCount - 2) else totalCount - 5
+        if (position >= threshold) {
             onPreloadListener?.invoke()
         }
     }

@@ -593,6 +593,7 @@ class ThreadDetailActivity : AppCompatActivity() {
         displayedReplies = ArrayList(replies)
         lastPreloadTriggerCount = 0
         updateReplyFilterAndOrder()
+        binding.btnLoadMore.visibility = if (postDetail.currentPage < postDetail.totalPages) View.VISIBLE else View.GONE
         val replyCount = postDetail.replyCount
         if (replyCount > 0) {
             binding.tvReplyCount.visibility = View.VISIBLE
@@ -2023,7 +2024,7 @@ class ThreadDetailActivity : AppCompatActivity() {
         val detail = postDetail ?: return
         if (detail.currentPage >= detail.totalPages) return
         val totalCount = replyAdapter?.itemCount ?: 0
-        if (totalCount >= 15 && totalCount != lastPreloadTriggerCount) {
+        if (totalCount != lastPreloadTriggerCount) {
             lastPreloadTriggerCount = totalCount
             loadMoreReplies()
         }
@@ -2035,10 +2036,14 @@ class ThreadDetailActivity : AppCompatActivity() {
         if (detail.currentPage >= detail.totalPages) return
 
         val totalCount = replyAdapter?.itemCount ?: 0
-        if (totalCount < 15 || totalCount == lastPreloadTriggerCount) return
+        if (totalCount == lastPreloadTriggerCount) return
 
-        val triggerIndex = maxOf(14, totalCount - 6)
         val lm = binding.recyclerReplies.layoutManager as? LinearLayoutManager
+        val triggerIndex = if (totalCount <= 15) {
+            maxOf(0, totalCount - 2)
+        } else {
+            maxOf(0, totalCount - 6)
+        }
         val triggerView = lm?.findViewByPosition(triggerIndex)
         val viewportBottom = scrollY + scrollView.height
         var shouldTrigger = false
@@ -2052,7 +2057,7 @@ class ThreadDetailActivity : AppCompatActivity() {
             val scrollContent = scrollView.getChildAt(0)
             if (scrollContent != null) {
                 val contentHeight = scrollContent.height - scrollView.height
-                if (scrollY >= contentHeight - 800) {
+                if (scrollY >= contentHeight - 1000) {
                     shouldTrigger = true
                 }
             }
@@ -2090,11 +2095,13 @@ class ThreadDetailActivity : AppCompatActivity() {
                         if (!pageReplies.isNullOrEmpty()) {
                             allNewReplies.addAll(pageReplies)
                         }
-                        curDetail.currentPage = pageDetail.currentPage
+                        curDetail.currentPage = maxOf(curDetail.currentPage, pageDetail.currentPage, page)
                         if (pageDetail.totalPages > totalPages) {
                             totalPages = pageDetail.totalPages
                             curDetail.totalPages = totalPages
                         }
+                    } else {
+                        curDetail.currentPage = maxOf(curDetail.currentPage, page)
                     }
                     page++
                 }
@@ -2121,7 +2128,7 @@ class ThreadDetailActivity : AppCompatActivity() {
                     } else {
                         Toast.makeText(this, R.string.no_more_replies, Toast.LENGTH_SHORT).show()
                     }
-                    binding.btnLoadMore.visibility = View.GONE
+                binding.btnLoadMore.visibility = if (curDetail.currentPage < curDetail.totalPages) View.VISIBLE else View.GONE
                 }
             } catch (e: Exception) {
                 runOnUiThread {
