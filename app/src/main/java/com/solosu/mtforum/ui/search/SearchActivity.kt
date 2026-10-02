@@ -47,6 +47,13 @@ class SearchActivity : AppCompatActivity() {
     private lateinit var btnSortReplies: TextView
     private var currentSortBy = "lastpost" // lastpost / dateline / replies
     private var pendingKeyword: String? = null
+    private val pendingBuffer: MutableList<Thread> = ArrayList()
+    private val displayedResults: MutableList<Thread> = ArrayList()
+
+    companion object {
+        private const val BATCH_STEP = 10
+        private const val PRELOAD_THRESHOLD = 4
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         com.solosu.mtforum.util.ThemeManager.applyTheme(this)
@@ -73,6 +80,9 @@ class SearchActivity : AppCompatActivity() {
         toolbar.setNavigationIcon(R.drawable.ic_arrow_left)
         toolbar.setNavigationOnClickListener { finish() }
 
+        // 顶栏双击快速回到顶部
+        com.solosu.mtforum.util.ScrollToTopHelper.attachRecyclerView(toolbar, recyclerView)
+
         // === RecyclerView ===
         threadAdapter = ThreadAdapter(this)
         threadAdapter.setOnItemClickListener(object : ThreadAdapter.OnItemClickListener {
@@ -93,6 +103,20 @@ class SearchActivity : AppCompatActivity() {
         })
         recyclerView.layoutManager = LinearLayoutManager(this)
         recyclerView.adapter = threadAdapter
+
+        // 滚动监听实现 10 条批次自动预载（滑到第 6 条时触发下一批 10 条）
+        recyclerView.addOnScrollListener(object : RecyclerView.OnScrollListener() {
+            override fun onScrolled(rv: RecyclerView, dx: Int, dy: Int) {
+                super.onScrolled(rv, dx, dy)
+                if (dy <= 0) return
+                val lm = rv.layoutManager as? LinearLayoutManager ?: return
+                val lastVisiblePosition = lm.findLastVisibleItemPosition()
+                val totalItemCount = lm.itemCount
+                if (totalItemCount > 0 && lastVisiblePosition >= totalItemCount - PRELOAD_THRESHOLD) {
+                    dispatchNextSearchBatch()
+                }
+            }
+        })
 
         // === 搜索按钮 ===
         findViewById<View>(R.id.btn_search).setOnClickListener { performSearch() }
@@ -244,24 +268,47 @@ class SearchActivity : AppCompatActivity() {
                     executor.shutdown()
                 }
 
-                // === 3. 一次性显示全部结果 ===
+                // === 3. 初始只展示前 10 条，滑到第 6 条自动加载后续 10 条 ===
                 val finalResults = allResults
                 runOnUiThread {
+                    if (isFinishing || isDestroyed) return@runOnUiThread
                     progressBar.visibility = View.GONE
+                    pendingBuffer.clear()
+                    displayedResults.clear()
                     if (finalResults.isNotEmpty()) {
-                        threadAdapter.setThreadList(finalResults)
+                        pendingBuffer.addAll(finalResults)
+                        val countToTake = minOf(BATCH_STEP, pendingBuffer.size)
+                        val firstBatch = ArrayList(pendingBuffer.subList(0, countToTake))
+                        for (i in 0 until countToTake) {
+                            pendingBuffer.removeAt(0)
+                        }
+                        displayedResults.addAll(firstBatch)
+                        threadAdapter.setThreadList(firstBatch)
                         recyclerView.visibility = View.VISIBLE
                     } else {
+                        threadAdapter.setThreadList(ArrayList())
                         tvEmpty.setText(R.string.search_no_results)
                         tvEmpty.visibility = View.VISIBLE
                     }
                 }
             } catch (e: Exception) {
                 runOnUiThread {
+                    if (isFinishing || isDestroyed) return@runOnUiThread
                     progressBar.visibility = View.GONE
                     tvError.visibility = View.VISIBLE
                 }
             }
         }.start()
+    }
+
+    private fun dispatchNextSearchBatch() {
+        if (pendingBuffer.isEmpty()) return
+        val countToTake = minOf(BATCH_STEP, pendingBuffer.size)
+        val batch = ArrayList(pendingBuffer.subList(0, countToTake))
+        for (i in 0 until countToTake) {
+            pendingBuffer.removeAt(0)
+        }
+        displayedResults.addAll(batch)
+        threadAdapter.addThreads(batch)
     }
 }

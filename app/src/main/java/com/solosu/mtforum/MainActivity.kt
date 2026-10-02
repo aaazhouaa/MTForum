@@ -148,7 +148,6 @@ class MainActivity : AppCompatActivity() {
 
     private var drawerLayout: DrawerLayout? = null
     private var drawerPanel: View? = null
-    private var swAutoReply: SwitchMaterial? = null
     private var swSilent: SwitchMaterial? = null
     private var swSignIn: SwitchMaterial? = null
     private var swUnlock: SwitchMaterial? = null
@@ -156,7 +155,6 @@ class MainActivity : AppCompatActivity() {
     private var swAutoHideNav: SwitchMaterial? = null
     private var tvDrawerName: TextView? = null
     private var tvDrawerSubtitle: TextView? = null
-    private var tvAiDesc: TextView? = null
     private var ivDrawerAvatar: ImageView? = null
 
     /** 侧边栏开关的读写/跳转 */
@@ -185,7 +183,6 @@ class MainActivity : AppCompatActivity() {
         })
 
         drawerPanel = findViewById(R.id.drawer_panel)
-        swAutoReply = findViewById(R.id.drawer_switch_auto_reply)
         swSilent = findViewById(R.id.drawer_switch_silent)
         swSignIn = findViewById(R.id.drawer_switch_sign_in)
         swUnlock = findViewById(R.id.drawer_switch_unlock)
@@ -193,7 +190,6 @@ class MainActivity : AppCompatActivity() {
         swAutoHideNav = findViewById(R.id.drawer_switch_auto_hide_nav)
         tvDrawerName = findViewById(R.id.drawer_username)
         tvDrawerSubtitle = findViewById(R.id.drawer_subtitle)
-        tvAiDesc = findViewById(R.id.drawer_ai_desc)
         ivDrawerAvatar = findViewById(R.id.drawer_avatar)
         // build57: 侧边栏头部(头像/用户名/UID行)点击进自己主页
         val ownProfile = View.OnClickListener { openOwnProfile() }
@@ -207,22 +203,8 @@ class MainActivity : AppCompatActivity() {
             openBtn.setOnClickListener { drawerLayout!!.openDrawer(drawerPanel!!) }
         }
 
-        bindSwitchRow(R.id.drawer_auto_reply_row, swAutoReply)
         bindSwitchRow(R.id.drawer_silent_row, swSilent)
         bindSwitchRow(R.id.drawer_sign_in_row, swSignIn)
-
-        // 自动回复开关
-        if (swAutoReply != null) {
-            swAutoReply!!.isChecked = AiConfigManager.isAutoReplyEnabled(this)
-            swAutoReply!!.setOnCheckedChangeListener { v, checked ->
-                AiConfigManager.setAutoReplyEnabled(this, checked)
-                AutoReplyScheduler.reschedule(this)
-                AiLog.i("drawer", "自动回复 " + (if (checked) "开启" else "关闭"))
-                if (checked) {
-                    Toast.makeText(this, "自动回复已开启（后台静默运行）", Toast.LENGTH_SHORT).show()
-                }
-            }
-        }
 
         // 静默模式开关
         if (swSilent != null) {
@@ -330,24 +312,6 @@ class MainActivity : AppCompatActivity() {
         val runSignIn = findViewById<View>(R.id.drawer_run_sign_in)
         if (runSignIn != null) {
             runSignIn.setOnClickListener { doSignInNow() }
-        }
-
-        // AI 配置
-        val aiConfig = findViewById<View>(R.id.drawer_ai_config)
-        if (aiConfig != null) {
-            aiConfig.setOnClickListener {
-                drawerLayout!!.closeDrawer(drawerPanel!!)
-                startActivity(Intent(this@MainActivity, AiConfigActivity::class.java))
-            }
-        }
-
-        // AI 助手
-        val aiChat = findViewById<View>(R.id.drawer_ai_chat)
-        if (aiChat != null) {
-            aiChat.setOnClickListener {
-                drawerLayout!!.closeDrawer(drawerPanel!!)
-                startActivity(Intent(this@MainActivity, AiChatActivity::class.java))
-            }
         }
 
         // 切换账号
@@ -585,10 +549,6 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        if (tvAiDesc != null) {
-            tvAiDesc!!.text = if (AiConfigManager.isConfigured(this))
-                AiConfigManager.getModel(this) else "未配置模型"
-        }
 
         if (ivDrawerAvatar != null) {
             val avatar = session.getAvatarUrl(this)

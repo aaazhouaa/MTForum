@@ -61,6 +61,7 @@ class UserProfileActivity : AppCompatActivity() {
         // ★ 移除返回箭头图标（仅保留点击返回功能）
         binding.toolbar.setNavigationIcon(null)
         binding.toolbar.setNavigationOnClickListener { finish() }
+        com.solosu.mtforum.util.ScrollToTopHelper.attachScrollView(binding.toolbar, binding.scrollView)
 
         if (targetUid == null) {
             Toast.makeText(this, "缺少用户ID", Toast.LENGTH_SHORT).show()

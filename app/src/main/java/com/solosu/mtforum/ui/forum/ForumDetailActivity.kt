@@ -48,6 +48,12 @@ class ForumDetailActivity : AppCompatActivity() {
     private var currentPage = 1
     private var isLoading = false
     private var hasMore = true
+    private val pendingBuffer: MutableList<Thread> = ArrayList()
+
+    companion object {
+        private const val BATCH_STEP = 10
+        private const val PRELOAD_THRESHOLD = 4
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         com.solosu.mtforum.util.ThemeManager.applyTheme(this)
@@ -102,6 +108,9 @@ class ForumDetailActivity : AppCompatActivity() {
             }
         }
 
+        // 顶栏双击快速回到顶部
+        com.solosu.mtforum.util.ScrollToTopHelper.attachRecyclerView(binding.toolbar, binding.recyclerView)
+
         // 设置帖子列表
         val layoutManager = LinearLayoutManager(this)
         binding.recyclerView.layoutManager = layoutManager
@@ -122,18 +131,18 @@ class ForumDetailActivity : AppCompatActivity() {
             }
         })
         binding.recyclerView.adapter = threadAdapter
-        com.solosu.mtforum.util.PerspectiveFoldScrollHelper.attach(binding.recyclerView)
 
 
-        // RecyclerView 滚动到底部时加载更多
+        // RecyclerView 滚动监听实现 10 条批次自动预载（滑到第 6 条时触发下一批）
         binding.recyclerView.addOnScrollListener(object : RecyclerView.OnScrollListener() {
             override fun onScrolled(rv: RecyclerView, dx: Int, dy: Int) {
                 super.onScrolled(rv, dx, dy)
-                if (dy <= 0 || isLoading || !hasMore) return
-                val lm = rv.layoutManager as LinearLayoutManager?
-                if (lm != null && lm.findLastCompletelyVisibleItemPosition() >= lm.itemCount - 3) {
-                    currentPage++
-                    loadThreads(currentPage)
+                if (dy <= 0) return
+                val lm = rv.layoutManager as? LinearLayoutManager ?: return
+                val lastVisiblePosition = lm.findLastVisibleItemPosition()
+                val totalItemCount = lm.itemCount
+                if (totalItemCount > 0 && lastVisiblePosition >= totalItemCount - PRELOAD_THRESHOLD) {
+                    checkAndTriggerNextBatch()
                 }
             }
         })
@@ -141,23 +150,51 @@ class ForumDetailActivity : AppCompatActivity() {
         // TabLayout 切换
         binding.tabLayout.addOnTabSelectedListener(object : TabLayout.OnTabSelectedListener {
             override fun onTabSelected(tab: TabLayout.Tab) {
-                currentPage = 1
-                hasMore = true
-                loadThreads(currentPage)
+                refreshThreads()
             }
 
             override fun onTabUnselected(tab: TabLayout.Tab) {
             }
 
             override fun onTabReselected(tab: TabLayout.Tab) {
-                currentPage = 1
-                hasMore = true
-                loadThreads(currentPage)
+                refreshThreads()
             }
         })
 
         // 初始加载
-        loadThreads(currentPage)
+        refreshThreads()
+    }
+
+    private fun refreshThreads() {
+        currentPage = 1
+        hasMore = true
+        pendingBuffer.clear()
+        allThreads.clear()
+        threadAdapter.setThreadList(ArrayList())
+        fetchNetworkPage(currentPage, true)
+    }
+
+    private fun checkAndTriggerNextBatch() {
+        if (isLoading) return
+        if (pendingBuffer.size >= BATCH_STEP) {
+            dispatchNextBatch()
+        } else if (hasMore) {
+            currentPage++
+            fetchNetworkPage(currentPage, false)
+        } else if (pendingBuffer.isNotEmpty()) {
+            dispatchNextBatch()
+        }
+    }
+
+    private fun dispatchNextBatch() {
+        if (pendingBuffer.isEmpty()) return
+        val countToTake = minOf(BATCH_STEP, pendingBuffer.size)
+        val batch = ArrayList(pendingBuffer.subList(0, countToTake))
+        for (i in 0 until countToTake) {
+            pendingBuffer.removeAt(0)
+        }
+        allThreads.addAll(batch)
+        threadAdapter.addThreads(batch)
     }
 
     /**
@@ -167,10 +204,12 @@ class ForumDetailActivity : AppCompatActivity() {
      * Tab 2: 热门动态 (order=hot)
      * Tab 3: 精华 (filter=digest&digest=1, 服务端过滤)
      */
-    private fun loadThreads(page: Int) {
+    private fun fetchNetworkPage(page: Int, isRefresh: Boolean) {
         if (isLoading) return
         isLoading = true
-        binding.tvEmpty.visibility = View.GONE
+        if (isRefresh) {
+            binding.tvEmpty.visibility = View.GONE
+        }
 
         val tabPosition = binding.tabLayout.selectedTabPosition
 
@@ -191,7 +230,7 @@ class ForumDetailActivity : AppCompatActivity() {
 
                 val url = ForumParser.getThreadListUrl(fid + sortParam, page)
                 val html = httpClient.get(url)
-                var threads: MutableList<Thread> = ForumParser.parseForumThreadList(html)
+                val threads: MutableList<Thread> = ForumParser.parseForumThreadList(html)
                 // 黑名单过滤:拉黑作者的帖子直接不进列表
                 val black = com.solosu.mtforum.session.BlacklistManager.uidSet(this@ForumDetailActivity)
                 if (black.isNotEmpty()) {
@@ -204,12 +243,14 @@ class ForumDetailActivity : AppCompatActivity() {
                 val resultThreads = threads
 
                 runOnUiThread {
+                    if (isFinishing || isDestroyed) return@runOnUiThread
                     isLoading = false
 
                     if (resultThreads.isEmpty()) {
                         hasMore = false
-                        if (page == 1) {
-                            allThreads.clear()
+                        if (pendingBuffer.isNotEmpty()) {
+                            dispatchNextBatch()
+                        } else if (isRefresh && allThreads.isEmpty()) {
                             threadAdapter.setThreadList(ArrayList())
                             binding.tvEmpty.setText(R.string.forum_empty)
                             binding.tvEmpty.visibility = View.VISIBLE
@@ -217,24 +258,30 @@ class ForumDetailActivity : AppCompatActivity() {
                         return@runOnUiThread
                     }
 
-                    if (page == 1) {
+                    // 只要本页有数据，就认为可能还有下一页（兼容不同版块10条/15条/20条不同分页限制）
+                    hasMore = true
+                    pendingBuffer.addAll(resultThreads)
+
+                    if (isRefresh) {
+                        val countToTake = minOf(BATCH_STEP, pendingBuffer.size)
+                        val firstBatch = ArrayList(pendingBuffer.subList(0, countToTake))
+                        for (i in 0 until countToTake) {
+                            pendingBuffer.removeAt(0)
+                        }
                         allThreads.clear()
-                    }
-                    // 置顶帖与普通帖统一显示在列表中
-                    if (page == 1) {
-                        threadAdapter.setThreadList(resultThreads)
+                        allThreads.addAll(firstBatch)
+                        threadAdapter.setThreadList(firstBatch)
+                        binding.tvEmpty.visibility = View.GONE
                     } else {
-                        threadAdapter.addThreads(resultThreads)
+                        dispatchNextBatch()
                     }
-                    allThreads.addAll(resultThreads)
-                    binding.tvEmpty.visibility = View.GONE
-                    // build63: 取消列表页收藏数预取(每页20发->0),改为进详情页时回填缓存
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
                 runOnUiThread {
+                    if (isFinishing || isDestroyed) return@runOnUiThread
                     isLoading = false
-                    if (page == 1 && allThreads.isEmpty()) {
+                    if (isRefresh && allThreads.isEmpty() && pendingBuffer.isEmpty()) {
                         binding.tvEmpty.setText(R.string.forum_empty)
                         binding.tvEmpty.visibility = View.VISIBLE
                     }

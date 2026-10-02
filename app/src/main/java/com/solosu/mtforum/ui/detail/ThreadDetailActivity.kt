@@ -1,6 +1,7 @@
 package com.solosu.mtforum.ui.detail
 
 import android.app.Dialog
+import android.content.Context
 import android.content.DialogInterface
 import android.content.Intent
 import android.content.SharedPreferences
@@ -28,6 +29,8 @@ import android.text.style.URLSpan
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
+import android.view.WindowManager
+import android.view.inputmethod.InputMethodManager
 import android.widget.ArrayAdapter
 import android.widget.Button
 import android.widget.EditText
@@ -114,6 +117,9 @@ class ThreadDetailActivity : AppCompatActivity() {
     private lateinit var binding: ThreadDetailActivityBinding
     private lateinit var httpClient: HttpClient
     private var mBottomSheetDialog: BottomSheetDialog? = null
+    private var mEtReplyDialog: com.solosu.mtforum.ui.widget.RichTextInputEditText? = null
+    private var mTvReplyTarget: TextView? = null
+    private var mBtnSendReply: MaterialButton? = null
     private var postDetail: PostDetail? = null
     private var replyAdapter: ReplyAdapter? = null
     private var tid: String? = null
@@ -168,7 +174,10 @@ class ThreadDetailActivity : AppCompatActivity() {
         binding.toolbar.setNavigationOnClickListener { finish() }
         binding.swipeRefresh.setOnRefreshListener { refreshPostDetail() }
         setupRecyclerView()
-        binding.etReply.setOnClickListener { showReplyBottomSheet(currentReplyTarget) }
+        val onBottomReplyBarClick = View.OnClickListener { showReplyBottomSheet(currentReplyTarget) }
+        binding.etReply.setOnClickListener(onBottomReplyBarClick)
+        binding.tilReply.setOnClickListener(onBottomReplyBarClick)
+        binding.layoutReply.setOnClickListener(onBottomReplyBarClick)
         binding.etReply.isFocusable = false
         binding.etReply.isCursorVisible = false
         val commentsClick = View.OnClickListener {
@@ -187,6 +196,9 @@ class ThreadDetailActivity : AppCompatActivity() {
         binding.btnLike.setOnClickListener { toggleLike() }
         binding.layoutLike.setOnClickListener { toggleLike() }
 
+        // 顶栏双击快速回到顶部
+        com.solosu.mtforum.util.ScrollToTopHelper.attachNestedScrollView(binding.toolbar, binding.nestedScroll)
+
         binding.btnFavorite.setOnClickListener { toggleFavorite() }
         binding.layoutFavorite.setOnClickListener { toggleFavorite() }
         binding.btnShare.setOnClickListener { shareThread() }
@@ -194,17 +206,13 @@ class ThreadDetailActivity : AppCompatActivity() {
         binding.btnLoadMore.setOnClickListener { loadMoreReplies() }
         binding.nestedScroll.setOnScrollChangeListener { v, _, scrollY, _, oldScrollY ->
             val scrollView = v as NestedScrollView
-            val child = scrollView.getChildAt(0)
-            if (child != null && scrollY > oldScrollY) {
-                val contentHeight = child.height - scrollView.height
-                val isNearBottom = scrollY >= contentHeight - 600
-                if (isNearBottom) {
-                    checkAndPreloadReplies()
-                }
+            if (scrollY > oldScrollY) {
+                checkReplyPreload(scrollView, scrollY)
             }
         }
         binding.btnOnlyOp.setOnClickListener {
             onlyOpReplies = !onlyOpReplies
+            lastPreloadTriggerCount = 0
             updateReplyFilterAndOrder()
         }
         binding.btnReplyOrder.setOnClickListener {
@@ -280,6 +288,7 @@ class ThreadDetailActivity : AppCompatActivity() {
                     throw IllegalStateException("服务器返回空页面，请检查网络后重试")
                 }
                 val detail = ForumParser.parseThreadDetail(html)
+                fetchRepliesUpTo(detail, 20)
                 enrichGoodReviewAvatars(detail)
                 refreshServerActionState(detail)
                 // build61: 进帖触发解锁——只记录页面,渲染后在后台线程执行(不阻塞首屏)
@@ -347,6 +356,7 @@ class ThreadDetailActivity : AppCompatActivity() {
                     throw IllegalStateException("服务器返回空页面，请检查网络后重试")
                 }
                 val detail = ForumParser.parseThreadDetail(html)
+                fetchRepliesUpTo(detail, 20)
                 enrichGoodReviewAvatars(detail)
                 refreshServerActionState(detail)
                 // build61: 下拉刷新链同样只记录页面,渲染后异步解锁(同加载链)
@@ -581,6 +591,7 @@ class ThreadDetailActivity : AppCompatActivity() {
             }
         }
         displayedReplies = ArrayList(replies)
+        lastPreloadTriggerCount = 0
         updateReplyFilterAndOrder()
         val replyCount = postDetail.replyCount
         if (replyCount > 0) {
@@ -751,56 +762,108 @@ class ThreadDetailActivity : AppCompatActivity() {
 
     // ==================== 回复 ====================
 
+    private fun ensureReplyBottomSheetDialog(): BottomSheetDialog {
+        var dialog = mBottomSheetDialog
+        if (dialog == null) {
+            val dialogView = layoutInflater.inflate(R.layout.dialog_reply_bottom_sheet, null)
+            val etReplyDialog = dialogView.findViewById<com.solosu.mtforum.ui.widget.RichTextInputEditText>(R.id.et_reply_dialog)
+            val btnSend = dialogView.findViewById<MaterialButton>(R.id.btn_send_reply)
+            val tvTarget = dialogView.findViewById<TextView>(R.id.tv_reply_target)
+            val btnPickImage = dialogView.findViewById<ImageButton>(R.id.btn_pick_image)
+
+            mEtReplyDialog = etReplyDialog
+            mTvReplyTarget = tvTarget
+            mBtnSendReply = btnSend
+
+            etReplyDialog.onImageReceivedListener = { uri ->
+                addPendingImages(listOf(uri))
+                Toast.makeText(this@ThreadDetailActivity, "已添加图片", Toast.LENGTH_SHORT).show()
+                true
+            }
+
+            btnSend.setOnClickListener {
+                val text = etReplyDialog.text?.toString()?.trim() ?: ""
+                if (TextUtils.isEmpty(text) && pendingImageUris.isEmpty()) {
+                    etReplyDialog.error = getString(R.string.reply_hint_empty)
+                } else {
+                    etReplyDialog.error = null
+                    val attachTags = buildAttachTags()
+                    attemptReply(attachTags + text, etReplyDialog)
+                }
+            }
+
+            btnPickImage?.setOnClickListener { pickImage() }
+
+            dialog = BottomSheetDialog(this, com.google.android.material.R.style.Theme_Design_BottomSheetDialog)
+            dialog.setContentView(dialogView)
+
+            dialog.window?.let { win ->
+                win.setBackgroundDrawable(ColorDrawable(android.graphics.Color.TRANSPARENT))
+                win.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
+            }
+
+            dialog.setOnDismissListener {
+                currentReplyPid = ""
+                currentReplyTarget = ""
+            }
+
+            dialog.setOnShowListener {
+                val sheet = dialog.findViewById<View>(com.google.android.material.R.id.design_bottom_sheet)
+                if (sheet != null) {
+                    sheet.setBackgroundColor(android.graphics.Color.TRANSPARENT)
+                    val behavior = BottomSheetBehavior.from(sheet)
+                    behavior.skipCollapsed = true
+                    behavior.state = BottomSheetBehavior.STATE_EXPANDED
+                }
+                etReplyDialog.post {
+                    etReplyDialog.isFocusable = true
+                    etReplyDialog.isFocusableInTouchMode = true
+                    etReplyDialog.requestFocus()
+                    val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
+                    imm?.showSoftInput(etReplyDialog, InputMethodManager.SHOW_IMPLICIT)
+                }
+            }
+            mBottomSheetDialog = dialog
+        }
+        return dialog
+    }
+
     private fun showReplyBottomSheet(prefillText: String?) {
-        if (mBottomSheetDialog != null && mBottomSheetDialog!!.isShowing) {
-            mBottomSheetDialog!!.dismiss()
-        }
-        val dialogView = layoutInflater.inflate(R.layout.dialog_reply_bottom_sheet, null)
-        val dialogCard = dialogView.findViewById<MaterialCardView>(R.id.dialog_card)
-        val etReplyDialog = dialogView.findViewById<TextInputEditText>(R.id.et_reply_dialog)
-        val btnSend = dialogView.findViewById<MaterialButton>(R.id.btn_send_reply)
-        val tvTarget = dialogView.findViewById<TextView>(R.id.tv_reply_target)
+        if (isFinishing || isDestroyed) return
+        val dialog = ensureReplyBottomSheetDialog()
+        val etReplyDialog = mEtReplyDialog
+        val tvTarget = mTvReplyTarget
+
         if (!TextUtils.isEmpty(prefillText)) {
-            etReplyDialog.setText(prefillText)
-            etReplyDialog.setSelection(prefillText!!.length)
-            tvTarget.text = prefillText
-            tvTarget.visibility = View.VISIBLE
-        }
-        FrostedGlassHelper.applyToCardViews(dialogCard, this)
-        mBottomSheetDialog = BottomSheetDialog(this)
-        mBottomSheetDialog!!.setContentView(dialogView)
-        DialogHelper.applyToBottomSheet(mBottomSheetDialog, dialogView, this)
-        mBottomSheetDialog!!.setOnDismissListener {
-            currentReplyPid = ""
-            currentReplyTarget = ""
-        }
-        mBottomSheetDialog!!.setOnShowListener {
-            val parent = dialogView.parent as? View
-            if (parent != null) {
-                parent.setBackgroundResource(android.R.color.transparent)
-                val behavior = BottomSheetBehavior.from(parent)
-                val peekHeight = (resources.displayMetrics.heightPixels * 0.5).toInt()
-                behavior.peekHeight = peekHeight
-            }
-        }
-        btnSend.setOnClickListener {
-            val text = etReplyDialog.text!!.toString().trim()
-            if (TextUtils.isEmpty(text) && pendingImageUris.isEmpty()) {
-                etReplyDialog.error = getString(R.string.reply_hint_empty)
+            if (prefillText!!.startsWith("回复 ") || prefillText.contains("：")) {
+                tvTarget?.text = prefillText
+                tvTarget?.visibility = View.VISIBLE
+                etReplyDialog?.setText("")
             } else {
-                etReplyDialog.error = null
-                val attachTags = buildAttachTags()
-                attemptReply(attachTags + text, etReplyDialog)
+                etReplyDialog?.setText(prefillText)
+                etReplyDialog?.setSelection(prefillText.length)
+                tvTarget?.text = prefillText
+                tvTarget?.visibility = View.VISIBLE
             }
+        } else {
+            tvTarget?.visibility = View.GONE
+            etReplyDialog?.setText("")
         }
-        val btnPickImage = dialogView.findViewById<ImageButton>(R.id.btn_pick_image)
-        if (btnPickImage != null) {
-            btnPickImage.setOnClickListener { pickImage() }
-        }
+        etReplyDialog?.error = null
+
         if (!pendingImageUris.isEmpty()) {
             updateDialogImagePreview()
         }
-        mBottomSheetDialog!!.show()
+
+        if (!dialog.isShowing) {
+            dialog.show()
+        } else {
+            etReplyDialog?.post {
+                etReplyDialog.requestFocus()
+                val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
+                imm?.showSoftInput(etReplyDialog, InputMethodManager.SHOW_IMPLICIT)
+            }
+        }
     }
 
     /** 未登录操作统一弹出登录底部弹窗(与回复弹窗同风格) */
@@ -1922,14 +1985,81 @@ class ThreadDetailActivity : AppCompatActivity() {
         }, "auto-unlock").start()
     }
 
-    private var lastRequestedPage = -1
+    private var lastPreloadTriggerCount = 0
+
+    /**
+     * 顺序拉取后续页面，直到回复总数达到 targetCount 或无更多页
+     */
+    private fun fetchRepliesUpTo(detail: PostDetail, targetCount: Int) {
+        var curTotalPages = detail.totalPages
+        var nextPage = detail.currentPage + 1
+        while ((detail.replies?.size ?: 0) < targetCount && nextPage <= curTotalPages) {
+            try {
+                val nextUrl = ForumParser.getThreadDetailUrl(tid, nextPage, getReplyOrder())
+                val nextHtml = httpClient.get(nextUrl)
+                if (!TextUtils.isEmpty(nextHtml)) {
+                    val nextPageDetail = ForumParser.parseThreadDetail(nextHtml)
+                    val nextReplies = nextPageDetail.replies
+                    if (!nextReplies.isNullOrEmpty()) {
+                        val currentReplies = detail.replies ?: ArrayList()
+                        currentReplies.addAll(nextReplies)
+                        detail.replies = currentReplies
+                    }
+                    detail.currentPage = nextPageDetail.currentPage
+                    if (nextPageDetail.totalPages > curTotalPages) {
+                        curTotalPages = nextPageDetail.totalPages
+                        detail.totalPages = curTotalPages
+                    }
+                }
+            } catch (_: Exception) {
+                break
+            }
+            nextPage++
+        }
+    }
 
     private fun checkAndPreloadReplies() {
         if (postDetail == null || isLoadingMore) return
-        val nextPage = postDetail!!.currentPage + 1
-        val totalPages = postDetail!!.totalPages
-        if (nextPage <= totalPages && nextPage != lastRequestedPage) {
-            lastRequestedPage = nextPage
+        val detail = postDetail ?: return
+        if (detail.currentPage >= detail.totalPages) return
+        val totalCount = replyAdapter?.itemCount ?: 0
+        if (totalCount >= 15 && totalCount != lastPreloadTriggerCount) {
+            lastPreloadTriggerCount = totalCount
+            loadMoreReplies()
+        }
+    }
+
+    private fun checkReplyPreload(scrollView: NestedScrollView, scrollY: Int) {
+        if (postDetail == null || isLoadingMore) return
+        val detail = postDetail ?: return
+        if (detail.currentPage >= detail.totalPages) return
+
+        val totalCount = replyAdapter?.itemCount ?: 0
+        if (totalCount < 15 || totalCount == lastPreloadTriggerCount) return
+
+        val triggerIndex = maxOf(14, totalCount - 6)
+        val lm = binding.recyclerReplies.layoutManager as? LinearLayoutManager
+        val triggerView = lm?.findViewByPosition(triggerIndex)
+        val viewportBottom = scrollY + scrollView.height
+        var shouldTrigger = false
+
+        if (triggerView != null) {
+            val triggerTopInScroll = triggerView.top + binding.recyclerReplies.top
+            if (viewportBottom >= triggerTopInScroll) {
+                shouldTrigger = true
+            }
+        } else {
+            val scrollContent = scrollView.getChildAt(0)
+            if (scrollContent != null) {
+                val contentHeight = scrollContent.height - scrollView.height
+                if (scrollY >= contentHeight - 800) {
+                    shouldTrigger = true
+                }
+            }
+        }
+
+        if (shouldTrigger) {
+            lastPreloadTriggerCount = totalCount
             loadMoreReplies()
         }
     }
@@ -1938,39 +2068,54 @@ class ThreadDetailActivity : AppCompatActivity() {
         if (postDetail == null || isLoadingMore) {
             return
         }
+        val curDetail = postDetail!!
+        if (curDetail.currentPage >= curDetail.totalPages) {
+            return
+        }
         isLoadingMore = true
         binding.btnLoadMore.isEnabled = false
         binding.btnLoadMore.setText(R.string.loading)
         binding.loadingMore.visibility = View.VISIBLE
         java.lang.Thread {
             try {
-                var totalPages = postDetail!!.totalPages
+                var totalPages = curDetail.totalPages
                 val allNewReplies = ArrayList<ReplyItem>()
-                var page = postDetail!!.currentPage + 1
-                while (allNewReplies.size < 10 && page <= totalPages) {
+                var page = curDetail.currentPage + 1
+                while (allNewReplies.size < 20 && page <= totalPages) {
                     val pageUrl = ForumParser.getThreadDetailUrl(tid, page, getReplyOrder())
                     val html = httpClient.get(pageUrl)
-                    val pageDetail = ForumParser.parseThreadDetail(html)
-                    val pageReplies = pageDetail.replies
-                    if (pageReplies != null && !pageReplies.isEmpty()) {
-                        allNewReplies.addAll(pageReplies)
-                    }
-                    postDetail!!.currentPage = pageDetail.currentPage
-                    if (pageDetail.totalPages > totalPages) {
-                        totalPages = pageDetail.totalPages
-                        postDetail!!.totalPages = totalPages
+                    if (!TextUtils.isEmpty(html)) {
+                        val pageDetail = ForumParser.parseThreadDetail(html)
+                        val pageReplies = pageDetail.replies
+                        if (!pageReplies.isNullOrEmpty()) {
+                            allNewReplies.addAll(pageReplies)
+                        }
+                        curDetail.currentPage = pageDetail.currentPage
+                        if (pageDetail.totalPages > totalPages) {
+                            totalPages = pageDetail.totalPages
+                            curDetail.totalPages = totalPages
+                        }
                     }
                     page++
                 }
                 runOnUiThread {
+                    if (isFinishing || isDestroyed) return@runOnUiThread
                     isLoadingMore = false
                     binding.btnLoadMore.isEnabled = true
                     binding.btnLoadMore.setText(R.string.load_more_replies)
                     binding.loadingMore.visibility = View.GONE
                     if (!allNewReplies.isEmpty()) {
-                        val merged = ArrayList<ReplyItem>(postDetail!!.replies ?: ArrayList())
+                        val bl = BlacklistManager.uidSet(this)
+                        if (!bl.isEmpty()) {
+                            val itr = allNewReplies.iterator()
+                            while (itr.hasNext()) {
+                                val r = itr.next()
+                                if (r != null && r.authorUid != null && bl.contains(r.authorUid)) itr.remove()
+                            }
+                        }
+                        val merged = ArrayList<ReplyItem>(curDetail.replies ?: ArrayList())
                         merged.addAll(allNewReplies)
-                        postDetail!!.replies = merged
+                        curDetail.replies = merged
                         displayedReplies = ArrayList(merged)
                         updateReplyFilterAndOrder()
                     } else {
@@ -1980,6 +2125,8 @@ class ThreadDetailActivity : AppCompatActivity() {
                 }
             } catch (e: Exception) {
                 runOnUiThread {
+                    if (isFinishing || isDestroyed) return@runOnUiThread
+                    isLoadingMore = false
                     binding.btnLoadMore.isEnabled = true
                     binding.btnLoadMore.setText(R.string.load_more_replies)
                     binding.loadingMore.visibility = View.GONE
@@ -3529,18 +3676,58 @@ class ThreadDetailActivity : AppCompatActivity() {
             val start = spannable.getSpanStart(oldSpan)
             val end = spannable.getSpanEnd(oldSpan)
             val flags = spannable.getSpanFlags(oldSpan)
+            val spanText = spannable.subSequence(start, end).toString().trim()
+            val isReplyLink = spanText == "回复" ||
+                    (targetUrl != null && (targetUrl.contains("action=reply") || targetUrl.contains("mod=post")) && spanText.contains("回复"))
             spannable.removeSpan(oldSpan)
-            if (start >= 0 && end > start && !TextUtils.isEmpty(targetUrl)) {
-                spannable.setSpan(object : ClickableSpan() {
-                    override fun onClick(widget: View) {
-                        openLink(targetUrl)
-                    }
+            if (start >= 0 && end > start) {
+                if (isReplyLink) {
+                    spannable.setSpan(object : ClickableSpan() {
+                        override fun onClick(widget: View) {
+                            showReplyBottomSheet(currentReplyTarget)
+                        }
 
-                    override fun updateDrawState(ds: TextPaint) {
-                        ds.color = linkColor
-                        ds.isUnderlineText = true
-                    }
-                }, start, end, flags)
+                        override fun updateDrawState(ds: TextPaint) {
+                            ds.color = linkColor
+                            ds.isUnderlineText = true
+                        }
+                    }, start, end, flags)
+                } else if (!TextUtils.isEmpty(targetUrl)) {
+                    spannable.setSpan(object : ClickableSpan() {
+                        override fun onClick(widget: View) {
+                            openLink(targetUrl)
+                        }
+
+                        override fun updateDrawState(ds: TextPaint) {
+                            ds.color = linkColor
+                            ds.isUnderlineText = true
+                        }
+                    }, start, end, flags)
+                }
+            }
+        }
+        // 针对正文中包含的隐藏内容提示“...请回复”做增强：确保仅“回复”两字为高亮可点击并呼出输入框
+        val fullStr = spannable.toString()
+        val replyKeywords = arrayOf("如果您要查看本帖隐藏内容请回复", "要查看本帖隐藏内容请回复", "隐藏内容请回复")
+        for (kw in replyKeywords) {
+            var index = fullStr.indexOf(kw)
+            while (index >= 0) {
+                val replyStart = index + kw.lastIndexOf("回复")
+                val replyEnd = replyStart + 2
+                val existingSpans = spannable.getSpans(replyStart, replyEnd, ClickableSpan::class.java)
+                if (existingSpans.isEmpty()) {
+                    spannable.setSpan(object : ClickableSpan() {
+                        override fun onClick(widget: View) {
+                            showReplyBottomSheet(currentReplyTarget)
+                        }
+
+                        override fun updateDrawState(ds: TextPaint) {
+                            ds.color = linkColor
+                            ds.isUnderlineText = true
+                        }
+                    }, replyStart, replyEnd, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+                }
+                index = fullStr.indexOf(kw, index + kw.length)
             }
         }
         textView.movementMethod = FixNestedScrollLinkMovementMethod()
@@ -3576,6 +3763,10 @@ class ThreadDetailActivity : AppCompatActivity() {
         }
         try {
             val lower = url!!.lowercase(Locale.ROOT)
+            if (lower.contains("action=reply") || lower.contains("mod=post&action=reply")) {
+                showReplyBottomSheet(currentReplyTarget)
+                return
+            }
             val isForumLink = lower.contains("bbs.binmt.cc")
 
             if (isForumLink) {
@@ -3722,6 +3913,15 @@ class ThreadDetailActivity : AppCompatActivity() {
             return url
         }
         return HttpClient.BASE_URL + url
+    }
+
+    override fun onDestroy() {
+        if (mBottomSheetDialog != null && mBottomSheetDialog!!.isShowing) {
+            try {
+                mBottomSheetDialog!!.dismiss()
+            } catch (_: Exception) {}
+        }
+        super.onDestroy()
     }
 
     private fun dpToPx(dp: Int): Int {

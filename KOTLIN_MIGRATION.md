@@ -4,7 +4,7 @@
 
 ## 背景
 
-项目：`~/workspace/MTForum-ThirdParty`，Android 应用，Java + Kotlin 混编。
+项目：`~/workspace/MTForum`，Android 应用，Java + Kotlin 混编。
 目标：把 Java 文件转为 Kotlin，**外部行为与 JVM 签名必须完全不变**，
 因为大量 Java 调用点不允许改动。
 

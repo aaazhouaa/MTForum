@@ -71,7 +71,7 @@
             android:textSize="12sp"
             android:textColor="@color/text_white"
             app:cornerRadius="18dp"
-            app:backgroundTint="?attr/colorPrimary" />
+            app:backgroundTint="?attr/colorPrimary80" />
     </LinearLayout>
 
     <View

@@ -55,10 +55,6 @@ class HomeFragment : Fragment() {
         httpClient = HttpClient.getInstance()
 
         // 搜索图标点击 -> 打开搜索页面
-        binding!!.ivAi.setOnClickListener {
-            startActivity(Intent(requireContext(), AiChatActivity::class.java))
-        }
-
         binding!!.ivSearch.setOnClickListener {
             val intent = Intent(requireContext(), SearchActivity::class.java)
             startActivity(intent)
@@ -85,10 +81,11 @@ class HomeFragment : Fragment() {
                 .start()
         }
 
-        // 顶栏图标背景统一质感
-        binding!!.ivThemeToggle.background = FrostedGlassDrawable.createSubtle(requireContext(), 10f)
-        binding!!.ivAi.background = FrostedGlassDrawable.createSubtle(requireContext(), 10f)
-        binding!!.ivSearch.background = FrostedGlassDrawable.createSubtle(requireContext(), 10f)
+
+
+        // 顶栏双击快速回到顶部
+        com.solosu.mtforum.util.ScrollToTopHelper.attachRecyclerView(binding!!.layoutTitleBar, binding!!.recyclerView)
+        com.solosu.mtforum.util.ScrollToTopHelper.attachRecyclerView(binding!!.tvAppTitle, binding!!.recyclerView)
 
         // RecyclerView + ThreadAdapter
         threadAdapter = ThreadAdapter(requireContext())
@@ -133,8 +130,7 @@ class HomeFragment : Fragment() {
         val themeColor = com.solosu.mtforum.util.ThemeManager.getThemeColor(requireContext())
         binding!!.swipeRefresh.setColorSchemeColors(themeColor)
 
-        // 顶尖流体动效：透视后退折叠（Z轴透视滚动消失 / 扶梯式折叠退场）
-        com.solosu.mtforum.util.PerspectiveFoldScrollHelper.attach(binding!!.recyclerView)
+
 
         // 加载热板推荐
         loadHotBoards()

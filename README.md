@@ -1,4 +1,4 @@
-# MTForum-ThirdParty — MT 论坛第三方客户端（二改版）
+# MTForum — MT 论坛第三方客户端（二改版）
 
 [bbs.binmt.cc](https://bbs.binmt.cc/) 的第三方 Android 客户端。Kotlin + Material Design，
 覆盖版块浏览、帖子阅读、回复/发帖、个人中心、多账号、AI 自动签到/自动回复。

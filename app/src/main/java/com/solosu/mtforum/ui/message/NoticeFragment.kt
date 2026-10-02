@@ -97,6 +97,9 @@ class NoticeFragment : Fragment() {
         badgeApp = b.badgeApp
         tvClearAll = b.tvClearAll
 
+        // 顶栏双击快速回到顶部
+        com.solosu.mtforum.util.ScrollToTopHelper.attachNestedScrollView(b.toolbar, b.scrollNotice)
+
         // 为图标设置毛玻璃背景
         applyFrostedGlassToIcon(b.ivEmojiMessages)
         applyFrostedGlassToIcon(b.ivEmojiFans)

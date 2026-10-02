@@ -357,6 +357,7 @@ class SpaceThreadListActivity : AppCompatActivity() {
         binding.toolbar.title = title
         binding.toolbar.setNavigationIcon(R.drawable.ic_arrow_left)
         binding.toolbar.setNavigationOnClickListener { finish() }
+        com.solosu.mtforum.util.ScrollToTopHelper.attachRecyclerView(binding.toolbar, binding.recyclerView)
 
         adapter = ThreadAdapter(this)
         adapter.setOnItemClickListener(object : ThreadAdapter.OnItemClickListener {

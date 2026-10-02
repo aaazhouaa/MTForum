@@ -153,6 +153,11 @@ class ReplyAdapter(rawReplies: List<ReplyItem>?) :
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
         val row = displayList[position]
         holder.bind(row)
+        val totalCount = displayList.size
+        // 浏览到当前批次中第 15 条（即离当前展示末尾还剩 5~6 条以内）时触发预加载下 20 条
+        if (totalCount >= 15 && position >= totalCount - 6) {
+            onPreloadListener?.invoke()
+        }
     }
 
     override fun getItemCount(): Int {

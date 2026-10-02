@@ -4,6 +4,7 @@
     <style name="Theme.AppTheme" parent="Theme.MaterialComponents.DayNight.NoActionBar">
         <!-- 品牌色 -->
         <item name="colorPrimary">@color/primary</item>
+        <item name="colorPrimary80">#CC2563EB</item>
         <item name="colorPrimaryVariant">@color/primary_dark</item>
         <item name="colorOnPrimary">@color/text_white</item>
         <item name="colorSecondary">@color/primary_light</item>
@@ -49,6 +50,15 @@
         <item name="cornerSize">50%</item>
     </style>
 
+    <!-- 底部弹窗仅顶部大圆角，底部无圆角平直贴底 -->
+    <style name="ShapeAppearance.BottomSheetCardTopOnly" parent="">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSizeTopLeft">16dp</item>
+        <item name="cornerSizeTopRight">16dp</item>
+        <item name="cornerSizeBottomLeft">0dp</item>
+        <item name="cornerSizeBottomRight">0dp</item>
+    </style>
+
     <!-- 圆形头像背景 -->
     <style name="CircleAvatarBg">
         <item name="android:background">@drawable/circle_avatar_bg</item>
@@ -63,6 +73,7 @@
     <!-- 多主题色彩变体 -->
     <style name="Theme.AppTheme.Teal" parent="Theme.AppTheme">
         <item name="colorPrimary">@color/theme_teal</item>
+        <item name="colorPrimary80">#CC0D9488</item>
         <item name="colorPrimaryVariant">@color/theme_teal_dark</item>
         <item name="colorSecondary">@color/theme_teal_light</item>
         <item name="colorSecondaryVariant">@color/theme_teal</item>
@@ -72,6 +83,7 @@
 
     <style name="Theme.AppTheme.Purple" parent="Theme.AppTheme">
         <item name="colorPrimary">@color/theme_purple</item>
+        <item name="colorPrimary80">#CC7C3AED</item>
         <item name="colorPrimaryVariant">@color/theme_purple_dark</item>
         <item name="colorSecondary">@color/theme_purple_light</item>
         <item name="colorSecondaryVariant">@color/theme_purple</item>
@@ -81,6 +93,7 @@
 
     <style name="Theme.AppTheme.Orange" parent="Theme.AppTheme">
         <item name="colorPrimary">@color/theme_orange</item>
+        <item name="colorPrimary80">#CCEA580C</item>
         <item name="colorPrimaryVariant">@color/theme_orange_dark</item>
         <item name="colorSecondary">@color/theme_orange_light</item>
         <item name="colorSecondaryVariant">@color/theme_orange</item>
@@ -90,6 +103,7 @@
 
     <style name="Theme.AppTheme.Graphite" parent="Theme.AppTheme">
         <item name="colorPrimary">@color/theme_graphite</item>
+        <item name="colorPrimary80">#CC475569</item>
         <item name="colorPrimaryVariant">@color/theme_graphite_dark</item>
         <item name="colorSecondary">@color/theme_graphite_light</item>
         <item name="colorSecondaryVariant">@color/theme_graphite</item>
@@ -99,6 +113,7 @@
 
     <style name="Theme.AppTheme.Rose" parent="Theme.AppTheme">
         <item name="colorPrimary">@color/theme_rose</item>
+        <item name="colorPrimary80">#CCE11D48</item>
         <item name="colorPrimaryVariant">@color/theme_rose_dark</item>
         <item name="colorSecondary">@color/theme_rose_light</item>
         <item name="colorSecondaryVariant">@color/theme_rose</item>

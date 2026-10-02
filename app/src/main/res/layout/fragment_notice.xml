@@ -48,6 +48,7 @@
 
     <!-- 消息分类卡片容器 -->
     <androidx.core.widget.NestedScrollView
+        android:id="@+id/scroll_notice"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:clipToPadding="false"

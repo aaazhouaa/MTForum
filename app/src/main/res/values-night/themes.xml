@@ -3,6 +3,7 @@
     <!-- 暗色主题 - 现代深邃极简风格 -->
     <style name="Theme.AppTheme" parent="Theme.MaterialComponents.DayNight.NoActionBar">
         <item name="colorPrimary">@color/primary</item>
+        <item name="colorPrimary80">#CC60A5FA</item>
         <item name="colorPrimaryVariant">@color/primary_dark</item>
         <item name="colorOnPrimary">@color/text_white</item>
         <item name="colorSecondary">@color/primary_light</item>
@@ -42,6 +43,7 @@
     <!-- 多主题色彩变体 (暗色) -->
     <style name="Theme.AppTheme.Teal" parent="Theme.AppTheme">
         <item name="colorPrimary">@color/theme_teal</item>
+        <item name="colorPrimary80">#CC2DD4BF</item>
         <item name="colorPrimaryVariant">@color/theme_teal_dark</item>
         <item name="colorSecondary">@color/theme_teal_light</item>
         <item name="colorSecondaryVariant">@color/theme_teal</item>
@@ -51,6 +53,7 @@
 
     <style name="Theme.AppTheme.Purple" parent="Theme.AppTheme">
         <item name="colorPrimary">@color/theme_purple</item>
+        <item name="colorPrimary80">#CCA78BFA</item>
         <item name="colorPrimaryVariant">@color/theme_purple_dark</item>
         <item name="colorSecondary">@color/theme_purple_light</item>
         <item name="colorSecondaryVariant">@color/theme_purple</item>
@@ -60,6 +63,7 @@
 
     <style name="Theme.AppTheme.Orange" parent="Theme.AppTheme">
         <item name="colorPrimary">@color/theme_orange</item>
+        <item name="colorPrimary80">#CCFB923C</item>
         <item name="colorPrimaryVariant">@color/theme_orange_dark</item>
         <item name="colorSecondary">@color/theme_orange_light</item>
         <item name="colorSecondaryVariant">@color/theme_orange</item>
@@ -69,6 +73,7 @@
 
     <style name="Theme.AppTheme.Graphite" parent="Theme.AppTheme">
         <item name="colorPrimary">@color/theme_graphite</item>
+        <item name="colorPrimary80">#CC94A3B8</item>
         <item name="colorPrimaryVariant">@color/theme_graphite_dark</item>
         <item name="colorSecondary">@color/theme_graphite_light</item>
         <item name="colorSecondaryVariant">@color/theme_graphite</item>
@@ -78,6 +83,7 @@
 
     <style name="Theme.AppTheme.Rose" parent="Theme.AppTheme">
         <item name="colorPrimary">@color/theme_rose</item>
+        <item name="colorPrimary80">#CCFB7185</item>
         <item name="colorPrimaryVariant">@color/theme_rose_dark</item>
         <item name="colorSecondary">@color/theme_rose_light</item>
         <item name="colorSecondaryVariant">@color/theme_rose</item>

@@ -86,6 +86,10 @@ class CommunityFragment : Fragment() {
             }
         })
 
+        // 顶栏双击快速回到顶部
+        com.solosu.mtforum.util.ScrollToTopHelper.attachNestedScrollView(binding!!.layoutTitleBar, binding!!.navScrollCommunity)
+        com.solosu.mtforum.util.ScrollToTopHelper.attachNestedScrollView(binding!!.tvTitleDiscover, binding!!.navScrollCommunity)
+
         // Setup sign-in button click
         binding!!.btnSignIn.setOnClickListener {
             // 检查登录状态
@@ -146,7 +150,7 @@ class CommunityFragment : Fragment() {
                         binding!!.btnSignIn.text = data.signInText
                         // If text contains "已签到" or "已", treat as already signed in
                         if (data.signInText.contains("已")) {
-                            binding!!.btnSignIn.setBackgroundResource(R.drawable.rounded_btn_success)
+                            binding!!.btnSignIn.setBackgroundResource(R.drawable.rounded_btn_gray)
                             binding!!.btnSignIn.isEnabled = false
                             // 同步到本地持久化
                             UserSessionManager.getInstance().saveSignInDate(requireContext())
@@ -263,7 +267,7 @@ class CommunityFragment : Fragment() {
     private fun showAlreadySignedIn() {
         if (binding == null) return
         binding!!.tvSignInStatus.text = "已签到"
-        binding!!.btnSignIn.setBackgroundResource(R.drawable.rounded_btn_success)
+        binding!!.btnSignIn.setBackgroundResource(R.drawable.rounded_btn_gray)
         binding!!.btnSignIn.text = "已签到"
         binding!!.btnSignIn.isEnabled = false
     }

@@ -39,11 +39,6 @@ class SettingsActivity : AppCompatActivity() {
 
         FrostedGlassHelper.applyToCardViews(binding.root, this)
 
-        val autoSignInEnabled = AutoSignInManager.isEnabled(this)
-        binding.switchAutoSignIn.isChecked = autoSignInEnabled
-        binding.switchAutoSignIn.setOnCheckedChangeListener { buttonView, isChecked ->
-            AutoSignInManager.setEnabled(this, isChecked)
-        }
 
         binding.toolbar.setNavigationIcon(R.drawable.ic_arrow_left)
         binding.toolbar.setNavigationOnClickListener { finish() }

@@ -8,11 +8,13 @@
 
     <!-- 标题栏:让出侧边栏汉堡按钮 -->
     <RelativeLayout
+        android:id="@+id/layout_title_bar"
         android:layout_width="match_parent"
         android:layout_height="48dp"
         android:background="@color/background">
 
         <TextView
+            android:id="@+id/tv_title_discover"
             android:layout_width="wrap_content"
             android:layout_height="match_parent"
             android:layout_alignParentStart="true"
@@ -22,6 +24,34 @@
             android:textColor="@color/text_primary"
             android:textSize="20sp"
             android:textStyle="bold" />
+
+        <!-- 顶栏右侧签到按钮，与发现标题水平对齐 -->
+        <TextView
+            android:id="@+id/btn_sign_in"
+            android:layout_width="wrap_content"
+            android:layout_height="30dp"
+            android:minHeight="0dp"
+            android:minWidth="60dp"
+            android:layout_alignParentEnd="true"
+            android:layout_centerVertical="true"
+            android:layout_marginEnd="14dp"
+            android:gravity="center"
+            android:includeFontPadding="false"
+            android:singleLine="true"
+            android:clickable="true"
+            android:focusable="true"
+            android:text="@string/action_sign_in"
+            android:textSize="13sp"
+            android:textColor="@color/text_white"
+            android:background="@drawable/rounded_btn_primary"
+            android:paddingStart="14dp"
+            android:paddingEnd="14dp" />
+
+        <TextView
+            android:id="@+id/tv_sign_in_status"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:visibility="gone" />
 
     </RelativeLayout>
 
@@ -42,62 +72,12 @@
             android:paddingStart="9dp"
             android:paddingTop="4dp">
 
-        <androidx.cardview.widget.CardView
-            android:id="@+id/cv_sign_in"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            app:cardCornerRadius="16dp"
-            app:cardElevation="1dp"
-            app:cardBackgroundColor="@color/surface">
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center_vertical|end"
-                android:padding="8dp">
-
-                <TextView
-                    android:id="@+id/tv_sign_in_status"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:visibility="gone"
-                    android:text="@string/action_sign_in"
-                    android:textSize="14sp"
-                    android:textColor="@color/text_primary" />
-
-                <Button
-                    android:id="@+id/btn_sign_in"
-                    android:layout_width="wrap_content"
-                    android:layout_height="34dp"
-                    android:text="@string/action_sign_in"
-                    android:textSize="12sp"
-                    android:textColor="@color/text_white"
-                    android:background="@drawable/rounded_btn_primary"
-                    android:drawableStart="@drawable/ic_refresh"
-                    android:drawablePadding="4dp"
-                    android:paddingStart="12dp"
-                    android:paddingEnd="12dp" />
-
-            </LinearLayout>
-
-        </androidx.cardview.widget.CardView>
-
-        <!-- 签到模块与统计卡片之间的隔离线 -->
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="0.5dp"
-            android:layout_marginTop="12dp"
-            android:layout_marginBottom="8dp"
-            android:background="@color/scrim" />
-
         <!-- 统计卡片 -->
         <!-- 数据统计:4 个独立玻璃卡片 -->
         <FrameLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp">
+            android:layout_marginTop="2dp">
 
             <GridLayout
                 android:layout_width="match_parent"
