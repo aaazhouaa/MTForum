@@ -186,7 +186,7 @@ object AiSessionStore {
         if (msgs == null) return null
         for (m in msgs) {
             if (m != null && "user" == m.role && !TextUtils.isEmpty(m.content)) {
-                val t = m.content.trim()
+                val t = m.content!!.trim()
                 return if (t.length <= 30) t else t.substring(0, 30)
             }
         }

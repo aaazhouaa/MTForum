@@ -82,11 +82,11 @@ class AiConfigActivity : AppCompatActivity() {
             val r = AiClient.listModels(this)
             runOnUiThread {
                 b.btnFetchModels.isEnabled = true
-                if (!r.success || r.models == null || r.models.isEmpty()) {
+                val models = r.models
+                if (!r.success || models == null || models.isEmpty()) {
                     b.tvModelStatus.text = "获取失败：" + (if (r.error == null) "未知错误" else r.error)
                     return@runOnUiThread
                 }
-                val models = r.models
                 val adapter = ArrayAdapter(
                     this,
                     android.R.layout.simple_spinner_dropdown_item, models!!
