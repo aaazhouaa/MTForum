@@ -106,6 +106,7 @@ class PostActivity : AppCompatActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        com.solosu.mtforum.util.ThemeManager.applyTheme(this)
         super.onCreate(savedInstanceState)
         setContentView(R.layout.post_activity)
 

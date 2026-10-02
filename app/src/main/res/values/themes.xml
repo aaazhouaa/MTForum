@@ -1,24 +1,28 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources xmlns:tools="http://schemas.android.com/tools">
-    <!-- 主主题 - 科技蓝风格 -->
+    <!-- 主主题 - 现代科技微蓝极简风格 -->
     <style name="Theme.AppTheme" parent="Theme.MaterialComponents.DayNight.NoActionBar">
-        <!-- Primary brand color. -->
+        <!-- 品牌色 -->
         <item name="colorPrimary">@color/primary</item>
         <item name="colorPrimaryVariant">@color/primary_dark</item>
         <item name="colorOnPrimary">@color/text_white</item>
-        <!-- Secondary brand color. -->
         <item name="colorSecondary">@color/primary_light</item>
         <item name="colorSecondaryVariant">@color/primary</item>
         <item name="colorOnSecondary">@color/text_white</item>
-        <!-- 状态栏:与背景同色,图标深色 -->
+
+        <!-- 沉浸式状态栏与导航栏：无缝融入背景 -->
         <item name="android:statusBarColor" tools:targetApi="21">@color/background</item>
         <item name="android:windowLightStatusBar" tools:targetApi="23">true</item>
-        <!-- 导航栏:与背景同色 -->
         <item name="android:navigationBarColor" tools:targetApi="21">@color/background</item>
-        <!-- Background colors -->
+        <item name="android:windowLightNavigationBar" tools:targetApi="27">true</item>
+
+        <!-- 窗口背景 -->
         <item name="android:windowBackground">@color/background</item>
         <item name="android:colorBackground">@color/background</item>
-        <!-- Customize your theme here. -->
+
+        <!-- 涟漪交互反馈波纹色 -->
+        <item name="colorControlHighlight">@color/primary_alpha_19</item>
+
         <item name="windowActionBar">false</item>
         <item name="windowNoTitle">true</item>
         <item name="materialCardViewStyle">@style/CardView.NewStyle</item>
@@ -29,12 +33,13 @@
         <item name="windowNoTitle">true</item>
     </style>
 
-    <!-- 卡片样式 -->
+    <!-- 现代质感卡片：16dp 大圆角、微描边分层与柔和投影 -->
     <style name="CardView.NewStyle" parent="Widget.MaterialComponents.CardView">
-        <item name="cardCornerRadius">12dp</item>
-        <item name="cardElevation">2dp</item>
-        <item name="cardBackgroundColor">@color/card_frosted</item>
-        <item name="strokeWidth">0dp</item>
+        <item name="cardCornerRadius">16dp</item>
+        <item name="cardElevation">1dp</item>
+        <item name="cardBackgroundColor">@color/surface</item>
+        <item name="strokeWidth">1dp</item>
+        <item name="strokeColor">@color/divider</item>
         <item name="cardPreventCornerOverlap">false</item>
     </style>
 
@@ -53,5 +58,51 @@
     <style name="Theme.AppTheme.FullScreen" parent="Theme.AppTheme">
         <item name="android:windowFullscreen">true</item>
         <item name="android:windowContentOverlay">@null</item>
+    </style>
+
+    <!-- 多主题色彩变体 -->
+    <style name="Theme.AppTheme.Teal" parent="Theme.AppTheme">
+        <item name="colorPrimary">@color/theme_teal</item>
+        <item name="colorPrimaryVariant">@color/theme_teal_dark</item>
+        <item name="colorSecondary">@color/theme_teal_light</item>
+        <item name="colorSecondaryVariant">@color/theme_teal</item>
+        <item name="android:statusBarColor">@color/background</item>
+        <item name="android:navigationBarColor">@color/background</item>
+    </style>
+
+    <style name="Theme.AppTheme.Purple" parent="Theme.AppTheme">
+        <item name="colorPrimary">@color/theme_purple</item>
+        <item name="colorPrimaryVariant">@color/theme_purple_dark</item>
+        <item name="colorSecondary">@color/theme_purple_light</item>
+        <item name="colorSecondaryVariant">@color/theme_purple</item>
+        <item name="android:statusBarColor">@color/background</item>
+        <item name="android:navigationBarColor">@color/background</item>
+    </style>
+
+    <style name="Theme.AppTheme.Orange" parent="Theme.AppTheme">
+        <item name="colorPrimary">@color/theme_orange</item>
+        <item name="colorPrimaryVariant">@color/theme_orange_dark</item>
+        <item name="colorSecondary">@color/theme_orange_light</item>
+        <item name="colorSecondaryVariant">@color/theme_orange</item>
+        <item name="android:statusBarColor">@color/background</item>
+        <item name="android:navigationBarColor">@color/background</item>
+    </style>
+
+    <style name="Theme.AppTheme.Graphite" parent="Theme.AppTheme">
+        <item name="colorPrimary">@color/theme_graphite</item>
+        <item name="colorPrimaryVariant">@color/theme_graphite_dark</item>
+        <item name="colorSecondary">@color/theme_graphite_light</item>
+        <item name="colorSecondaryVariant">@color/theme_graphite</item>
+        <item name="android:statusBarColor">@color/background</item>
+        <item name="android:navigationBarColor">@color/background</item>
+    </style>
+
+    <style name="Theme.AppTheme.Rose" parent="Theme.AppTheme">
+        <item name="colorPrimary">@color/theme_rose</item>
+        <item name="colorPrimaryVariant">@color/theme_rose_dark</item>
+        <item name="colorSecondary">@color/theme_rose_light</item>
+        <item name="colorSecondaryVariant">@color/theme_rose</item>
+        <item name="android:statusBarColor">@color/background</item>
+        <item name="android:navigationBarColor">@color/background</item>
     </style>
 </resources>

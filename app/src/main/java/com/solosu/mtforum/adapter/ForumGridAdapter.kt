@@ -30,9 +30,12 @@ class ForumGridAdapter(private val context: Context) : RecyclerView.Adapter<Foru
         return forumList
     }
 
+    private var lastAnimatedPosition = -1
+
     fun setForumList(list: List<ForumCategory.Forum>?) {
         forumList.clear()
         if (list != null) forumList.addAll(list)
+        lastAnimatedPosition = -1
         notifyDataSetChanged()
     }
 
@@ -52,8 +55,6 @@ class ForumGridAdapter(private val context: Context) : RecyclerView.Adapter<Foru
     @NonNull
     override fun onCreateViewHolder(@NonNull parent: ViewGroup, viewType: Int): ViewHolder {
         val view = LayoutInflater.from(context).inflate(R.layout.item_forum_grid, parent, false)
-        val density = context.getResources().getDisplayMetrics().density
-        view.setBackground(FrostedGlassDrawable.create(context, 14f))
         return ViewHolder(view)
     }
 
@@ -81,11 +82,39 @@ class ForumGridAdapter(private val context: Context) : RecyclerView.Adapter<Foru
             holder.ivIcon.setImageResource(R.drawable.ic_circle)
         }
 
-        // 点击事件
+        // 点击事件：带现代弹性反馈
         holder.itemView.setOnClickListener { v ->
-            if (listener != null) {
-                listener!!.onForumClick(forum, position)
-            }
+            v.animate()
+                .scaleX(0.95f)
+                .scaleY(0.95f)
+                .setDuration(80)
+                .withEndAction {
+                    v.animate()
+                        .scaleX(1.0f)
+                        .scaleY(1.0f)
+                        .setDuration(120)
+                        .setInterpolator(android.view.animation.OvershootInterpolator(2.0f))
+                        .start()
+                    if (listener != null) {
+                        listener!!.onForumClick(forum, position)
+                    }
+                }
+                .start()
+        }
+
+        // 入场动效
+        if (position > lastAnimatedPosition) {
+            holder.itemView.alpha = 0f
+            holder.itemView.scaleX = 0.92f
+            holder.itemView.scaleY = 0.92f
+            holder.itemView.animate()
+                .alpha(1f)
+                .scaleX(1.0f)
+                .scaleY(1.0f)
+                .setDuration(200)
+                .setInterpolator(android.view.animation.DecelerateInterpolator(1.5f))
+                .start()
+            lastAnimatedPosition = position
         }
     }
 

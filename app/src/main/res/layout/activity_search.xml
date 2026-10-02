@@ -59,7 +59,7 @@
             android:textSize="14sp"
             android:textColor="@color/text_white"
             app:cornerRadius="8dp"
-            app:backgroundTint="@color/primary" />
+            app:backgroundTint="?attr/colorPrimary" />
     </LinearLayout>
 
     <!-- 分割线 -->
@@ -136,7 +136,7 @@
         android:layout_gravity="center"
         android:layout_marginTop="48dp"
         android:visibility="gone"
-        android:indeterminateTint="@color/primary" />
+        android:indeterminateTint="?attr/colorPrimary" />
 
     <!-- 搜索结果列表 -->
     <androidx.recyclerview.widget.RecyclerView
@@ -157,7 +157,7 @@
         android:layout_gravity="center"
         android:layout_marginVertical="12dp"
         android:visibility="gone"
-        android:indeterminateTint="@color/primary" />
+        android:indeterminateTint="?attr/colorPrimary" />
 
     <!-- 空状态提示（初始/无结果） -->
     <TextView

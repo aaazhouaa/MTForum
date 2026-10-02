@@ -36,6 +36,7 @@ class AiSummarizeActivity : AppCompatActivity() {
     private lateinit var root: LinearLayout
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        com.solosu.mtforum.util.ThemeManager.applyTheme(this)
         super.onCreate(savedInstanceState)
         tid = intent.getStringExtra("tid")
         title = intent.getStringExtra("title")
@@ -51,32 +52,41 @@ class AiSummarizeActivity : AppCompatActivity() {
     private fun buildUi() {
         root = LinearLayout(this)
         root.orientation = LinearLayout.VERTICAL
-        root.setBackgroundColor(Color.parseColor("#F7F8FA"))
+        root.fitsSystemWindows = true
+        root.setBackgroundColor(androidx.core.content.ContextCompat.getColor(this, com.solosu.mtforum.R.color.background))
 
         // 顶栏
         val bar = LinearLayout(this)
         bar.orientation = LinearLayout.HORIZONTAL
         bar.gravity = Gravity.CENTER_VERTICAL
-        bar.setPadding(dp(12), dp(10), dp(12), dp(10))
-        val btnBack = TextView(this)
-        btnBack.text = "←"
-        btnBack.setTextColor(0xFF202124.toInt())
-        btnBack.setTextSize(18f)
-        btnBack.setPadding(dp(8), 0, dp(8), 0)
+        bar.layoutParams = LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            dp(48)
+        )
+        bar.setPadding(dp(8), 0, dp(12), 0)
+
+        val btnBack = android.widget.ImageView(this)
+        btnBack.setImageResource(com.solosu.mtforum.R.drawable.ic_back)
+        btnBack.setColorFilter(androidx.core.content.ContextCompat.getColor(this, com.solosu.mtforum.R.color.text_primary))
+        btnBack.setPadding(dp(8), dp(8), dp(8), dp(8))
         btnBack.setOnClickListener { finish() }
-        bar.addView(btnBack)
+        bar.addView(btnBack, LinearLayout.LayoutParams(dp(40), dp(40)))
+
         val tvTitle = TextView(this)
         tvTitle.text = if (TextUtils.isEmpty(title)) "AI 总结" else title
-        tvTitle.setTextColor(0xFF202124.toInt())
+        tvTitle.setTextColor(androidx.core.content.ContextCompat.getColor(this, com.solosu.mtforum.R.color.text_primary))
         tvTitle.setTextSize(16f)
+        tvTitle.setTypeface(null, android.graphics.Typeface.BOLD)
         tvTitle.isSingleLine = true
         tvTitle.ellipsize = TextUtils.TruncateAt.END
+        tvTitle.setPadding(dp(6), 0, dp(6), 0)
         val tp = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
         bar.addView(tvTitle, tp)
-        // build70: 复制按钮
+
+        // 复制按钮
         val btnCopy = TextView(this)
         btnCopy.text = "复制"
-        btnCopy.setTextColor(0xFF1A73E8.toInt())
+        btnCopy.setTextColor(com.solosu.mtforum.util.ThemeManager.getThemeColor(this))
         btnCopy.setTextSize(14f)
         btnCopy.setPadding(dp(10), dp(6), dp(10), dp(6))
         btnCopy.setOnClickListener { copySummary() }
@@ -86,7 +96,7 @@ class AiSummarizeActivity : AppCompatActivity() {
         // 状态行（显示进行中的步骤）
         tvStatus = TextView(this)
         tvStatus.text = "正在拉取帖子…"
-        tvStatus.setTextColor(0xFFD81B60.toInt())
+        tvStatus.setTextColor(androidx.core.content.ContextCompat.getColor(this, com.solosu.mtforum.R.color.accent_ai))
         tvStatus.setTextSize(13f)
         tvStatus.setPadding(dp(16), dp(6), dp(16), dp(6))
         root.addView(tvStatus)
@@ -99,9 +109,9 @@ class AiSummarizeActivity : AppCompatActivity() {
         tvSummary = TextView(this)
         tvSummary.text = ""
         tvSummary.setTextIsSelectable(true)
-        tvSummary.setTextColor(0xFF333333.toInt())
+        tvSummary.setTextColor(androidx.core.content.ContextCompat.getColor(this, com.solosu.mtforum.R.color.text_primary))
         tvSummary.setTextSize(15f)
-        tvSummary.setLineSpacing(dp(2).toFloat(), 1f)
+        tvSummary.setLineSpacing(dp(3).toFloat(), 1f)
         contentBox.addView(tvSummary)
         scroll.addView(contentBox)
         val sp = LinearLayout.LayoutParams(

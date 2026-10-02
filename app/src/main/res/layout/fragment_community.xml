@@ -3,8 +3,27 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:background="@color/background"
     android:orientation="vertical">
 
+    <!-- 标题栏:让出侧边栏汉堡按钮 -->
+    <RelativeLayout
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:background="@color/background">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:layout_alignParentStart="true"
+            android:gravity="center_vertical"
+            android:paddingStart="52dp"
+            android:text="@string/tab_discover"
+            android:textColor="@color/text_primary"
+            android:textSize="20sp"
+            android:textStyle="bold" />
+
+    </RelativeLayout>
 
     <androidx.core.widget.NestedScrollView
         android:id="@+id/nav_scroll_community"
@@ -23,13 +42,12 @@
             android:paddingStart="9dp"
             android:paddingTop="4dp">
 
-        <!-- 签到卡片 -->
         <androidx.cardview.widget.CardView
             android:id="@+id/cv_sign_in"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            app:cardCornerRadius="8dp"
-            app:cardElevation="2dp"
+            app:cardCornerRadius="16dp"
+            app:cardElevation="1dp"
             app:cardBackgroundColor="@color/surface">
 
             <LinearLayout
@@ -37,7 +55,7 @@
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
                 android:gravity="center_vertical|end"
-                android:padding="6dp">
+                android:padding="8dp">
 
                 <TextView
                     android:id="@+id/tv_sign_in_status"
@@ -104,7 +122,7 @@
                         android:layout_height="wrap_content"
                         android:textSize="16sp"
                         android:textStyle="bold"
-                        android:textColor="@color/primary"
+                        android:textColor="?attr/colorPrimary"
                         android:text="0" />
 
                     <TextView
@@ -134,7 +152,7 @@
                         android:layout_height="wrap_content"
                         android:textSize="16sp"
                         android:textStyle="bold"
-                        android:textColor="@color/primary"
+                        android:textColor="?attr/colorPrimary"
                         android:text="0" />
 
                     <TextView
@@ -164,7 +182,7 @@
                         android:layout_height="wrap_content"
                         android:textSize="16sp"
                         android:textStyle="bold"
-                        android:textColor="@color/primary"
+                        android:textColor="?attr/colorPrimary"
                         android:text="0" />
 
                     <TextView
@@ -194,7 +212,7 @@
                         android:layout_height="wrap_content"
                         android:textSize="16sp"
                         android:textStyle="bold"
-                        android:textColor="@color/primary"
+                        android:textColor="?attr/colorPrimary"
                         android:text="0" />
 
                     <TextView

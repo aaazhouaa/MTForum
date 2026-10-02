@@ -1,62 +1,65 @@
 package com.solosu.mtforum.ui.widget
 
 import android.content.Context
-import android.content.res.Configuration
-import android.graphics.Color
 import android.view.View
 import android.view.ViewGroup
-
 import androidx.cardview.widget.CardView
+import androidx.core.content.ContextCompat
+import com.google.android.material.card.MaterialCardView
+import com.solosu.mtforum.R
 
 /**
- * 毛玻璃背景统一入口:
- * 所有卡片统一使用 FrostedGlassDrawable(半透明渐变 + 高光 + 细边框),
- * 与主界面导航栏保持一致的视觉风格,自动适配亮色/暗色主题。
+ * 现代界面卡片与容器视觉规范应用器：
+ * 统一设置 Surface 表面色、纯净圆角与细微边缘分层，杜绝脏半透明与黑粗边框。
  */
 object FrostedGlassHelper {
 
-    /** 递归处理 root 下的所有 CardView(包含 root 自身)。 */
+    /** 递归处理 root 下的所有 CardView 与视觉容器 */
     @JvmStatic
     fun applyToCardViews(root: View?, context: Context?) {
         if (root == null || context == null) return
         if (root is CardView) {
             applyToCard(root, context)
-        }
-        if (root is ViewGroup) {
-            val group = root
-            for (i in 0 until group.childCount) {
-                applyToCardViews(group.getChildAt(i), context)
+        } else if (root is ViewGroup) {
+            for (i in 0 until root.childCount) {
+                applyToCardViews(root.getChildAt(i), context)
             }
         }
     }
 
-    /** 给单个卡片设置毛玻璃背景(与列表项一致的轻量样式)。 */
+    /** 规范化卡片视觉：大圆角 + 柔和 Surface 背景 + 细微边框 */
     @JvmStatic
     fun applyToCard(card: CardView?, context: Context?) {
         if (card == null || context == null) return
-        val isDark = isDarkMode(context)
         val density = context.resources.displayMetrics.density
-        var radius = card.radius
-        if (radius <= 0f) radius = 12f * density
-        card.setCardBackgroundColor(Color.TRANSPARENT)
-        card.background = FrostedGlassDrawable(
-                if (isDark) 0xFF1E1E1E.toInt() else 0xFFFFFFFF.toInt(), radius, density)
+        val surfaceColor = ContextCompat.getColor(context, R.color.surface)
+        val dividerColor = ContextCompat.getColor(context, R.color.divider)
+
+        // 规范化圆角，若未指定或较小则采用现代标准的 16dp
+        if (card.radius <= 0f || card.radius < 12f * density) {
+            card.radius = 16f * density
+        }
+
+        if (card is MaterialCardView) {
+            card.setCardBackgroundColor(surfaceColor)
+            card.strokeColor = dividerColor
+            card.strokeWidth = Math.max(1, (1f * density).toInt())
+            card.cardElevation = 1f * density
+        } else {
+            card.setCardBackgroundColor(surfaceColor)
+            card.cardElevation = 1f * density
+        }
     }
 
-    /** RecyclerView 卡片创建时使用。 */
+    /** 列表项容器处理 */
     @JvmStatic
     fun applyToItem(root: View?, context: Context?) {
         applyToCardViews(root, context)
     }
 
-    /** 兼容旧接口:无操作。 */
+    /** 兼容旧接口 */
     @JvmStatic
     fun setVisible(root: View?, visible: Boolean) {
         // no-op
-    }
-
-    private fun isDarkMode(context: Context): Boolean {
-        return (context.resources.configuration.uiMode
-                and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
     }
 }

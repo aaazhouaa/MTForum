@@ -1,57 +1,132 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- 主色调(暗色模式 - 提亮蓝色) -->
+    <!-- 主色调 (暗色模式 - 柔和微蓝，不刺眼) -->
     <color name="primary">#60A5FA</color>
     <color name="primary_dark">#3B82F6</color>
     <color name="primary_light">#93C5FD</color>
+    <color name="primary_alpha_30">#4D60A5FA</color>
+    <color name="primary_alpha_19">#2560A5FA</color>
 
-    <!-- 背景色 - 深蓝灰(比纯黑柔和) -->
-    <color name="background">#1A1D23</color>
-    <color name="background_primary">#1A1D23</color>
-    <color name="background_secondary">#22262E</color>
-    <color name="surface">#22262E</color>
-    <color name="card_frosted">#2A2F38</color>
-    <color name="divider">#383D47</color>
+    <!-- 多主题色彩体系 (夜间) -->
+    <color name="theme_blue">#60A5FA</color>
+    <color name="theme_blue_dark">#3B82F6</color>
+    <color name="theme_blue_light">#93C5FD</color>
+
+    <color name="theme_teal">#2DD4BF</color>
+    <color name="theme_teal_dark">#14B8A6</color>
+    <color name="theme_teal_light">#5EEAD4</color>
+
+    <color name="theme_purple">#A78BFA</color>
+    <color name="theme_purple_dark">#8B5CF6</color>
+    <color name="theme_purple_light">#C4B5FD</color>
+
+    <color name="theme_orange">#FB923C</color>
+    <color name="theme_orange_dark">#F97316</color>
+    <color name="theme_orange_light">#FDBA74</color>
+
+    <color name="theme_graphite">#94A3B8</color>
+    <color name="theme_graphite_dark">#64748B</color>
+    <color name="theme_graphite_light">#CBD5E1</color>
+
+    <color name="theme_rose">#FB7185</color>
+    <color name="theme_rose_dark">#F43F5E</color>
+    <color name="theme_rose_light">#FDA4AF</color>
+
+    <!-- 背景色 - 现代质感炭灰体系 (#2D3035) -->
+    <color name="background">#2D3035</color>
+    <color name="background_primary">#2D3035</color>
+    <color name="background_secondary">#26282C</color>
+    <color name="surface">#383C42</color>
+    <color name="card_frosted">#383C42</color>
+    <color name="divider">#484D55</color>
+
     <!-- 代码块背景(暗色) -->
-    <color name="code_block_bg">#2A2F38</color>
-    <!-- 代码块文字(暗色) -->
-    <color name="code_block_text">#D6DCE3</color>
+    <color name="code_block_bg">#242629</color>
+    <color name="code_block_text">#C8CDD5</color>
 
-    <!-- 文字颜色 - 高对比 -->
-    <color name="text_primary">#F1F3F5</color>
-    <color name="text_secondary">#B0B8C4</color>
-    <color name="text_hint">#6B7280</color>
-    <color name="text_white">#FFFFFF</color>
+    <!-- 暗色背景兼容值 -->
+    <color name="background_dark">#2D3035</color>
+    <color name="surface_dark">#383C42</color>
 
-    <!-- 导航栏颜色 -->
-    <color name="nav_icon_default">#6B7280</color>
+    <!-- 文字排版体系 - 柔和灰白，彻底杜绝高对比纯白刺眼眩光 -->
+    <color name="text_primary">#DCE0E6</color>
+    <color name="text_secondary">#9DA4B0</color>
+    <color name="text_hint">#6E7582</color>
+    <color name="text_white">#EAECEF</color>
+
+    <!-- 底部与导航栏 -->
+    <color name="nav_icon_default">#7E8694</color>
     <color name="nav_icon_active">#60A5FA</color>
-    <color name="nav_text_default">#6B7280</color>
+    <color name="nav_text_default">#7E8694</color>
     <color name="nav_text_active">#60A5FA</color>
 
-    <!-- 强调色 -->
+    <!-- 功能语义色 - 柔和护眼饱和度 -->
     <color name="success">#34D399</color>
     <color name="warning">#FBBF24</color>
     <color name="error">#F87171</color>
     <color name="link_color">#60A5FA</color>
     <color name="info">#60A5FA</color>
-
-    <!-- accent_primary -->
     <color name="accent_primary">#60A5FA</color>
 
     <!-- 渐变 -->
     <color name="gradient_start">#3B82F6</color>
-    <color name="gradient_end">#93C5FD</color>
+    <color name="gradient_end">#60A5FA</color>
 
-    <!-- 暗色背景(兼容旧引用) -->
-    <color name="background_dark">#1A1D23</color>
-    <color name="surface_dark">#22262E</color>
+    <!-- 中性辅助色与微阴影遮罩 -->
+    <color name="icon_secondary">#9DA4B0</color>
+    <color name="gold">#FBBF24</color>
+    <color name="gold_deep">#F59E0B</color>
 
-    <!-- 回复/引用区域(夜间) - 低对比暖色 -->
-    <color name="reply_quote_background">#2A2518</color>
-    <color name="reply_quote_border">#4A3D28</color>
-    <color name="reply_quote_title">#D4A84A</color>
-    <color name="reply_quote_content">#A08840</color>
-    <color name="reply_op_badge_background">#1E2A3A</color>
-    <color name="follow_bg">#2A2F38</color>
+    <!-- AI 科技青 (暗色夜间模式) -->
+    <color name="accent_ai">#2DD4BF</color>
+    <color name="accent_ai_fill">#242DD4BF</color>
+
+    <!-- 置顶帖胶囊 (柔和蓝调衬底) -->
+    <color name="sticky_card_bg">#323B49</color>
+    <color name="sticky_stroke">#3B5274</color>
+    <color name="sticky_text">#93C5FD</color>
+
+    <!-- 角标系统 -->
+    <color name="badge_red">#FB7185</color>
+    <color name="badge_green">#34D399</color>
+    <color name="badge_amber">#FBBF24</color>
+    <color name="badge_blue">#60A5FA</color>
+    <color name="badge_alert">#F87171</color>
+
+    <!-- 版块描边与图标 -->
+    <color name="forum_stroke">#484D55</color>
+    <color name="forum_icon">#9DA4B0</color>
+
+    <!-- 遮罩与半透明层 -->
+    <color name="scrim">#40000000</color>
+    <color name="scrim_heavy">#66000000</color>
+    <color name="scrim_light">#26000000</color>
+    <color name="transparent">#00000000</color>
+    <color name="preview_bg">#FF000000</color>
+
+    <!-- 基础兼容色 -->
+    <color name="black">#FF000000</color>
+    <color name="white">#FFFFFFFF</color>
+    <color name="purple_200">#D8B4FE</color>
+    <color name="purple_500">#A855F7</color>
+    <color name="purple_700">#7E22CE</color>
+    <color name="teal_200">#5EEAD4</color>
+    <color name="teal_700">#14B8A6</color>
+    <color name="blue_500">#3B82F6</color>
+    <color name="red_500">#EF4444</color>
+
+    <!-- 回复与引用区 (暗色模式) -->
+    <color name="reply_quote_background">#32363D</color>
+    <color name="reply_quote_border">#484E59</color>
+    <color name="reply_quote_title">#60A5FA</color>
+    <color name="reply_quote_content">#9DA4B0</color>
+    <color name="reply_op_badge_background">#2C3645</color>
+    <color name="follow_bg">#383C42</color>
+
+    <!-- 按钮与占位符 -->
+    <color name="reward_btn">#F59E0B</color>
+    <color name="gray_alpha_25">#3094A3B8</color>
+    <color name="gray_alpha_09">#1894A3B8</color>
+    <color name="image_placeholder_bg">#26282C</color>
+    <color name="image_placeholder_stroke">#383C42</color>
 </resources>

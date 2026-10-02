@@ -44,6 +44,7 @@ class UserProfileActivity : AppCompatActivity() {
     private var destroyed = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        com.solosu.mtforum.util.ThemeManager.applyTheme(this)
         super.onCreate(savedInstanceState)
         binding = ActivityUserProfileBinding.inflate(layoutInflater)
         setContentView(binding.root)

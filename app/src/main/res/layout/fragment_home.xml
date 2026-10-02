@@ -23,17 +23,33 @@
                 android:gravity="center_vertical"
                 android:paddingStart="52dp"
                 android:text="@string/app_name"
-                android:textColor="@color/primary"
+                android:textColor="?attr/colorPrimary"
                 android:textSize="22sp"
                 android:textStyle="bold" />
 
+            <!-- 深浅色主题手动切换 (太阳/月亮) -->
+            <ImageView
+                android:id="@+id/iv_theme_toggle"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:layout_toStartOf="@+id/iv_ai"
+                android:layout_centerVertical="true"
+                android:layout_marginEnd="10dp"
+                android:padding="7dp"
+                android:src="@drawable/ic_moon"
+                android:clickable="true"
+                android:focusable="true"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="切换深浅色主题" />
+
             <ImageView
                 android:id="@+id/iv_ai"
-                android:layout_width="40dp"
-                android:layout_height="40dp"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
                 android:layout_toStartOf="@+id/iv_search"
                 android:layout_centerVertical="true"
-                android:padding="9dp"
+                android:layout_marginEnd="10dp"
+                android:padding="7dp"
                 android:src="@drawable/ic_ai_spark"
                 android:clickable="true"
                 android:focusable="true"
@@ -42,11 +58,11 @@
 
             <ImageView
                 android:id="@+id/iv_search"
-                android:layout_width="40dp"
-                android:layout_height="40dp"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
                 android:layout_centerVertical="true"
-                android:layout_marginEnd="8dp"
-                android:padding="10dp"
+                android:layout_marginEnd="14dp"
+                android:padding="8dp"
                 android:src="@drawable/ic_search_new"
                 android:clickable="true"
                 android:focusable="true"

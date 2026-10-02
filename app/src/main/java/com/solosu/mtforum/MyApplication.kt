@@ -16,6 +16,24 @@ class MyApplication : Application() {
     override fun onCreate() {
         super.onCreate()
 
+        // 初始化主题与夜间模式设置
+        com.solosu.mtforum.util.ThemeManager.init(this)
+
+        // 自动管理当前前台 Activity（用于展示零 Logo 的纯净现代 Toast）
+        registerActivityLifecycleCallbacks(object : ActivityLifecycleCallbacks {
+            override fun onActivityResumed(activity: android.app.Activity) {
+                com.solosu.mtforum.util.ToastUtil.setTopActivity(activity)
+            }
+            override fun onActivityPaused(activity: android.app.Activity) {
+                com.solosu.mtforum.util.ToastUtil.setTopActivity(null)
+            }
+            override fun onActivityCreated(activity: android.app.Activity, savedInstanceState: android.os.Bundle?) {}
+            override fun onActivityStarted(activity: android.app.Activity) {}
+            override fun onActivityStopped(activity: android.app.Activity) {}
+            override fun onActivitySaveInstanceState(activity: android.app.Activity, outState: android.os.Bundle) {}
+            override fun onActivityDestroyed(activity: android.app.Activity) {}
+        })
+
         // 恢复持久化的 Cookie —— 在任何 Activity 启动前执行
         // 防止从最近任务直接恢复 SearchActivity 等非 MainActivity 时登录态丢失
         HttpClient.getInstance().init(this)

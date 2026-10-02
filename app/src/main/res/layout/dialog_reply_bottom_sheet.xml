@@ -41,7 +41,7 @@
             android:layout_marginTop="12dp"
             app:boxBackgroundMode="outline"
             app:hintEnabled="false"
-            app:boxStrokeColor="@color/primary"
+            app:boxStrokeColor="?attr/colorPrimary"
             app:boxStrokeWidth="1.5dp">
 
             <com.google.android.material.textfield.TextInputEditText
@@ -109,7 +109,7 @@
                 android:textColor="@color/text_white"
                 android:textSize="14sp"
                 app:cornerRadius="20dp"
-                app:backgroundTint="@color/primary" />
+                app:backgroundTint="?attr/colorPrimary" />
         </LinearLayout>
     </LinearLayout>
 </com.google.android.material.card.MaterialCardView>

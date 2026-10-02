@@ -25,6 +25,7 @@ class CreditDetailActivity : AppCompatActivity() {
     private lateinit var httpClient: HttpClient
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        com.solosu.mtforum.util.ThemeManager.applyTheme(this)
         super.onCreate(savedInstanceState)
         binding = ActivityCreditDetailBinding.inflate(layoutInflater)
         setContentView(binding.root)

@@ -88,7 +88,7 @@
                                     android:background="@drawable/level_badge_bg"
                                     android:paddingHorizontal="8dp"
                                     android:paddingVertical="2dp"
-                                    android:textColor="@color/primary"
+                                    android:textColor="?attr/colorPrimary"
                                     android:textSize="11sp" />
                             </LinearLayout>
 
@@ -97,7 +97,7 @@
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:layout_marginTop="2dp"
-                                android:textColor="@color/primary"
+                                android:textColor="?attr/colorPrimary"
                                 android:textSize="13sp"
                                 android:textStyle="bold" />
                         </LinearLayout>
@@ -256,7 +256,7 @@
                             android:id="@+id/tv_credits"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:textColor="@color/primary"
+                            android:textColor="?attr/colorPrimary"
                             android:textSize="18sp"
                             android:textStyle="bold" />
                         <TextView
@@ -361,7 +361,7 @@
                             android:background="@drawable/menu_icon_bg"
                             android:padding="7dp"
                             android:src="@drawable/ic_history"
-                            app:tint="@color/primary"
+                            app:tint="?attr/colorPrimary"
                             android:contentDescription="我的帖子"
                             android:scaleType="fitCenter" />
                         <TextView
@@ -404,7 +404,7 @@
                             android:background="@drawable/menu_icon_bg"
                             android:padding="7dp"
                             android:src="@drawable/ic_star_filled"
-                            app:tint="@color/primary"
+                            app:tint="?attr/colorPrimary"
                             android:contentDescription="我的收藏"
                             android:scaleType="fitCenter" />
                         <TextView
@@ -447,7 +447,7 @@
                             android:background="@drawable/menu_icon_bg"
                             android:padding="7dp"
                             android:src="@drawable/ic_account"
-                            app:tint="@color/primary"
+                            app:tint="?attr/colorPrimary"
                             android:contentDescription="我的好友"
                             android:scaleType="fitCenter" />
                         <TextView
@@ -490,7 +490,7 @@
                             android:background="@drawable/menu_icon_bg"
                             android:padding="7dp"
                             android:src="@drawable/ic_reward"
-                            app:tint="@color/primary"
+                            app:tint="?attr/colorPrimary"
                             android:contentDescription="积分详情"
                             android:scaleType="fitCenter" />
                         <TextView
@@ -533,7 +533,7 @@
                             android:background="@drawable/menu_icon_bg"
                             android:padding="7dp"
                             android:src="@drawable/ic_profile"
-                            app:tint="@color/primary"
+                            app:tint="?attr/colorPrimary"
                             android:contentDescription="个人资料"
                             android:scaleType="fitCenter" />
                         <TextView
@@ -576,7 +576,7 @@
                             android:background="@drawable/menu_icon_bg"
                             android:padding="7dp"
                             android:src="@drawable/ic_gear"
-                            app:tint="@color/primary"
+                            app:tint="?attr/colorPrimary"
                             android:contentDescription="设置"
                             android:scaleType="fitCenter" />
                         <TextView

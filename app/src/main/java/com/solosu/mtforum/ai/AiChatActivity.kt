@@ -49,6 +49,7 @@ class AiChatActivity : AppCompatActivity() {
     private var freshSession = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        com.solosu.mtforum.util.ThemeManager.applyTheme(this)
         super.onCreate(savedInstanceState)
         setContentView(com.solosu.mtforum.R.layout.activity_ai_chat)
 

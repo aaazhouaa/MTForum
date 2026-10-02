@@ -47,6 +47,7 @@ class ChatActivity : AppCompatActivity() {
     private var destroyed = false
 
     override fun onCreate(@Nullable savedInstanceState: Bundle?) {
+        com.solosu.mtforum.util.ThemeManager.applyTheme(this)
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_chat)
 

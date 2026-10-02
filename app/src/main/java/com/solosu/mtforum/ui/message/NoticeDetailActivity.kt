@@ -42,6 +42,7 @@ class NoticeDetailActivity : AppCompatActivity() {
     private var cachedFormhash: String? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        com.solosu.mtforum.util.ThemeManager.applyTheme(this)
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_notice_detail)
 

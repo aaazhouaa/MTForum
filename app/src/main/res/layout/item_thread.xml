@@ -3,20 +3,20 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_marginStart="9dp"
-    android:layout_marginEnd="9dp"
+    android:layout_marginStart="12dp"
+    android:layout_marginEnd="12dp"
     android:orientation="vertical"
     android:clickable="true"
     android:focusable="true"
     android:foreground="?attr/selectableItemBackground">
 
-    <!-- 帖子卡片:磨砂/半透明背景由代码挂载,宽约95%屏幕,高度自适应内容 -->
+    <!-- 帖子卡片容器 -->
     <LinearLayout
         android:id="@+id/thread_card"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:padding="10dp">
+        android:padding="14dp">
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -53,7 +53,7 @@
                         android:layout_height="wrap_content"
                         android:ellipsize="end"
                         android:maxLines="1"
-                        android:textColor="@color/primary"
+                        android:textColor="@color/text_primary"
                         android:textSize="14sp"
                         android:textStyle="bold" />
 
@@ -201,8 +201,8 @@
                 android:gravity="center"
                 android:orientation="horizontal">
                 <ImageView
-                    android:layout_width="18dp"
-                    android:layout_height="18dp"
+                    android:layout_width="16dp"
+                    android:layout_height="16dp"
                     android:src="@drawable/ic_view"
                     android:contentDescription="浏览"
                     app:tint="@color/icon_secondary" />
@@ -212,7 +212,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginStart="4dp"
                     android:textColor="@color/text_secondary"
-                    android:textSize="14sp" />
+                    android:textSize="12sp" />
             </LinearLayout>
 
             <!-- 评论(第二格) -->
@@ -223,8 +223,8 @@
                 android:gravity="center"
                 android:orientation="horizontal">
                 <ImageView
-                    android:layout_width="18dp"
-                    android:layout_height="18dp"
+                    android:layout_width="16dp"
+                    android:layout_height="16dp"
                     android:src="@drawable/ic_reply"
                     android:contentDescription="回复"
                     app:tint="@color/icon_secondary" />
@@ -234,7 +234,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginStart="4dp"
                     android:textColor="@color/text_secondary"
-                    android:textSize="14sp" />
+                    android:textSize="12sp" />
             </LinearLayout>
 
 
@@ -246,8 +246,8 @@
                 android:gravity="center"
                 android:orientation="horizontal">
                 <ImageView
-                    android:layout_width="18dp"
-                    android:layout_height="18dp"
+                    android:layout_width="16dp"
+                    android:layout_height="16dp"
                     android:src="@drawable/ic_like"
                     android:contentDescription="点赞"
                     app:tint="@color/icon_secondary" />
@@ -257,7 +257,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginStart="4dp"
                     android:textColor="@color/text_secondary"
-                    android:textSize="14sp" />
+                    android:textSize="12sp" />
             </LinearLayout>
         </LinearLayout>
 

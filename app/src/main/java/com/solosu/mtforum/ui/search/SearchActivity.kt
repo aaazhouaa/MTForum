@@ -49,6 +49,7 @@ class SearchActivity : AppCompatActivity() {
     private var pendingKeyword: String? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        com.solosu.mtforum.util.ThemeManager.applyTheme(this)
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_search)
 

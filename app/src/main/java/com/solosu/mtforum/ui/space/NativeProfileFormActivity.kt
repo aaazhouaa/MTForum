@@ -84,6 +84,7 @@ class NativeProfileFormActivity : AppCompatActivity() {
     private var tempAvatarFile: File? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        com.solosu.mtforum.util.ThemeManager.applyTheme(this)
         super.onCreate(savedInstanceState)
         binding = ActivityNativeProfileFormBinding.inflate(layoutInflater)
         setContentView(binding.root)

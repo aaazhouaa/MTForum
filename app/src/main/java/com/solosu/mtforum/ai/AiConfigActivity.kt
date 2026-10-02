@@ -24,6 +24,7 @@ class AiConfigActivity : AppCompatActivity() {
     private lateinit var b: ActivityAiConfigBinding
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        com.solosu.mtforum.util.ThemeManager.applyTheme(this)
         super.onCreate(savedInstanceState)
         b = ActivityAiConfigBinding.inflate(layoutInflater)
         setContentView(b.root)

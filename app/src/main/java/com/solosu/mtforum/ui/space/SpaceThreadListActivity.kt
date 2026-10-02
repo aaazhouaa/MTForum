@@ -314,6 +314,7 @@ class SpaceThreadListActivity : AppCompatActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        com.solosu.mtforum.util.ThemeManager.applyTheme(this)
         super.onCreate(savedInstanceState)
         binding = ActivitySpaceThreadListBinding.inflate(layoutInflater)
         setContentView(binding.root)

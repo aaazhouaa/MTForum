@@ -70,7 +70,7 @@
                         android:layout_marginEnd="16dp"
                         android:layout_marginTop="12dp"
                         android:textSize="20sp"
-                        android:textColor="@color/primary"
+                        android:textColor="?attr/colorPrimary"
                         android:textStyle="bold"
                         android:lineSpacingExtra="6dp"
                         android:letterSpacing="0.01" />
@@ -353,7 +353,7 @@
                             android:layout_height="wrap_content"
                             android:layout_marginTop="8dp"
                             android:text="@string/view_hidden_content"
-                            android:textColor="@color/primary" />
+                            android:textColor="?attr/colorPrimary" />
 
                         <TextView
                             android:id="@+id/tv_hidden_content"
@@ -592,7 +592,7 @@
                 android:layout_marginStart="6dp"
                 android:text="@string/view_more"
                 android:textSize="12sp"
-                android:textColor="@color/primary" />
+                android:textColor="?attr/colorPrimary" />
         </LinearLayout>
         <!-- ========== 评论标题栏 ========== -->
                     <LinearLayout
@@ -651,7 +651,7 @@
                             android:paddingEnd="0dp"
                             android:text="@string/reply_order_desc"
                             android:textSize="12sp"
-                                        android:textColor="@color/primary"
+                                        android:textColor="?attr/colorPrimary"
                             android:textAllCaps="false" />
                     </LinearLayout>
 
@@ -686,7 +686,7 @@
                         android:layout_gravity="center"
                         android:layout_marginTop="8dp"
                         android:text="@string/load_more_replies"
-                                    android:textColor="@color/primary"
+                                    android:textColor="?attr/colorPrimary"
                         android:visibility="gone" />
 
                     <ProgressBar
@@ -800,113 +800,132 @@
                     android:imeOptions="actionSend" />
             </com.google.android.material.textfield.TextInputLayout>
 
-                    <FrameLayout
-                android:layout_width="32dp"
+            <!-- 评论按钮容器 (图标 + 右侧灰白数字) -->
+            <LinearLayout
+                android:id="@+id/layout_comments"
+                android:layout_width="wrap_content"
                 android:layout_height="48dp"
-                android:layout_marginHorizontal="1dp">
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:clickable="true"
+                android:focusable="true"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:paddingHorizontal="4dp">
+
                 <ImageButton
                     android:id="@+id/btn_comments"
-                    android:layout_width="32dp"
-                    android:layout_height="48dp"
+                    android:layout_width="22dp"
+                    android:layout_height="22dp"
                     android:minWidth="0dp"
                     android:src="@drawable/forum_comment"
                     android:scaleType="fitCenter"
-                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:background="@android:color/transparent"
                     android:contentDescription="查看评论"
-                    android:padding="4dp" />
+                    app:tint="@color/icon_secondary" />
+
                 <TextView
                     android:id="@+id/tv_comments_badge"
                     android:layout_width="wrap_content"
-                    android:layout_height="18dp"
-                    android:minWidth="18dp"
-                    android:layout_gravity="top|end"
-                    android:gravity="center"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="3dp"
                     android:singleLine="true"
-                    android:textColor="@android:color/white"
-                    android:textSize="10sp"
-                    android:textStyle="bold"
-                    android:background="@drawable/badge_bg"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="12sp"
                     android:visibility="gone" />
 
-            </FrameLayout>
+            </LinearLayout>
 
-                    <FrameLayout
-                android:layout_width="32dp"
+            <!-- 点赞按钮容器 (图标 + 右侧灰白数字) -->
+            <LinearLayout
+                android:id="@+id/layout_like"
+                android:layout_width="wrap_content"
                 android:layout_height="48dp"
-                android:layout_marginHorizontal="1dp">
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:clickable="true"
+                android:focusable="true"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:paddingHorizontal="4dp">
+
                 <ImageButton
                     android:id="@+id/btn_like"
-                    android:layout_width="32dp"
-                    android:layout_height="48dp"
+                    android:layout_width="22dp"
+                    android:layout_height="22dp"
                     android:minWidth="0dp"
                     android:src="@drawable/forum_like_off"
                     android:scaleType="fitCenter"
-                    android:background="?attr/selectableItemBackgroundBorderless"
-                    android:contentDescription="@string/action_like"
-                    android:padding="4dp" />
+                    android:background="@android:color/transparent"
+                    android:contentDescription="@string/action_like" />
+
                 <TextView
                     android:id="@+id/tv_like_badge"
                     android:layout_width="wrap_content"
-                    android:layout_height="18dp"
-                    android:minWidth="18dp"
-                    android:layout_gravity="top|end"
-                    android:gravity="center"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="3dp"
                     android:singleLine="true"
-                    android:textColor="@android:color/white"
-                    android:textSize="10sp"
-                    android:textStyle="bold"
-                    android:background="@drawable/badge_bg"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="12sp"
                     android:visibility="gone" />
 
-            </FrameLayout>
+            </LinearLayout>
 
-                    <FrameLayout
-                android:layout_width="32dp"
+            <!-- 收藏按钮容器 (图标 + 右侧灰白数字) -->
+            <LinearLayout
+                android:id="@+id/layout_favorite"
+                android:layout_width="wrap_content"
                 android:layout_height="48dp"
-                android:layout_marginHorizontal="1dp">
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:clickable="true"
+                android:focusable="true"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:paddingHorizontal="4dp">
+
                 <ImageButton
                     android:id="@+id/btn_favorite"
-                    android:layout_width="32dp"
-                    android:layout_height="48dp"
+                    android:layout_width="22dp"
+                    android:layout_height="22dp"
                     android:minWidth="0dp"
                     android:src="@drawable/forum_favorite_off"
                     android:scaleType="fitCenter"
-                    android:background="?attr/selectableItemBackgroundBorderless"
-                    android:contentDescription="@string/action_favorite"
-                    android:padding="4dp" />
+                    android:background="@android:color/transparent"
+                    android:contentDescription="@string/action_favorite" />
+
                 <TextView
                     android:id="@+id/tv_favorite_badge"
                     android:layout_width="wrap_content"
-                    android:layout_height="18dp"
-                    android:minWidth="18dp"
-                    android:layout_gravity="top|end"
-                    android:gravity="center"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="3dp"
                     android:singleLine="true"
-                    android:textColor="@android:color/white"
-                    android:textSize="10sp"
-                    android:textStyle="bold"
-                    android:background="@drawable/badge_bg"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="12sp"
                     android:visibility="gone" />
 
-            </FrameLayout>
+            </LinearLayout>
 
             <!-- 图片选择按钮 -->
-            <FrameLayout
-                android:layout_width="32dp"
+            <LinearLayout
+                android:id="@+id/layout_pick_image"
+                android:layout_width="wrap_content"
                 android:layout_height="48dp"
-                android:layout_marginHorizontal="1dp">
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:clickable="true"
+                android:focusable="true"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:paddingHorizontal="4dp">
+
                 <ImageButton
                     android:id="@+id/btn_pick_image_inline"
-                    android:layout_width="32dp"
-                    android:layout_height="48dp"
+                    android:layout_width="22dp"
+                    android:layout_height="22dp"
                     android:minWidth="0dp"
                     android:src="@drawable/ic_image"
                     android:scaleType="fitCenter"
-                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:background="@android:color/transparent"
                     android:contentDescription="选择图片"
-                    android:padding="4dp"
                     app:tint="@color/text_secondary" />
-            </FrameLayout>
+            </LinearLayout>
 
             <!-- 发送按钮(暂时注释)
             <ImageButton
@@ -918,7 +937,7 @@
                 android:scaleType="fitCenter"
                 android:background="?attr/selectableItemBackgroundBorderless"
                 android:contentDescription="发送"
-                app:tint="@color/primary"
+                app:tint="?attr/colorPrimary"
                 android:padding="4dp" />
             -->
         </LinearLayout>

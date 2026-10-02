@@ -56,8 +56,8 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="12dp"
                 style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
-                app:hintTextColor="@color/primary"
-                app:boxStrokeColor="@color/primary"
+                app:hintTextColor="?attr/colorPrimary"
+                app:boxStrokeColor="?attr/colorPrimary"
                 app:endIconMode="clear_text">
 
                 <com.google.android.material.textfield.TextInputEditText
@@ -77,8 +77,8 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="12dp"
                 style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
-                app:hintTextColor="@color/primary"
-                app:boxStrokeColor="@color/primary"
+                app:hintTextColor="?attr/colorPrimary"
+                app:boxStrokeColor="?attr/colorPrimary"
                 app:endIconMode="password_toggle"
                 app:passwordToggleTint="@color/text_secondary">
 
@@ -118,7 +118,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
                 style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
-                app:boxStrokeColor="@color/primary"
+                app:boxStrokeColor="?attr/colorPrimary"
                 app:hintEnabled="false">
 
                 <com.google.android.material.textfield.TextInputEditText
@@ -159,7 +159,7 @@
                 android:layout_height="48dp"
                 android:text="@string/action_login"
                 android:textColor="@color/text_white"
-                app:backgroundTint="@color/primary"
+                app:backgroundTint="?attr/colorPrimary"
                 app:cornerRadius="20dp"
                 app:elevation="2dp" />
 

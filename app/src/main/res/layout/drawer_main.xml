@@ -102,7 +102,7 @@
                     android:layout_height="20dp"
                     android:src="@drawable/ic_reply"
                     android:contentDescription="回复"
-                    app:tint="@color/primary" />
+                    app:tint="?attr/colorPrimary" />
 
                 <LinearLayout
                     android:layout_width="0dp"
@@ -153,7 +153,7 @@
                     android:layout_height="20dp"
                     android:src="@drawable/ic_block"
                     android:contentDescription="屏蔽"
-                    app:tint="@color/primary" />
+                    app:tint="?attr/colorPrimary" />
 
                 <LinearLayout
                     android:layout_width="0dp"
@@ -203,7 +203,7 @@
                     android:layout_height="20dp"
                     android:src="@drawable/ic_check"
                     android:contentDescription="已选中"
-                    app:tint="@color/primary" />
+                    app:tint="?attr/colorPrimary" />
 
                 <LinearLayout
                     android:layout_width="0dp"
@@ -254,7 +254,7 @@
                     android:layout_height="20dp"
                     android:src="@drawable/ic_star"
                     android:contentDescription="收藏"
-                    app:tint="@color/primary" />
+                    app:tint="?attr/colorPrimary" />
 
                 <LinearLayout
                     android:layout_width="0dp"
@@ -305,7 +305,7 @@
                     android:layout_height="20dp"
                     android:src="@drawable/ic_message"
                     android:contentDescription="消息"
-                    app:tint="@color/primary" />
+                    app:tint="?attr/colorPrimary" />
 
                 <LinearLayout
                     android:layout_width="0dp"
@@ -356,7 +356,7 @@
                     android:layout_height="20dp"
                     android:src="@drawable/ic_block"
                     android:contentDescription="屏蔽"
-                    app:tint="@color/primary" />
+                    app:tint="?attr/colorPrimary" />
 
                 <LinearLayout
                     android:layout_width="0dp"
@@ -407,7 +407,7 @@
                     android:layout_height="20dp"
                     android:src="@drawable/ic_view"
                     android:contentDescription="视图"
-                    app:tint="@color/primary" />
+                    app:tint="?attr/colorPrimary" />
 
                 <LinearLayout
                     android:layout_width="0dp"
@@ -467,7 +467,7 @@
                     android:layout_height="20dp"
                     android:src="@drawable/ic_refresh"
                     android:contentDescription="刷新"
-                    app:tint="@color/primary" />
+                    app:tint="?attr/colorPrimary" />
 
                 <TextView
                     android:layout_width="0dp"
@@ -494,7 +494,7 @@
                     android:layout_height="20dp"
                     android:src="@drawable/ic_star"
                     android:contentDescription="收藏"
-                    app:tint="@color/primary" />
+                    app:tint="?attr/colorPrimary" />
 
                 <TextView
                     android:layout_width="0dp"
@@ -532,7 +532,7 @@
                     android:layout_height="20dp"
                     android:src="@drawable/ic_ai"
                     android:contentDescription="AI助手"
-                    app:tint="@color/primary" />
+                    app:tint="?attr/colorPrimary" />
 
                 <LinearLayout
                     android:layout_width="0dp"
@@ -581,7 +581,7 @@
                     android:layout_height="20dp"
                     android:src="@drawable/ic_smile"
                     android:contentDescription="表情"
-                    app:tint="@color/primary" />
+                    app:tint="?attr/colorPrimary" />
 
                 <LinearLayout
                     android:layout_width="0dp"
@@ -640,7 +640,7 @@
                     android:layout_height="20dp"
                     android:src="@drawable/ic_account"
                     android:contentDescription="账号"
-                    app:tint="@color/primary" />
+                    app:tint="?attr/colorPrimary" />
 
 
 <LinearLayout
@@ -690,7 +690,7 @@
                     android:layout_height="20dp"
                     android:src="@drawable/ic_block"
                     android:contentDescription="黑名单"
-                    app:tint="@color/primary" />
+                    app:tint="?attr/colorPrimary" />
 
                 <LinearLayout
                     android:layout_width="0dp"
@@ -724,7 +724,58 @@
                     app:tint="@color/text_hint" />
             </LinearLayout>
 
-<LinearLayout
+            <!-- 主题色彩切换 -->
+            <LinearLayout
+                android:id="@+id/drawer_theme_color"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="6dp"
+                android:background="@drawable/bg_drawer_item"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingHorizontal="10dp"
+                android:paddingVertical="12dp">
+
+                <ImageView
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
+                    android:src="@drawable/ic_fire"
+                    android:contentDescription="主题色彩"
+                    app:tint="?attr/colorPrimary" />
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="12dp"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="主题色彩"
+                        android:textColor="@color/text_primary"
+                        android:textSize="14sp" />
+
+                    <TextView
+                        android:id="@+id/drawer_theme_color_desc"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:text="个性化选择应用主色调"
+                        android:textColor="@color/text_hint"
+                        android:textSize="11sp" />
+                </LinearLayout>
+
+                <ImageView
+                    android:layout_width="16dp"
+                    android:layout_height="16dp"
+                    android:src="@drawable/ic_arrow_right"
+                    android:contentDescription="前往"
+                    app:tint="@color/text_hint" />
+            </LinearLayout>
+
+            <LinearLayout
                 android:id="@+id/drawer_settings"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -739,7 +790,7 @@
                     android:layout_height="20dp"
                     android:src="@drawable/ic_gear"
                     android:contentDescription="设置"
-                    app:tint="@color/primary" />
+                    app:tint="?attr/colorPrimary" />
 
                 <TextView
                     android:layout_width="0dp"
@@ -766,7 +817,7 @@
                     android:layout_height="20dp"
                     android:src="@drawable/ic_history"
                     android:contentDescription="历史记录"
-                    app:tint="@color/primary" />
+                    app:tint="?attr/colorPrimary" />
 
                 <TextView
                     android:layout_width="0dp"

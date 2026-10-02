@@ -50,6 +50,7 @@ class ForumDetailActivity : AppCompatActivity() {
     private var hasMore = true
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        com.solosu.mtforum.util.ThemeManager.applyTheme(this)
         super.onCreate(savedInstanceState)
         binding = ActivityForumDetailBinding.inflate(layoutInflater)
         setContentView(binding.root)

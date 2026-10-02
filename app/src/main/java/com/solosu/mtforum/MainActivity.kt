@@ -1,17 +1,23 @@
 package com.solosu.mtforum
 
 import android.content.Intent
+import android.content.res.ColorStateList
+import android.graphics.Typeface
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.view.View
 import android.view.animation.Animation
 import android.view.animation.AnimationUtils
+import android.view.animation.DecelerateInterpolator
+import android.view.animation.OvershootInterpolator
 import android.widget.ImageView
 import android.widget.TextView
 import android.widget.Toast
 
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
+import androidx.core.widget.ImageViewCompat
 import androidx.drawerlayout.widget.DrawerLayout
 import androidx.viewpager2.widget.ViewPager2
 
@@ -86,13 +92,15 @@ class MainActivity : AppCompatActivity() {
     private var frostedNavBackground: FrostedGlassDrawable? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        com.solosu.mtforum.util.ThemeManager.applyTheme(this)
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
+        binding.mainDrawer.setStatusBarBackgroundColor(ContextCompat.getColor(this, R.color.background))
+        com.solosu.mtforum.util.ThemeManager.setupWindow(this)
 
-        // 底部导航栏统一使用彩色流水灯边缘，并保留胶囊形状。
-        val density = resources.displayMetrics.density
-        frostedNavBackground = FrostedGlassDrawable.create(this, 24f)
+        // 底部导航栏统一使用纯净圆润大胶囊
+        frostedNavBackground = FrostedGlassDrawable.create(this, 32f)
         binding.bottomNavContainer.background = frostedNavBackground
 
         // 初始化 ViewPager2：首页/版块/消息/我的 四页快速切换
@@ -100,6 +108,8 @@ class MainActivity : AppCompatActivity() {
         pagerAdapter = MainPagerAdapter(this)
         mainPager!!.adapter = pagerAdapter
         mainPager!!.offscreenPageLimit = MainPagerAdapter.PAGE_COUNT - 1 // 全页保活，切换不重建
+        // 降低 ViewPager2 左右滑动灵敏度，保证列表上下滑动极其丝滑不被截胡
+        reduceViewPager2Sensitivity(mainPager!!, 3.2f)
         mainPager!!.registerOnPageChangeCallback(object : ViewPager2.OnPageChangeCallback() {
             override fun onPageSelected(position: Int) {
                 updateNavSelectionByPosition(position)
@@ -356,6 +366,18 @@ class MainActivity : AppCompatActivity() {
                         com.solosu.mtforum.ui.BlacklistActivity::class.java
                     )
                 )
+            }
+        }
+
+        // 主题色彩切换
+        val themeColorRow = findViewById<View>(R.id.drawer_theme_color)
+        val tvThemeColorDesc = findViewById<TextView>(R.id.drawer_theme_color_desc)
+        if (themeColorRow != null) {
+            val cur = com.solosu.mtforum.util.ThemeManager.getCurrentThemeColor(this)
+            tvThemeColorDesc?.text = "当前：${cur.name}"
+            themeColorRow.setOnClickListener {
+                drawerLayout!!.closeDrawer(drawerPanel!!)
+                com.solosu.mtforum.util.ThemeManager.showColorPickerDialog(this)
             }
         }
 
@@ -670,17 +692,60 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
-        // 前4项 — 首页/版块/我的使用NavController导航；消息直接启动NoticeActivity
-        navHome!!.setOnClickListener { switchPage(MainPagerAdapter.PAGE_HOME) }
-        navCommunity!!.setOnClickListener { switchPage(MainPagerAdapter.PAGE_COMMUNITY) }
-        navMessage!!.setOnClickListener { switchPage(MainPagerAdapter.PAGE_MESSAGE) }
-        navProfile!!.setOnClickListener { switchPage(MainPagerAdapter.PAGE_PROFILE) }
-
-        // 中间凸起发布按钮 — 启动 PostActivity
-        navPost!!.setOnClickListener {
-            val intent = Intent(this@MainActivity, PostActivity::class.java)
-            startActivity(intent)
+        // 前4项 — 首页/版块/我的使用NavController导航；带现代回弹微动效
+        val applyTabClick: (View, Int) -> Unit = { view, pos ->
+            view.animate()
+                .scaleX(0.88f)
+                .scaleY(0.88f)
+                .setDuration(90)
+                .withEndAction {
+                    view.animate()
+                        .scaleX(1.0f)
+                        .scaleY(1.0f)
+                        .setDuration(160)
+                        .setInterpolator(OvershootInterpolator(2.2f))
+                        .start()
+                    switchPage(pos)
+                }
+                .start()
         }
+
+        navHome!!.setOnClickListener { applyTabClick(it, MainPagerAdapter.PAGE_HOME) }
+        navCommunity!!.setOnClickListener { applyTabClick(it, MainPagerAdapter.PAGE_COMMUNITY) }
+        navMessage!!.setOnClickListener { applyTabClick(it, MainPagerAdapter.PAGE_MESSAGE) }
+        navProfile!!.setOnClickListener { applyTabClick(it, MainPagerAdapter.PAGE_PROFILE) }
+
+        // 中间凸起发布按钮 — 带旋转回弹微动效
+        navPost!!.setOnClickListener {
+            navPost!!.animate()
+                .scaleX(0.86f)
+                .scaleY(0.86f)
+                .rotation(45f)
+                .setDuration(110)
+                .withEndAction {
+                    navPost!!.animate()
+                        .scaleX(1.0f)
+                        .scaleY(1.0f)
+                        .rotation(0f)
+                        .setDuration(200)
+                        .setInterpolator(OvershootInterpolator(2.5f))
+                        .start()
+                    val intent = Intent(this@MainActivity, PostActivity::class.java)
+                    startActivity(intent)
+                }
+                .start()
+        }
+
+        // 中间发布按钮动态应用当前主题色微渐变
+        val themeColor = com.solosu.mtforum.util.ThemeManager.getThemeColor(this)
+        val themeLight = com.solosu.mtforum.util.ThemeManager.getThemeLightColor(this)
+        val centerBg = android.graphics.drawable.GradientDrawable(
+            android.graphics.drawable.GradientDrawable.Orientation.TL_BR,
+            intArrayOf(themeColor, themeLight)
+        ).apply {
+            shape = android.graphics.drawable.GradientDrawable.OVAL
+        }
+        ivPostIcon?.background = centerBg
 
         // 初始选中状态
         updateNavSelectionByPosition(MainPagerAdapter.PAGE_HOME)
@@ -696,6 +761,21 @@ class MainActivity : AppCompatActivity() {
         updateNavSelectionByPosition(position)
         // build71: 用户主动点标签 -> 底部栏必须显示
         setBottomNavVisible(true)
+    }
+
+    /**
+     * 降低 ViewPager2 左右滑动的灵敏度，避免手指轻微倾斜误触发横向切页导致上下滑动卡顿
+     */
+    private fun reduceViewPager2Sensitivity(viewPager: ViewPager2, multiplier: Float) {
+        try {
+            val recyclerView = viewPager.getChildAt(0) as? androidx.recyclerview.widget.RecyclerView ?: return
+            val touchSlopField = androidx.recyclerview.widget.RecyclerView::class.java.getDeclaredField("mTouchSlop")
+            touchSlopField.isAccessible = true
+            val currentTouchSlop = touchSlopField.getInt(recyclerView)
+            touchSlopField.setInt(recyclerView, (currentTouchSlop * multiplier).toInt())
+        } catch (e: Throwable) {
+            android.util.Log.w("MainActivity", "Failed to reduce ViewPager2 sensitivity: ${e.message}")
+        }
     }
 
     // ==================== build71: 底部导航栏滚动自动隐藏 ====================
@@ -782,18 +862,49 @@ class MainActivity : AppCompatActivity() {
 
     private fun setItemActive(icon: ImageView?, text: TextView?) {
         if (icon == null || text == null) return
-        icon.setImageResource(getActiveIconRes(icon.id))
-        icon.clearAnimation()
-        val anim: Animation = AnimationUtils.loadAnimation(this, android.R.anim.fade_in)
-        anim.duration = 150
-        icon.startAnimation(anim)
-        text.setTextColor(resources.getColor(R.color.nav_text_active, null))
+        val activeColor = com.solosu.mtforum.util.ThemeManager.getThemeColor(this)
+        ImageViewCompat.setImageTintList(icon, ColorStateList.valueOf(activeColor))
+        text.setTextColor(activeColor)
+        text.setTypeface(null, Typeface.BOLD)
+
+        // 现代弹性微缩放与微上浮动效
+        icon.animate()
+            .scaleX(1.15f)
+            .scaleY(1.15f)
+            .translationY(-dp(2f))
+            .setDuration(190)
+            .setInterpolator(OvershootInterpolator(2.2f))
+            .start()
+
+        text.animate()
+            .scaleX(1.05f)
+            .scaleY(1.05f)
+            .translationY(-dp(1f))
+            .setDuration(190)
+            .start()
     }
 
     private fun setItemInactive(icon: ImageView?, text: TextView?) {
         if (icon == null || text == null) return
-        icon.setImageResource(getInactiveIconRes(icon.id))
-        text.setTextColor(resources.getColor(R.color.nav_text_default, null))
+        val defaultColor = ContextCompat.getColor(this, R.color.nav_icon_default)
+        ImageViewCompat.setImageTintList(icon, ColorStateList.valueOf(defaultColor))
+        text.setTextColor(ContextCompat.getColor(this, R.color.nav_text_default))
+        text.setTypeface(null, Typeface.NORMAL)
+
+        icon.animate()
+            .scaleX(1.0f)
+            .scaleY(1.0f)
+            .translationY(0f)
+            .setDuration(160)
+            .setInterpolator(DecelerateInterpolator())
+            .start()
+
+        text.animate()
+            .scaleX(1.0f)
+            .scaleY(1.0f)
+            .translationY(0f)
+            .setDuration(160)
+            .start()
     }
 
     private fun getActiveIconRes(viewId: Int): Int {

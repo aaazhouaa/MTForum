@@ -48,11 +48,14 @@ class ThreadAdapter(private val context: Context) : RecyclerView.Adapter<ThreadA
         fun onUserClick(thread: Thread?)
     }
 
+    private var lastAnimatedPosition = -1
+
     fun setThreadList(list: MutableList<Thread>?) {
         this.threadList = if (list != null) list else ArrayList()
         serverFollowingUids = null
         serverFollowingLoaded = false
         followStateLoading = false
+        lastAnimatedPosition = -1
         notifyDataSetChanged()
     }
 
@@ -325,9 +328,35 @@ class ThreadAdapter(private val context: Context) : RecyclerView.Adapter<ThreadA
         }
 
         holder.itemView.setOnClickListener { v ->
-            if (listener != null) {
-                listener!!.onItemClick(thread, position)
-            }
+            v.animate()
+                .scaleX(0.97f)
+                .scaleY(0.97f)
+                .setDuration(80)
+                .withEndAction {
+                    v.animate()
+                        .scaleX(1.0f)
+                        .scaleY(1.0f)
+                        .setDuration(120)
+                        .setInterpolator(android.view.animation.OvershootInterpolator(2.0f))
+                        .start()
+                    if (listener != null) {
+                        listener!!.onItemClick(thread, position)
+                    }
+                }
+                .start()
+        }
+
+        // 现代列表入场微动效：淡入 + 微上浮
+        if (position > lastAnimatedPosition) {
+            holder.itemView.alpha = 0f
+            holder.itemView.translationY = 24f * context.resources.displayMetrics.density
+            holder.itemView.animate()
+                .alpha(1f)
+                .translationY(0f)
+                .setDuration(220)
+                .setInterpolator(android.view.animation.DecelerateInterpolator(1.5f))
+                .start()
+            lastAnimatedPosition = position
         }
 
         // 长按帖子卡片 = 拉黑作者(个人小黑屋)

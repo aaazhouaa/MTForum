@@ -100,7 +100,7 @@
                                     android:background="@drawable/level_badge_bg"
                                     android:paddingHorizontal="8dp"
                                     android:paddingVertical="2dp"
-                                    android:textColor="@color/primary"
+                                    android:textColor="?attr/colorPrimary"
                                     android:textSize="11sp" />
                             </LinearLayout>
 
@@ -111,7 +111,7 @@
                                 android:layout_marginTop="2dp"
                                 android:maxLines="1"
                                 android:ellipsize="end"
-                                android:textColor="@color/primary"
+                                android:textColor="?attr/colorPrimary"
                                 android:textSize="13sp"
                                 android:textStyle="bold" />
 
@@ -128,7 +128,7 @@
                             android:paddingHorizontal="12dp"
                             android:text="关注"
                             android:textSize="12sp"
-                            android:textColor="@color/primary" />
+                            android:textColor="?attr/colorPrimary" />
                     </LinearLayout>
 
                     <!-- 分隔线 -->
@@ -358,7 +358,7 @@
                             android:id="@+id/tv_credits"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:textColor="@color/primary"
+                            android:textColor="?attr/colorPrimary"
                             android:textSize="18sp"
                             android:textStyle="bold" />
                         <TextView

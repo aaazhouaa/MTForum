@@ -12,19 +12,16 @@ import android.widget.LinearLayout
 import android.widget.ListView
 import android.widget.TextView
 import android.widget.Toast
-
 import androidx.appcompat.app.AppCompatActivity
-
+import androidx.core.content.ContextCompat
 import com.bumptech.glide.Glide
+import com.google.android.material.appbar.MaterialToolbar
 import com.solosu.mtforum.R
 import com.solosu.mtforum.session.BlacklistManager
 import com.solosu.mtforum.session.BlacklistSyncer
 import com.solosu.mtforum.ui.space.UserProfileActivity
-
 import java.text.SimpleDateFormat
-import java.util.ArrayList
 import java.util.Date
-import java.util.List
 import java.util.Locale
 
 /**
@@ -37,18 +34,31 @@ class BlacklistActivity : AppCompatActivity() {
     private lateinit var adapter: EntryAdapter
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        com.solosu.mtforum.util.ThemeManager.applyTheme(this)
         super.onCreate(savedInstanceState)
-        title = "个人小黑屋"
-        if (supportActionBar != null) supportActionBar!!.setDisplayHomeAsUpEnabled(true)
 
         val root = LinearLayout(this)
         root.orientation = LinearLayout.VERTICAL
-        root.setBackgroundColor(0xFFF5F6F8.toInt())
+        root.fitsSystemWindows = true
+        root.setBackgroundColor(ContextCompat.getColor(this, R.color.background))
+
+        // 现代标准 Toolbar
+        val toolbar = MaterialToolbar(this)
+        toolbar.layoutParams = LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            dp(48f)
+        )
+        toolbar.title = "个人小黑屋"
+        toolbar.setTitleTextColor(ContextCompat.getColor(this, R.color.text_primary))
+        toolbar.setNavigationIcon(R.drawable.ic_back)
+        toolbar.setNavigationIconTint(ContextCompat.getColor(this, R.color.text_primary))
+        toolbar.setNavigationOnClickListener { finish() }
+        root.addView(toolbar)
 
         tvCount = TextView(this)
-        tvCount.setPadding(dp(20f), dp(14f), dp(20f), dp(10f))
-        tvCount.setTextColor(0xFF888888.toInt())
-        tvCount.setTextSize(13f)
+        tvCount.setPadding(dp(16f), dp(10f), dp(16f), dp(8f))
+        tvCount.setTextColor(ContextCompat.getColor(this, R.color.text_hint))
+        tvCount.textSize = 12f
         tvCount.isClickable = true
         // 长按计数行 = 清空个人名单
         tvCount.setOnLongClickListener {
@@ -67,8 +77,10 @@ class BlacklistActivity : AppCompatActivity() {
         root.addView(tvCount, LinearLayout.LayoutParams(-1, -2))
 
         val listView = ListView(this)
-        listView.divider = android.graphics.drawable.ColorDrawable(0x11000000)
-        listView.dividerHeight = 1
+        listView.divider = android.graphics.drawable.ColorDrawable(
+            ContextCompat.getColor(this, R.color.divider)
+        )
+        listView.dividerHeight = dp(0.5f)
         adapter = EntryAdapter(this)
         listView.adapter = adapter
         root.addView(listView, LinearLayout.LayoutParams(-1, -1, 1f))
@@ -82,14 +94,6 @@ class BlacklistActivity : AppCompatActivity() {
                 runOnUiThread { render() }
             }
         })
-    }
-
-    override fun onOptionsItemSelected(item: android.view.MenuItem): Boolean {
-        if (item.itemId == android.R.id.home) {
-            finish()
-            return true
-        }
-        return super.onOptionsItemSelected(item)
     }
 
     private fun render() {

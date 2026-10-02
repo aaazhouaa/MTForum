@@ -38,6 +38,7 @@ class EditProfileActivity : AppCompatActivity() {
     private var avatarUploadInProgress = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        com.solosu.mtforum.util.ThemeManager.applyTheme(this)
         super.onCreate(savedInstanceState)
         binding = ActivityEditProfileBinding.inflate(layoutInflater)
         setContentView(binding.root)

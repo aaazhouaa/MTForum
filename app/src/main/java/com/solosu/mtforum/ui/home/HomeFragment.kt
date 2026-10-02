@@ -39,8 +39,9 @@ class HomeFragment : Fragment() {
     private lateinit var httpClient: HttpClient
     private var threadAdapter: ThreadAdapter? = null
     private var currentPage = 1
-    private var isLoading = false
+    private var isFetchingNetwork = false
     private var hasMore = true
+    private val pendingBuffer: MutableList<Thread> = ArrayList()
 
     @Nullable
     override fun onCreateView(@NonNull inflater: LayoutInflater, @Nullable container: ViewGroup?, @Nullable savedInstanceState: Bundle?): View? {
@@ -62,9 +63,32 @@ class HomeFragment : Fragment() {
             val intent = Intent(requireContext(), SearchActivity::class.java)
             startActivity(intent)
         }
-        // 搜索图标毛玻璃背景
-        binding!!.ivAi.background = FrostedGlassDrawable.create(requireContext(), 10f)
-        binding!!.ivSearch.background = FrostedGlassDrawable.create(requireContext(), 10f)
+        // 深浅色主题手动切换 (太阳/月亮)
+        updateThemeToggleIcon()
+        binding!!.ivThemeToggle.setOnClickListener {
+            it.animate()
+                .rotationBy(360f)
+                .scaleX(0.85f)
+                .scaleY(0.85f)
+                .setDuration(180)
+                .withEndAction {
+                    it.scaleX = 1.0f
+                    it.scaleY = 1.0f
+                    val isDarkNow = com.solosu.mtforum.util.ThemeManager.toggleNightMode(requireActivity())
+                    updateThemeToggleIcon()
+                    android.widget.Toast.makeText(
+                        requireContext(),
+                        if (isDarkNow) "已切换为暗色主题" else "已切换为亮色主题",
+                        android.widget.Toast.LENGTH_SHORT
+                    ).show()
+                }
+                .start()
+        }
+
+        // 顶栏图标背景统一质感
+        binding!!.ivThemeToggle.background = FrostedGlassDrawable.createSubtle(requireContext(), 10f)
+        binding!!.ivAi.background = FrostedGlassDrawable.createSubtle(requireContext(), 10f)
+        binding!!.ivSearch.background = FrostedGlassDrawable.createSubtle(requireContext(), 10f)
 
         // RecyclerView + ThreadAdapter
         threadAdapter = ThreadAdapter(requireContext())
@@ -87,21 +111,19 @@ class HomeFragment : Fragment() {
         binding!!.recyclerView.layoutManager = LinearLayoutManager(requireContext())
         binding!!.recyclerView.adapter = threadAdapter
 
-        // 滚动监听实现翻页加载
+        // 滚动监听实现翻页加载（每次加载10条，滑到第6条时自动往后预载）
         binding!!.recyclerView.addOnScrollListener(object : RecyclerView.OnScrollListener() {
             override fun onScrolled(@NonNull recyclerView: RecyclerView, dx: Int, dy: Int) {
                 super.onScrolled(recyclerView, dx, dy)
                 // build71: 滚动方向 -> 底部导航栏自动隐藏/出现
                 NavBarAutoHideHelper.onScrolled(getActivity(), dy)
-                if (dy <= 0 || isLoading || !hasMore) return
-                val lm = recyclerView.layoutManager as LinearLayoutManager?
-                if (lm != null) {
-                    val visibleItemCount = lm.childCount
-                    val totalItemCount = lm.itemCount
-                    val firstVisibleItemPosition = lm.findFirstVisibleItemPosition()
-                    if (visibleItemCount + firstVisibleItemPosition >= totalItemCount - 2) {
-                        loadMoreThreads()
-                    }
+                if (dy <= 0) return
+                val lm = recyclerView.layoutManager as? LinearLayoutManager ?: return
+                val lastVisiblePosition = lm.findLastVisibleItemPosition()
+                val totalItemCount = lm.itemCount
+                // 当滑到新刷出的第 6 条（即离当前末尾只剩 4 条以内），自动追加后 10 条
+                if (totalItemCount > 0 && lastVisiblePosition >= totalItemCount - PRELOAD_THRESHOLD) {
+                    checkAndTriggerNextBatch()
                 }
             }
         })
@@ -283,75 +305,101 @@ class HomeFragment : Fragment() {
     private fun refreshThreads() {
         currentPage = 1
         hasMore = true
-        loadThreads(currentPage, true)
+        pendingBuffer.clear()
+        fetchNetworkPage(currentPage, true)
     }
 
-    private fun loadMoreThreads() {
-        if (isLoading || !hasMore) return
-        currentPage++
-        loadThreads(currentPage, false)
+    private fun checkAndTriggerNextBatch() {
+        if (isFetchingNetwork) return
+        if (pendingBuffer.size >= BATCH_STEP) {
+            dispatchNextBatch()
+        } else if (hasMore) {
+            currentPage++
+            fetchNetworkPage(currentPage, false)
+        } else if (pendingBuffer.isNotEmpty()) {
+            dispatchNextBatch()
+        }
     }
 
-    private fun loadThreads(page: Int, isRefresh: Boolean) {
-        isLoading = true
-        binding!!.swipeRefresh.isRefreshing = true
+    private fun dispatchNextBatch() {
+        if (pendingBuffer.isEmpty()) return
+        val countToTake = minOf(BATCH_STEP, pendingBuffer.size)
+        val batch = ArrayList(pendingBuffer.subList(0, countToTake))
+        for (i in 0 until countToTake) {
+            pendingBuffer.removeAt(0)
+        }
+        if (!isAdded) return
+        threadAdapter?.addThreads(batch)
+    }
 
-        java.lang.Thread(object : Runnable {
-            override fun run() {
-                try {
-                    val url = ForumParser.getHomeUrl(page)
-                    val html = httpClient.get(url)
-                    val threads: MutableList<Thread>? = ForumParser.parseThreadList(html)
+    private fun fetchNetworkPage(page: Int, isRefresh: Boolean) {
+        if (isFetchingNetwork) return
+        isFetchingNetwork = true
+        if (isRefresh) {
+            binding?.swipeRefresh?.isRefreshing = true
+        }
 
-                    if (!isAdded()) return
-                    // 黑名单过滤:拉黑作者的帖子直接不进列表
-                    if (threads != null) {
-                        val black = com.solosu.mtforum.session.BlacklistManager.uidSet(requireContext())
-                        if (!black.isEmpty()) {
-                            val it = threads.iterator()
-                            while (it.hasNext()) {
-                                val t = it.next()
-                                if (t != null && t.authorUid != null && black.contains(t.authorUid)) it.remove()
-                            }
-                        }
-                    }
-                    requireActivity().runOnUiThread {
-                        if (!isAdded()) return@runOnUiThread
-                        if (threads != null && !threads.isEmpty()) {
-                            if (isRefresh) {
-                                threadAdapter!!.setThreadList(threads)
-                            } else {
-                                threadAdapter!!.addThreads(threads)
-                            }
-                            hasMore = threads.size >= PAGE_SIZE
-                            // build63: 取消列表页收藏数预取(每页20发->0),改为进详情页时回填缓存
-                        } else {
-                            hasMore = false
-                            if (isRefresh) {
-                                threadAdapter!!.setThreadList(null)
-                            }
-                        }
-                        isLoading = false
-                        binding!!.swipeRefresh.isRefreshing = false
-                    }
-                } catch (e: Exception) {
-                    if (!isAdded()) return
-                    requireActivity().runOnUiThread {
-                        if (!isAdded()) return@runOnUiThread
-                        isLoading = false
-                        binding!!.swipeRefresh.isRefreshing = false
-                        if (isRefresh && threadAdapter!!.itemCount == 0) {
-                            android.widget.Toast.makeText(requireContext(),
-                                    "加载失败: " + e.message, android.widget.Toast.LENGTH_SHORT).show()
+        java.lang.Thread {
+            try {
+                val url = ForumParser.getHomeUrl(page)
+                val html = httpClient.get(url)
+                val threads: MutableList<Thread>? = ForumParser.parseThreadList(html)
+
+                if (!isAdded) return@Thread
+                // 黑名单过滤:拉黑作者的帖子直接不进列表
+                if (threads != null) {
+                    val black = com.solosu.mtforum.session.BlacklistManager.uidSet(requireContext())
+                    if (!black.isEmpty()) {
+                        val it = threads.iterator()
+                        while (it.hasNext()) {
+                            val t = it.next()
+                            if (t != null && t.authorUid != null && black.contains(t.authorUid)) it.remove()
                         }
                     }
                 }
+                requireActivity().runOnUiThread {
+                    if (!isAdded) return@runOnUiThread
+                    if (threads != null && !threads.isEmpty()) {
+                        hasMore = threads.size >= PAGE_SIZE
+                        pendingBuffer.addAll(threads)
+                        if (isRefresh) {
+                            val countToTake = minOf(BATCH_STEP, pendingBuffer.size)
+                            val firstBatch = ArrayList(pendingBuffer.subList(0, countToTake))
+                            for (i in 0 until countToTake) {
+                                pendingBuffer.removeAt(0)
+                            }
+                            threadAdapter?.setThreadList(firstBatch)
+                        } else {
+                            dispatchNextBatch()
+                        }
+                    } else {
+                        hasMore = false
+                        if (isRefresh) {
+                            threadAdapter?.setThreadList(null)
+                        } else {
+                            dispatchNextBatch()
+                        }
+                    }
+                    isFetchingNetwork = false
+                    binding?.swipeRefresh?.isRefreshing = false
+                }
+            } catch (e: Exception) {
+                if (!isAdded) return@Thread
+                requireActivity().runOnUiThread {
+                    if (!isAdded) return@runOnUiThread
+                    isFetchingNetwork = false
+                    binding?.swipeRefresh?.isRefreshing = false
+                    if (isRefresh && (threadAdapter == null || threadAdapter!!.itemCount == 0)) {
+                        com.solosu.mtforum.util.ToastUtil.show(requireContext(), "加载失败: " + e.message)
+                    }
+                }
             }
-        }).start()
+        }.start()
     }
 
     override fun onResume() {
         super.onResume()
+        updateThemeToggleIcon()
         if (threadAdapter != null && threadAdapter!!.itemCount == 0) {
             refreshThreads()
         } else if (threadAdapter != null) {
@@ -379,6 +427,12 @@ class HomeFragment : Fragment() {
         } catch (ignore: Exception) { }
     }
 
+    private fun updateThemeToggleIcon() {
+        val b = binding ?: return
+        val isDark = com.solosu.mtforum.util.ThemeManager.isDarkMode(requireContext())
+        b.ivThemeToggle.setImageResource(if (isDark) R.drawable.ic_sun else R.drawable.ic_moon)
+    }
+
     override fun onDestroyView() {
         super.onDestroyView()
         binding = null
@@ -386,5 +440,7 @@ class HomeFragment : Fragment() {
 
     companion object {
         private const val PAGE_SIZE = 20
+        private const val BATCH_STEP = 10
+        private const val PRELOAD_THRESHOLD = 4
     }
 }

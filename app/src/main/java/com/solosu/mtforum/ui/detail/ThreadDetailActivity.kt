@@ -155,6 +155,7 @@ class ThreadDetailActivity : AppCompatActivity() {
     private var imagePickerLauncher: ActivityResultLauncher<PickVisualMediaRequest>? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        com.solosu.mtforum.util.ThemeManager.applyTheme(this)
         super.onCreate(savedInstanceState)
         binding = ThreadDetailActivityBinding.inflate(layoutInflater)
         setContentView(binding.root)
@@ -170,18 +171,24 @@ class ThreadDetailActivity : AppCompatActivity() {
         binding.etReply.setOnClickListener { showReplyBottomSheet(currentReplyTarget) }
         binding.etReply.isFocusable = false
         binding.etReply.isCursorVisible = false
-        binding.btnComments.setOnClickListener {
+        val commentsClick = View.OnClickListener {
             binding.recyclerReplies.visibility = View.VISIBLE
             binding.nestedScroll.post {
                 binding.nestedScroll.smoothScrollTo(0, binding.recyclerReplies.top)
             }
         }
-        val btnPickImageInline = findViewById<ImageButton>(R.id.btn_pick_image_inline)
-        if (btnPickImageInline != null) {
-            btnPickImageInline.setOnClickListener { pickImage() }
-        }
+        binding.btnComments.setOnClickListener(commentsClick)
+        binding.layoutComments.setOnClickListener(commentsClick)
+
+        val pickImageClick = View.OnClickListener { pickImage() }
+        binding.btnPickImageInline.setOnClickListener(pickImageClick)
+        binding.layoutPickImage.setOnClickListener(pickImageClick)
+
         binding.btnLike.setOnClickListener { toggleLike() }
+        binding.layoutLike.setOnClickListener { toggleLike() }
+
         binding.btnFavorite.setOnClickListener { toggleFavorite() }
+        binding.layoutFavorite.setOnClickListener { toggleFavorite() }
         binding.btnShare.setOnClickListener { shareThread() }
         binding.btnViewHidden.setOnClickListener { viewHiddenContent() }
         binding.btnLoadMore.setOnClickListener { loadMoreReplies() }
@@ -665,10 +672,11 @@ class ThreadDetailActivity : AppCompatActivity() {
             }
         }
         replyAdapter!!.updateData(result)
+        val themeColor = com.solosu.mtforum.util.ThemeManager.getThemeColor(this)
         binding.btnOnlyOp.setText(if (onlyOpReplies) R.string.reply_all_users else R.string.reply_only_op)
-        binding.btnOnlyOp.setTextColor(getColor(if (onlyOpReplies) R.color.primary else R.color.text_secondary))
+        binding.btnOnlyOp.setTextColor(if (onlyOpReplies) themeColor else getColor(R.color.text_secondary))
         binding.btnReplyOrder.setText(if (repliesDescending) R.string.reply_order_desc else R.string.reply_order_asc)
-        binding.btnReplyOrder.setTextColor(getColor(if (repliesDescending) R.color.primary else R.color.text_secondary))
+        binding.btnReplyOrder.setTextColor(if (repliesDescending) themeColor else getColor(R.color.text_secondary))
         if (result.isEmpty()) {
             binding.recyclerReplies.visibility = View.GONE
             binding.tvEmptyReplies.visibility = View.VISIBLE
@@ -1052,11 +1060,28 @@ class ThreadDetailActivity : AppCompatActivity() {
         )
     }
 
+    private fun animateBounce(view: View) {
+        view.animate()
+            .scaleX(1.3f)
+            .scaleY(1.3f)
+            .setDuration(120)
+            .withEndAction {
+                view.animate()
+                    .scaleX(1.0f)
+                    .scaleY(1.0f)
+                    .setDuration(180)
+                    .setInterpolator(android.view.animation.OvershootInterpolator(2.5f))
+                    .start()
+            }
+            .start()
+    }
+
     private fun updateLikeIcon() {
         val button = binding.btnLike
         // build66: 改用与列表页一致的拇指标(原 forum_like 是心形),用颜色区分已赞/未赞
         button.setImageResource(R.drawable.ic_like_detail)
-        button.setColorFilter(getColor(if (isLiked) R.color.primary else R.color.icon_secondary))
+        val themeColor = com.solosu.mtforum.util.ThemeManager.getThemeColor(this)
+        button.setColorFilter(if (isLiked) themeColor else getColor(R.color.icon_secondary))
         updateCountBadge(binding.tvLikeBadge, maxOf(0, likeCount))
         // build80: 点赞数回写缓存, 返回列表页时按 tid 回填, 及时同步
         if (!TextUtils.isEmpty(tid)) {
@@ -1131,6 +1156,7 @@ class ThreadDetailActivity : AppCompatActivity() {
         }
         val targetState = !isFavorited
         val oldState = isFavorited
+        animateBounce(binding.btnFavorite)
         binding.btnFavorite.isEnabled = false
         java.lang.Thread {
             var success = false
@@ -1494,6 +1520,7 @@ class ThreadDetailActivity : AppCompatActivity() {
         val oldCount = likeCount
         isLiked = targetState
         likeCount = maxOf(0, likeCount + (if (targetState) 1 else -1))
+        animateBounce(binding.btnLike)
         updateLikeIcon()
         binding.btnLike.isEnabled = false
         java.lang.Thread {

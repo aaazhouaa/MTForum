@@ -39,6 +39,7 @@ class NoticeActivity : AppCompatActivity() {
     private var lastBadgeLoadAt = 0L // build68: 上次六类角标拉取时间戳(节流用)
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        com.solosu.mtforum.util.ThemeManager.applyTheme(this)
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_notice)
 

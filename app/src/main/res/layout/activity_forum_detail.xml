@@ -71,7 +71,7 @@
             android:textSize="12sp"
             android:textColor="@color/text_white"
             app:cornerRadius="18dp"
-            app:backgroundTint="@color/primary" />
+            app:backgroundTint="?attr/colorPrimary" />
     </LinearLayout>
 
     <View
@@ -84,9 +84,9 @@
         android:id="@+id/tab_layout"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        app:tabIndicatorColor="@color/primary"
+        app:tabIndicatorColor="?attr/colorPrimary"
         app:tabIndicatorHeight="2dp"
-        app:tabSelectedTextColor="@color/primary"
+        app:tabSelectedTextColor="?attr/colorPrimary"
         app:tabTextColor="@color/text_secondary"
         app:tabMode="fixed"
         app:tabGravity="fill"

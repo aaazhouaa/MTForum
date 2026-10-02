@@ -94,9 +94,8 @@ object DialogHelper {
         }
         if (root == null) root = content
 
-        // 直接替换根容器背景为毛玻璃
-        root.setBackground(FrostedGlassDrawable(
-                if (isDark) 0xFF1E1E1E.toInt() else 0xFFFFFFFF.toInt(), radius, density))
+        // 直接替换根容器背景为现代质感表面
+        root.setBackground(FrostedGlassDrawable.create(context, 16f))
 
         // 递归清空子 ViewGroup 背景,让毛玻璃透出
         clearChildBackgrounds(root)

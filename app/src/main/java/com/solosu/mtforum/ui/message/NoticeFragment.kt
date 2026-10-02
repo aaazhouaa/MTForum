@@ -11,6 +11,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.animation.Animation
 import android.view.animation.AnimationUtils
+import android.widget.ImageView
 import android.widget.TextView
 
 import androidx.annotation.NonNull
@@ -105,9 +106,9 @@ class NoticeFragment : Fragment() {
         applyFrostedGlassToIcon(b.ivEmojiApp)
     }
 
-    private fun applyFrostedGlassToIcon(icon: TextView?) {
+    private fun applyFrostedGlassToIcon(icon: ImageView?) {
         if (icon != null) {
-            icon.background = FrostedGlassDrawable.create(requireContext(), 10f)
+            icon.background = FrostedGlassDrawable.createSubtle(requireContext(), 10f)
         }
     }
 

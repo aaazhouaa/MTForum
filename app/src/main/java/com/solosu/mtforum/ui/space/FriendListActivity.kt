@@ -30,6 +30,7 @@ class FriendListActivity : AppCompatActivity() {
     private var mode: String? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        com.solosu.mtforum.util.ThemeManager.applyTheme(this)
         super.onCreate(savedInstanceState)
         binding = ActivityFriendListBinding.inflate(layoutInflater)
         setContentView(binding.root)
