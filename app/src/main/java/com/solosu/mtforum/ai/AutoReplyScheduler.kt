@@ -72,15 +72,16 @@ object AutoReplyScheduler {
     @JvmStatic
     fun start(context: Context?) {
         if (context == null) return
-        appContext = context.getApplicationContext()
+        val ctx = context.getApplicationContext()
+        appContext = ctx
         if (!STARTED.compareAndSet(false, true)) {
             // 已在跑，仅刷新下一轮时间
             scheduleNext()
             return
         }
-        AiLog.i("scheduler", "调度器已启动，间隔 " + AiConfigManager.getReplyInterval(appContext) + " 秒")
+        AiLog.i("scheduler", "调度器已启动，间隔 " + AiConfigManager.getReplyInterval(ctx) + " 秒")
         // Application 启动阶段不要立刻打网络请求，延后一轮
-        HANDLER.postDelayed(TICK, AiConfigManager.getReplyInterval(appContext) * 1000L)
+        HANDLER.postDelayed(TICK, AiConfigManager.getReplyInterval(ctx) * 1000L)
     }
 
     @JvmStatic

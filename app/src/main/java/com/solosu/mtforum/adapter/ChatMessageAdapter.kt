@@ -12,7 +12,6 @@ import com.bumptech.glide.Glide
 import com.solosu.mtforum.R
 import com.solosu.mtforum.model.ChatMessage
 import java.util.ArrayList
-import java.util.List
 
 class ChatMessageAdapter(private val context: Context) : RecyclerView.Adapter<ChatMessageAdapter.Holder>() {
     private val items = ArrayList<ChatMessage>()

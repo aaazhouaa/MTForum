@@ -68,7 +68,7 @@ class ThreadAdapter(private val context: Context) : RecyclerView.Adapter<ThreadA
         }
     }
 
-    fun addThreads(list: List<Thread>?) {
+    fun addThreads(list: MutableList<Thread>?) {
         if (list != null) {
             val start = threadList.size
             threadList.addAll(list)
