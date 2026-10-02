@@ -13,7 +13,6 @@ import com.solosu.mtforum.R
 import com.solosu.mtforum.model.ForumCategory
 import com.solosu.mtforum.ui.widget.FrostedGlassDrawable
 import java.util.ArrayList
-import java.util.List
 
 /**
  * 版块网格适配器 — 2列网格展示所有子版块
