@@ -8,7 +8,7 @@ import android.view.Window
 import android.view.WindowManager
 import android.widget.ImageButton
 import android.widget.TextView
-import android.widget.Toast
+import com.solosu.mtforum.util.ToastUtil as Toast
 
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.RecyclerView

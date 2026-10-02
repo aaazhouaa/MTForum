@@ -62,7 +62,7 @@
                 android:layout_height="36dp"
                 android:layout_centerVertical="true"
                 android:layout_marginEnd="14dp"
-                android:padding="8dp"
+                android:padding="7dp"
                 android:src="@drawable/ic_search_new"
                 android:clickable="true"
                 android:focusable="true"

@@ -45,7 +45,7 @@
             android:paddingHorizontal="14dp"
             android:paddingVertical="8dp"
             android:text="保存"
-            android:textColor="@color/primary"
+            android:textColor="?attr/colorPrimary"
             android:textSize="15sp"
             android:textStyle="bold" />
     </LinearLayout>
@@ -158,7 +158,7 @@
                         android:paddingHorizontal="12dp"
                         android:paddingVertical="7dp"
                         android:text="获取可用模型"
-                        android:textColor="@color/primary"
+                        android:textColor="?attr/colorPrimary"
                         android:textSize="12sp" />
 
                     <TextView
@@ -284,7 +284,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="0.7"
-                        android:textColor="@color/primary"
+                        android:textColor="?attr/colorPrimary"
                         android:textSize="13sp" />
                 </LinearLayout>
 
@@ -455,7 +455,7 @@
                     android:gravity="center"
                     android:paddingVertical="9dp"
                     android:text="恢复默认提示词"
-                    android:textColor="@color/primary"
+                    android:textColor="?attr/colorPrimary"
                     android:textSize="13sp" />
             </LinearLayout>
 

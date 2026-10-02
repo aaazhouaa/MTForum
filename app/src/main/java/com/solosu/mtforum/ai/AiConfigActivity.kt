@@ -7,7 +7,7 @@ import android.widget.AdapterView
 import android.widget.ArrayAdapter
 import android.widget.EditText
 import android.widget.SeekBar
-import android.widget.Toast
+import com.solosu.mtforum.util.ToastUtil as Toast
 
 import androidx.appcompat.app.AppCompatActivity
 

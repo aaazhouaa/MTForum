@@ -2,7 +2,7 @@ package com.solosu.mtforum.ui.space
 
 import android.content.Intent
 import android.os.Bundle
-import android.widget.Toast
+import com.solosu.mtforum.util.ToastUtil as Toast
 
 import androidx.annotation.Nullable
 import androidx.appcompat.app.AppCompatActivity
@@ -78,7 +78,7 @@ class FriendListActivity : AppCompatActivity() {
         binding.recyclerView.adapter = adapter
 
         binding.swipeRefresh.setOnRefreshListener { loadData(listUrl) }
-        binding.swipeRefresh.setColorSchemeResources(R.color.primary)
+        binding.swipeRefresh.setColorSchemeColors(com.solosu.mtforum.util.ThemeManager.getThemeColor(this))
 
         loadData(listUrl)
     }

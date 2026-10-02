@@ -58,7 +58,7 @@
                         android:paddingHorizontal="8dp"
                         android:paddingVertical="2dp"
                         android:textSize="11sp"
-                        android:textColor="@color/primary"
+                        android:textColor="?attr/colorPrimary"
                         android:visibility="gone" />
 
                     <TextView

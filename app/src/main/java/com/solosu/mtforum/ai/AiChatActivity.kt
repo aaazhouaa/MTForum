@@ -11,7 +11,7 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
-import android.widget.Toast
+import com.solosu.mtforum.util.ToastUtil as Toast
 
 import androidx.appcompat.app.AppCompatActivity
 
@@ -222,12 +222,25 @@ class AiChatActivity : AppCompatActivity() {
         tv.setPadding(pad, dp(9), pad, dp(9))
         tv.maxWidth = (resources.displayMetrics.widthPixels * 0.82f).toInt()
 
+        val density = resources.displayMetrics.density
+        val themeColor = com.solosu.mtforum.util.ThemeManager.getThemeColor(this)
+        val isDark = com.solosu.mtforum.util.ThemeManager.isDarkMode(this)
         if (isSystem) {
             tv.setBackgroundColor(Color.TRANSPARENT)
         } else if (isUser) {
-            tv.setBackgroundColor(Color.parseColor("#1A73E8"))
+            val userBg = android.graphics.drawable.GradientDrawable().apply {
+                shape = android.graphics.drawable.GradientDrawable.RECTANGLE
+                cornerRadius = 14f * density
+                setColor(themeColor)
+            }
+            tv.background = userBg
         } else {
-            tv.setBackgroundColor(Color.parseColor("#FFFFFF"))
+            val aiBg = android.graphics.drawable.GradientDrawable().apply {
+                shape = android.graphics.drawable.GradientDrawable.RECTANGLE
+                cornerRadius = 14f * density
+                setColor(if (isDark) 0xFF383C42.toInt() else 0xFFFFFFFF.toInt())
+            }
+            tv.background = aiBg
         }
         tv.setTextIsSelectable(true)
 
@@ -239,7 +252,13 @@ class AiChatActivity : AppCompatActivity() {
     private fun addThinking(): View {
         val box = LinearLayout(this)
         box.orientation = LinearLayout.VERTICAL
-        box.setBackgroundColor(Color.parseColor("#FFFFFF"))
+        val density = resources.displayMetrics.density
+        val isDark = com.solosu.mtforum.util.ThemeManager.isDarkMode(this)
+        box.background = android.graphics.drawable.GradientDrawable().apply {
+            shape = android.graphics.drawable.GradientDrawable.RECTANGLE
+            cornerRadius = 14f * density
+            setColor(if (isDark) 0xFF383C42.toInt() else 0xFFFFFFFF.toInt())
+        }
         val pad = dp(12)
         box.setPadding(pad, dp(9), pad, dp(9))
 

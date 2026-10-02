@@ -10,7 +10,7 @@ import android.view.View
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
-import android.widget.Toast
+import com.solosu.mtforum.util.ToastUtil as Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.solosu.mtforum.R
 import org.json.JSONObject

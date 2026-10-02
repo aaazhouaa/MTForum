@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
@@ -71,7 +72,7 @@
                     android:paddingBottom="2dp"
                     android:text="楼主"
                     android:textSize="10sp"
-                    android:textColor="@color/primary"
+                    android:textColor="?attr/colorPrimary"
                     android:background="@drawable/reply_op_badge_bg"
                     android:visibility="gone" />
 
@@ -84,7 +85,7 @@
                     android:paddingHorizontal="8dp"
                     android:paddingVertical="2dp"
                     android:textSize="11sp"
-                    android:textColor="@color/primary"
+                    android:textColor="?attr/colorPrimary"
                     android:maxLines="1"
                     android:ellipsize="end"
                     android:visibility="gone" />
@@ -113,7 +114,7 @@
                     android:gravity="center"
                     android:text="回复"
                     android:textSize="11sp"
-                    android:textColor="@color/primary"
+                    android:textColor="?attr/colorPrimary"
                     android:background="@drawable/rounded_btn_outline"
                     android:visibility="gone" />
 
@@ -149,7 +150,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="回复原文"
-            android:textColor="@color/reply_quote_title"
+            android:textColor="?attr/colorPrimary"
             android:textSize="11sp"
             android:textStyle="bold" />
 
@@ -182,4 +183,40 @@
         android:layout_marginStart="45dp"
         android:layout_marginTop="7dp"
         android:visibility="gone" />
+
+    <!-- 相同内容折叠提示胶囊条 -->
+    <LinearLayout
+        android:id="@+id/layout_collapsed_hint"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="45dp"
+        android:layout_marginTop="8dp"
+        android:layout_marginBottom="4dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:background="@drawable/reply_nested_bg"
+        android:paddingHorizontal="10dp"
+        android:paddingVertical="5dp"
+        android:clickable="true"
+        android:focusable="true"
+        android:visibility="gone">
+
+        <ImageView
+            android:id="@+id/iv_collapsed_icon"
+            android:layout_width="14dp"
+            android:layout_height="14dp"
+            android:src="@drawable/ic_arrow_right"
+            app:tint="?attr/colorPrimary"
+            android:contentDescription="折叠" />
+
+        <TextView
+            android:id="@+id/tv_collapsed_text"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="6dp"
+            android:textSize="12sp"
+            android:textColor="?attr/colorPrimary"
+            android:textStyle="bold"
+            android:text="已折叠 3 条相同回复 · 点击展开" />
+    </LinearLayout>
 </LinearLayout>

@@ -23,16 +23,38 @@ import java.lang.ref.WeakReference
  */
 object ToastUtil {
 
+    const val LENGTH_SHORT = 0
+    const val LENGTH_LONG = 1
+
     private val mainHandler = Handler(Looper.getMainLooper())
     private var topActivityRef: WeakReference<Activity>? = null
 
     @JvmStatic
     fun setTopActivity(activity: Activity?) {
-        topActivityRef = if (activity != null) WeakReference(activity) else null
+        if (activity != null) {
+            topActivityRef = WeakReference(activity)
+        }
     }
 
     @JvmStatic
-    fun show(context: Context?, message: CharSequence?) {
+    fun clearIfCurrent(activity: Activity?) {
+        if (activity != null && topActivityRef?.get() === activity) {
+            topActivityRef = null
+        }
+    }
+
+    private fun resolveActivity(context: Context?): Activity? {
+        var ctx = context
+        while (ctx is android.content.ContextWrapper) {
+            if (ctx is Activity) return ctx
+            ctx = ctx.baseContext
+        }
+        return topActivityRef?.get()
+    }
+
+    @JvmStatic
+    @JvmOverloads
+    fun show(context: Context?, message: CharSequence?, duration: Int = 0) {
         if (message.isNullOrEmpty()) return
         if (Looper.myLooper() == Looper.getMainLooper()) {
             showInternal(context, message)
@@ -42,13 +64,32 @@ object ToastUtil {
     }
 
     @JvmStatic
-    fun show(context: Context?, resId: Int) {
+    @JvmOverloads
+    fun show(context: Context?, resId: Int, duration: Int = 0) {
         if (context == null) return
-        show(context, context.getString(resId))
+        show(context, context.getString(resId), duration)
+    }
+
+    /** 兼容 Toast.makeText(c, m, d).show() 链式调用风格 */
+    class ToastProxy(private val context: Context?, private val message: CharSequence?) {
+        fun show() {
+            ToastUtil.show(context, message)
+        }
+    }
+
+    @JvmStatic
+    fun makeText(context: Context?, message: CharSequence?, duration: Int): ToastProxy {
+        return ToastProxy(context, message)
+    }
+
+    @JvmStatic
+    fun makeText(context: Context?, resId: Int, duration: Int): ToastProxy {
+        val msg = context?.getString(resId) ?: ""
+        return ToastProxy(context, msg)
     }
 
     private fun showInternal(context: Context?, message: CharSequence) {
-        val activity = (context as? Activity) ?: topActivityRef?.get()
+        val activity = resolveActivity(context)
         if (activity == null || activity.isFinishing || activity.isDestroyed) {
             // 回退到系统 Toast (无可用前台 Activity 时兜底)
             if (context != null) {

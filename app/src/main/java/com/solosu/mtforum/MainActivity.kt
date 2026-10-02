@@ -13,7 +13,7 @@ import android.view.animation.DecelerateInterpolator
 import android.view.animation.OvershootInterpolator
 import android.widget.ImageView
 import android.widget.TextView
-import android.widget.Toast
+import com.solosu.mtforum.util.ToastUtil as Toast
 
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
@@ -169,6 +169,7 @@ class MainActivity : AppCompatActivity() {
         drawerLayout = root
         // 遮罩加深，抽屉打开时右侧主内容不会透出文字
         drawerLayout!!.setScrimColor(0xC0000000.toInt())
+        enhanceDrawerEdgeSwipe(drawerLayout!!)
 
         // 打开侧边栏时藏掉底部悬浮导航栏，否则两边的文字会叠在一起
         drawerLayout!!.addDrawerListener(object : DrawerLayout.SimpleDrawerListener() {
@@ -749,6 +750,7 @@ class MainActivity : AppCompatActivity() {
 
         // 初始选中状态
         updateNavSelectionByPosition(MainPagerAdapter.PAGE_HOME)
+        setupDrawerSwipeConflict()
     }
 
     /**
@@ -761,6 +763,65 @@ class MainActivity : AppCompatActivity() {
         updateNavSelectionByPosition(position)
         // build71: 用户主动点标签 -> 底部栏必须显示
         setBottomNavVisible(true)
+    }
+
+    /**
+     * 扩大 DrawerLayout 的边缘触摸滑动呼出范围，让右滑呼出侧边栏更灵敏
+     */
+    private fun enhanceDrawerEdgeSwipe(drawer: androidx.drawerlayout.widget.DrawerLayout) {
+        try {
+            val leftDraggerField = androidx.drawerlayout.widget.DrawerLayout::class.java.getDeclaredField("mLeftDragger")
+            leftDraggerField.isAccessible = true
+            val leftDragger = leftDraggerField.get(drawer) as? androidx.customview.widget.ViewDragHelper ?: return
+
+            val edgeSizeField = leftDragger.javaClass.getDeclaredField("mEdgeSize")
+            edgeSizeField.isAccessible = true
+            val defaultEdge = edgeSizeField.getInt(leftDragger)
+
+            val density = resources.displayMetrics.density
+            val newEdge = (72 * density).toInt().coerceAtLeast(defaultEdge)
+            edgeSizeField.setInt(leftDragger, newEdge)
+
+            try {
+                val defaultEdgeSizeField = leftDragger.javaClass.getDeclaredField("mDefaultEdgeSize")
+                defaultEdgeSizeField.isAccessible = true
+                defaultEdgeSizeField.setInt(leftDragger, newEdge)
+            } catch (_: Throwable) {}
+        } catch (e: Throwable) {
+            android.util.Log.w("MainActivity", "Failed to enhance drawer edge swipe: ${e.message}")
+        }
+    }
+
+    /**
+     * 解决 ViewPager2 与 DrawerLayout 右滑手势冲突：在首页左边缘向右滑时优先拉出侧边栏
+     */
+    private fun setupDrawerSwipeConflict() {
+        val pager = mainPager ?: return
+        val density = resources.displayMetrics.density
+        val edgeThreshold = 80 * density
+        var startX = 0f
+        var startY = 0f
+
+        val recyclerView = pager.getChildAt(0) as? androidx.recyclerview.widget.RecyclerView
+        recyclerView?.addOnItemTouchListener(object : androidx.recyclerview.widget.RecyclerView.SimpleOnItemTouchListener() {
+            override fun onInterceptTouchEvent(rv: androidx.recyclerview.widget.RecyclerView, e: android.view.MotionEvent): Boolean {
+                when (e.actionMasked) {
+                    android.view.MotionEvent.ACTION_DOWN -> {
+                        startX = e.rawX
+                        startY = e.rawY
+                    }
+                    android.view.MotionEvent.ACTION_MOVE -> {
+                        val dx = e.rawX - startX
+                        val dy = e.rawY - startY
+                        if (pager.currentItem == 0 && startX <= edgeThreshold && dx > 0 && Math.abs(dx) > Math.abs(dy)) {
+                            rv.parent?.requestDisallowInterceptTouchEvent(false)
+                            return false
+                        }
+                    }
+                }
+                return false
+            }
+        })
     }
 
     /**

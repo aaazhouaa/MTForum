@@ -76,10 +76,10 @@ class HomeFragment : Fragment() {
                     it.scaleY = 1.0f
                     val isDarkNow = com.solosu.mtforum.util.ThemeManager.toggleNightMode(requireActivity())
                     updateThemeToggleIcon()
-                    android.widget.Toast.makeText(
+                    com.solosu.mtforum.util.ToastUtil.makeText(
                         requireContext(),
                         if (isDarkNow) "已切换为暗色主题" else "已切换为亮色主题",
-                        android.widget.Toast.LENGTH_SHORT
+                        com.solosu.mtforum.util.ToastUtil.LENGTH_SHORT
                     ).show()
                 }
                 .start()
@@ -130,11 +130,11 @@ class HomeFragment : Fragment() {
 
         // 下拉刷新
         binding!!.swipeRefresh.setOnRefreshListener { refreshThreads() }
-        binding!!.swipeRefresh.setColorSchemeResources(
-                com.google.android.material.R.color.design_default_color_primary,
-                android.R.color.holo_orange_light,
-                android.R.color.holo_green_light
-        )
+        val themeColor = com.solosu.mtforum.util.ThemeManager.getThemeColor(requireContext())
+        binding!!.swipeRefresh.setColorSchemeColors(themeColor)
+
+        // 顶尖流体动效：透视后退折叠（Z轴透视滚动消失 / 扶梯式折叠退场）
+        com.solosu.mtforum.util.PerspectiveFoldScrollHelper.attach(binding!!.recyclerView)
 
         // 加载热板推荐
         loadHotBoards()

@@ -82,9 +82,9 @@
     <color name="accent_ai">#0D9488</color>
     <color name="accent_ai_fill">#140D9488</color>
 
-    <!-- 置顶帖胶囊 (现代精致轻蓝胶囊，告别刺眼粉红) -->
-    <color name="sticky_card_bg">#EFF6FF</color>
-    <color name="sticky_stroke">#BFDBFE</color>
+    <!-- 置顶帖胶囊 (现代中性质感胶囊，搭配动态主题色文字) -->
+    <color name="sticky_card_bg">#F1F5F9</color>
+    <color name="sticky_stroke">#E2E8F0</color>
     <color name="sticky_text">#2563EB</color>
 
     <!-- 角标系统 -->

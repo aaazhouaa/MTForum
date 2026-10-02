@@ -65,7 +65,7 @@
                         android:background="@drawable/level_badge_bg"
                         android:paddingHorizontal="8dp"
                         android:paddingVertical="2dp"
-                        android:textColor="@color/primary"
+                        android:textColor="?attr/colorPrimary"
                         android:textSize="10sp"
                         android:visibility="gone" />
                 </LinearLayout>
@@ -136,7 +136,7 @@
                 android:gravity="center"
                 android:paddingHorizontal="7dp"
                 android:text="置顶"
-                android:textColor="@color/sticky_text"
+                android:textColor="?attr/colorPrimary"
                 android:textSize="10sp"
                 android:visibility="gone" />
         </LinearLayout>

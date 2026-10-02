@@ -4,7 +4,7 @@ import android.os.Bundle
 import android.view.View
 import android.widget.LinearLayout
 import android.widget.TextView
-import android.widget.Toast
+import com.solosu.mtforum.util.ToastUtil as Toast
 
 import androidx.annotation.Nullable
 import androidx.appcompat.app.AppCompatActivity
@@ -38,7 +38,7 @@ class CreditDetailActivity : AppCompatActivity() {
         binding.toolbar.setNavigationOnClickListener { finish() }
 
         binding.swipeRefresh.setOnRefreshListener { loadData() }
-        binding.swipeRefresh.setColorSchemeResources(R.color.primary)
+        binding.swipeRefresh.setColorSchemeColors(com.solosu.mtforum.util.ThemeManager.getThemeColor(this))
 
         loadData()
     }

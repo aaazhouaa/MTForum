@@ -39,12 +39,79 @@ import java.util.regex.Pattern
  * 回复列表适配器
  * 支持 Glide 加载头像、楼层标签、楼主标识、等级、时间、地点等完整信息
  */
-class ReplyAdapter(private var replyList: List<ReplyItem>?) :
+class ReplyAdapter(rawReplies: List<ReplyItem>?) :
     RecyclerView.Adapter<ReplyAdapter.ViewHolder>() {
+
+    data class DisplayRow(
+        val item: ReplyItem,
+        val foldedCount: Int = 0,
+        val isExpanded: Boolean = false,
+        val groupKey: String = ""
+    )
+
+    private var rawReplyList: List<ReplyItem> = rawReplies ?: ArrayList()
+    private val expandedKeys: MutableSet<String> = HashSet()
+    private var displayList: MutableList<DisplayRow> = ArrayList()
 
     private var replyClickListener: OnReplyClickListener? = null
     private var userClickListener: OnUserClickListener? = null
     private var replyLongClickListener: OnReplyLongClickListener? = null // build73: 长按出操作菜单
+    var onPreloadListener: (() -> Unit)? = null
+
+    init {
+        rebuildDisplayList()
+    }
+
+    private fun rebuildDisplayList() {
+        displayList.clear()
+        if (rawReplyList.isEmpty()) return
+
+        val grouped = LinkedHashMap<String, MutableList<ReplyItem>>()
+        for (item in rawReplyList) {
+            val rawText = item.contentText
+            val text = if (!rawText.isNullOrEmpty()) {
+                rawText.trim()
+            } else {
+                val html = item.contentHtml ?: ""
+                if (html.length < 300) html.replace(Regex("<[^>]*>"), "").trim() else ""
+            }
+            val hasImages = item.contentHtml?.contains("<img", ignoreCase = true) == true
+            // 纯文本相同（且无复杂图片、长度小于 100 字）的简短灌水回复进行折叠归并
+            val key = if (!hasImages && text.isNotEmpty() && text.length <= 100) text else "unique_${item.pid ?: System.identityHashCode(item)}"
+            grouped.getOrPut(key) { ArrayList() }.add(item)
+        }
+
+        for ((key, items) in grouped) {
+            if (items.size == 1) {
+                displayList.add(DisplayRow(items[0]))
+            } else {
+                val isExpanded = expandedKeys.contains(key)
+                val foldedCount = items.size - 1
+                if (isExpanded) {
+                    for (i in items.indices) {
+                        displayList.add(
+                            DisplayRow(
+                                item = items[i],
+                                foldedCount = if (i == 0) foldedCount else 0,
+                                isExpanded = true,
+                                groupKey = key
+                            )
+                        )
+                    }
+                } else {
+                    // 折叠态：仅展示首条，标注折叠数
+                    displayList.add(
+                        DisplayRow(
+                            item = items[0],
+                            foldedCount = foldedCount,
+                            isExpanded = false,
+                            groupKey = key
+                        )
+                    )
+                }
+            }
+        }
+    }
 
     interface OnReplyClickListener {
         fun onReplyClick(item: ReplyItem?, position: Int)
@@ -72,7 +139,8 @@ class ReplyAdapter(private var replyList: List<ReplyItem>?) :
     }
 
     fun updateData(newList: List<ReplyItem>?) {
-        this.replyList = newList
+        this.rawReplyList = newList ?: ArrayList()
+        rebuildDisplayList()
         notifyDataSetChanged()
     }
 
@@ -83,12 +151,12 @@ class ReplyAdapter(private var replyList: List<ReplyItem>?) :
     }
 
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
-        val item = replyList!![position]
-        holder.bind(item)
+        val row = displayList[position]
+        holder.bind(row)
     }
 
     override fun getItemCount(): Int {
-        return replyList?.size ?: 0
+        return displayList.size
     }
 
     inner class ViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
@@ -105,8 +173,12 @@ class ReplyAdapter(private var replyList: List<ReplyItem>?) :
         private val llReplyImages: LinearLayout = itemView.findViewById(R.id.ll_reply_images)
         private val btnReplyTo: TextView = itemView.findViewById(R.id.btn_reply_to)
         private val ivReplyMore: ImageView? = itemView.findViewById(R.id.iv_reply_more)
+        private val layoutCollapsedHint: View? = itemView.findViewById(R.id.layout_collapsed_hint)
+        private val ivCollapsedIcon: ImageView? = itemView.findViewById(R.id.iv_collapsed_icon)
+        private val tvCollapsedText: TextView? = itemView.findViewById(R.id.tv_collapsed_text)
 
-        fun bind(item: ReplyItem) {
+        fun bind(row: DisplayRow) {
+            val item = row.item
             // 头像 - Glide 加载圆图
             val avatarUrl = item.avatarUrl
             if (!TextUtils.isEmpty(avatarUrl)) {
@@ -292,6 +364,29 @@ class ReplyAdapter(private var replyList: List<ReplyItem>?) :
                 tvContent.visibility = View.GONE
                 llReplyImages.visibility = View.GONE
             }
+
+            // 相同内容折叠条展示与交互
+            if (row.foldedCount > 0 && layoutCollapsedHint != null && tvCollapsedText != null) {
+                layoutCollapsedHint.visibility = View.VISIBLE
+                if (row.isExpanded) {
+                    tvCollapsedText.text = "已展开 ${row.foldedCount} 条相同回复 · 点击折叠"
+                    ivCollapsedIcon?.rotation = 270f
+                } else {
+                    tvCollapsedText.text = "相同内容已折叠 ${row.foldedCount} 条 · 点击展开"
+                    ivCollapsedIcon?.rotation = 90f
+                }
+                layoutCollapsedHint.setOnClickListener {
+                    if (row.isExpanded) {
+                        expandedKeys.remove(row.groupKey)
+                    } else {
+                        expandedKeys.add(row.groupKey)
+                    }
+                    rebuildDisplayList()
+                    notifyDataSetChanged()
+                }
+            } else {
+                layoutCollapsedHint?.visibility = View.GONE
+            }
         }
     }
 
@@ -320,9 +415,9 @@ class ReplyAdapter(private var replyList: List<ReplyItem>?) :
                         .getSystemService(Context.CLIPBOARD_SERVICE) as? android.content.ClipboardManager
                     if (cm != null) {
                         cm.setPrimaryClip(android.content.ClipData.newPlainText("回复内容", text))
-                        android.widget.Toast.makeText(
+                        com.solosu.mtforum.util.ToastUtil.makeText(
                             textView.context, "已复制回复内容",
-                            android.widget.Toast.LENGTH_SHORT
+                            com.solosu.mtforum.util.ToastUtil.LENGTH_SHORT
                         ).show()
                         return@setOnLongClickListener true
                     }

@@ -2,22 +2,26 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:id="@+id/drawer_panel"
-    android:layout_width="296dp"
+    android:layout_width="256dp"
     android:layout_height="match_parent"
-    android:background="@color/surface"
+    android:background="@drawable/bg_drawer_panel"
+    android:outlineProvider="background"
+    android:clipToOutline="true"
     android:fitsSystemWindows="true"
     android:orientation="vertical">
 
-    <!-- 顶部用户信息 -->
+    <!-- 顶部用户信息（精致独立圆角卡片） -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="@color/background_secondary"
+        android:layout_marginHorizontal="10dp"
+        android:layout_marginTop="16dp"
+        android:layout_marginBottom="8dp"
+        android:background="@drawable/bg_drawer_header"
         android:gravity="center_vertical"
         android:orientation="horizontal"
-        android:paddingHorizontal="18dp"
-        android:paddingTop="34dp"
-        android:paddingBottom="18dp">
+        android:paddingHorizontal="14dp"
+        android:paddingVertical="14dp">
 
         <ImageView
             android:id="@+id/drawer_avatar"
@@ -73,6 +77,68 @@
             android:paddingHorizontal="10dp"
             android:paddingTop="10dp"
             android:paddingBottom="20dp">
+
+            <!-- ===== 主题色彩移到第一位 ===== -->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingHorizontal="10dp"
+                android:paddingTop="8dp"
+                android:paddingBottom="6dp"
+                android:text="个性化"
+                android:textColor="@color/text_hint"
+                android:textSize="11sp" />
+
+            <!-- 主题色彩切换 -->
+            <LinearLayout
+                android:id="@+id/drawer_theme_color"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="6dp"
+                android:background="@drawable/bg_drawer_item"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingHorizontal="10dp"
+                android:paddingVertical="12dp">
+
+                <ImageView
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
+                    android:src="@drawable/ic_fire"
+                    android:contentDescription="主题色彩"
+                    app:tint="?attr/colorPrimary" />
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="12dp"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="主题色彩"
+                        android:textColor="@color/text_primary"
+                        android:textSize="14sp" />
+
+                    <TextView
+                        android:id="@+id/drawer_theme_color_desc"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:text="个性化选择应用主色调"
+                        android:textColor="@color/text_hint"
+                        android:textSize="11sp" />
+                </LinearLayout>
+
+                <ImageView
+                    android:layout_width="16dp"
+                    android:layout_height="16dp"
+                    android:src="@drawable/ic_arrow_right"
+                    android:contentDescription="前往"
+                    app:tint="@color/text_hint" />
+            </LinearLayout>
 
             <!-- ===== 自动化开关组 ===== -->
             <TextView
@@ -712,57 +778,6 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="2dp"
                         android:text="拉黑后隐藏 TA 的帖子和回帖"
-                        android:textColor="@color/text_hint"
-                        android:textSize="11sp" />
-                </LinearLayout>
-
-                <ImageView
-                    android:layout_width="16dp"
-                    android:layout_height="16dp"
-                    android:src="@drawable/ic_arrow_right"
-                    android:contentDescription="前往"
-                    app:tint="@color/text_hint" />
-            </LinearLayout>
-
-            <!-- 主题色彩切换 -->
-            <LinearLayout
-                android:id="@+id/drawer_theme_color"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginBottom="6dp"
-                android:background="@drawable/bg_drawer_item"
-                android:gravity="center_vertical"
-                android:orientation="horizontal"
-                android:paddingHorizontal="10dp"
-                android:paddingVertical="12dp">
-
-                <ImageView
-                    android:layout_width="20dp"
-                    android:layout_height="20dp"
-                    android:src="@drawable/ic_fire"
-                    android:contentDescription="主题色彩"
-                    app:tint="?attr/colorPrimary" />
-
-                <LinearLayout
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="12dp"
-                    android:layout_weight="1"
-                    android:orientation="vertical">
-
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:text="主题色彩"
-                        android:textColor="@color/text_primary"
-                        android:textSize="14sp" />
-
-                    <TextView
-                        android:id="@+id/drawer_theme_color_desc"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="2dp"
-                        android:text="个性化选择应用主色调"
                         android:textColor="@color/text_hint"
                         android:textSize="11sp" />
                 </LinearLayout>

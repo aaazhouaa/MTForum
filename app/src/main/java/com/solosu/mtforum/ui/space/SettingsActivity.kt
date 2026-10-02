@@ -2,7 +2,7 @@ package com.solosu.mtforum.ui.space
 
 import android.content.Intent
 import android.os.Bundle
-import android.widget.Toast
+import com.solosu.mtforum.util.ToastUtil as Toast
 
 import androidx.annotation.Nullable
 import androidx.appcompat.app.AppCompatActivity
@@ -39,17 +39,6 @@ class SettingsActivity : AppCompatActivity() {
 
         FrostedGlassHelper.applyToCardViews(binding.root, this)
 
-        // 外观与主题
-        updateThemeDisplay()
-        binding.layoutThemeColor.setOnClickListener {
-            com.solosu.mtforum.util.ThemeManager.showColorPickerDialog(this) {
-                updateThemeDisplay()
-            }
-        }
-        binding.layoutDarkMode.setOnClickListener {
-            showDarkModeDialog()
-        }
-
         val autoSignInEnabled = AutoSignInManager.isEnabled(this)
         binding.switchAutoSignIn.isChecked = autoSignInEnabled
         binding.switchAutoSignIn.setOnCheckedChangeListener { buttonView, isChecked ->
@@ -78,43 +67,6 @@ class SettingsActivity : AppCompatActivity() {
                 Toast.makeText(this, "清除失败: " + e.message, Toast.LENGTH_SHORT).show()
             }
         }
-    }
-
-    private fun updateThemeDisplay() {
-        val currentTheme = com.solosu.mtforum.util.ThemeManager.getCurrentThemeColor(this)
-        binding.tvThemeColorName.text = currentTheme.name
-
-        val nightMode = com.solosu.mtforum.util.ThemeManager.getNightMode(this)
-        val modeText = when (nightMode) {
-            androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_NO -> "浅色模式"
-            androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_YES -> "深色模式"
-            else -> "跟随系统"
-        }
-        binding.tvDarkModeName.text = modeText
-    }
-
-    private fun showDarkModeDialog() {
-        val items = arrayOf("跟随系统", "浅色模式", "深色模式")
-        val currentMode = com.solosu.mtforum.util.ThemeManager.getNightMode(this)
-        val checkedItem = when (currentMode) {
-            androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_NO -> 1
-            androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_YES -> 2
-            else -> 0
-        }
-        android.app.AlertDialog.Builder(this)
-            .setTitle("深浅色模式")
-            .setSingleChoiceItems(items, checkedItem) { d, which ->
-                val newMode = when (which) {
-                    1 -> androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_NO
-                    2 -> androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_YES
-                    else -> androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM
-                }
-                com.solosu.mtforum.util.ThemeManager.setNightMode(this, newMode)
-                updateThemeDisplay()
-                d.dismiss()
-            }
-            .setNegativeButton("取消", null)
-            .show()
     }
 
     private fun updateErrorLogCount() {

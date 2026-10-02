@@ -142,9 +142,9 @@ class ProfileFragment : Fragment() {
             httpClient.clearCookies(requireContext())
             UserSessionManager.getInstance().clearLoginInfo(requireContext())
             updateLoginState()
-            android.widget.Toast.makeText(
+            com.solosu.mtforum.util.ToastUtil.makeText(
                 requireContext(),
-                "已退出登录", android.widget.Toast.LENGTH_SHORT
+                "已退出登录", com.solosu.mtforum.util.ToastUtil.LENGTH_SHORT
             ).show()
         }
     }
@@ -228,9 +228,9 @@ class ProfileFragment : Fragment() {
                                 updateLoginState()
                             }
                         }
-                        android.widget.Toast.makeText(
+                        com.solosu.mtforum.util.ToastUtil.makeText(
                             requireContext(),
-                            "登录已过期，请重新登录", android.widget.Toast.LENGTH_SHORT
+                            "登录已过期，请重新登录", com.solosu.mtforum.util.ToastUtil.LENGTH_SHORT
                         ).show()
                     }
                     return@Thread
@@ -266,9 +266,9 @@ class ProfileFragment : Fragment() {
                     if (finalProfile != null && finalProfile.username != null) {
                         displayProfile(finalProfile)
                     } else {
-                        android.widget.Toast.makeText(
+                        com.solosu.mtforum.util.ToastUtil.makeText(
                             requireContext(),
-                            "无法加载用户资料，请确认已登录", android.widget.Toast.LENGTH_SHORT
+                            "无法加载用户资料，请确认已登录", com.solosu.mtforum.util.ToastUtil.LENGTH_SHORT
                         ).show()
                     }
                 }
@@ -276,9 +276,9 @@ class ProfileFragment : Fragment() {
                 if (!isAdded) return@Thread
                 requireActivity().runOnUiThread {
                     if (!isAdded) return@runOnUiThread
-                    android.widget.Toast.makeText(
+                    com.solosu.mtforum.util.ToastUtil.makeText(
                         requireContext(),
-                        "加载资料失败: " + e.message, android.widget.Toast.LENGTH_SHORT
+                        "加载资料失败: " + e.message, com.solosu.mtforum.util.ToastUtil.LENGTH_SHORT
                     ).show()
                 }
             }

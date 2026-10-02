@@ -42,7 +42,11 @@
             app:boxBackgroundMode="outline"
             app:hintEnabled="false"
             app:boxStrokeColor="?attr/colorPrimary"
-            app:boxStrokeWidth="1.5dp">
+            app:boxStrokeWidth="1.5dp"
+            app:boxCornerRadiusTopStart="14dp"
+            app:boxCornerRadiusTopEnd="14dp"
+            app:boxCornerRadiusBottomStart="14dp"
+            app:boxCornerRadiusBottomEnd="14dp">
 
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/et_reply_dialog"

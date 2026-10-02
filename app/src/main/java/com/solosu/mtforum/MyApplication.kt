@@ -24,14 +24,18 @@ class MyApplication : Application() {
             override fun onActivityResumed(activity: android.app.Activity) {
                 com.solosu.mtforum.util.ToastUtil.setTopActivity(activity)
             }
-            override fun onActivityPaused(activity: android.app.Activity) {
-                com.solosu.mtforum.util.ToastUtil.setTopActivity(null)
+            override fun onActivityPaused(activity: android.app.Activity) {}
+            override fun onActivityCreated(activity: android.app.Activity, savedInstanceState: android.os.Bundle?) {
+                com.solosu.mtforum.util.ToastUtil.setTopActivity(activity)
             }
-            override fun onActivityCreated(activity: android.app.Activity, savedInstanceState: android.os.Bundle?) {}
-            override fun onActivityStarted(activity: android.app.Activity) {}
+            override fun onActivityStarted(activity: android.app.Activity) {
+                com.solosu.mtforum.util.ToastUtil.setTopActivity(activity)
+            }
             override fun onActivityStopped(activity: android.app.Activity) {}
             override fun onActivitySaveInstanceState(activity: android.app.Activity, outState: android.os.Bundle) {}
-            override fun onActivityDestroyed(activity: android.app.Activity) {}
+            override fun onActivityDestroyed(activity: android.app.Activity) {
+                com.solosu.mtforum.util.ToastUtil.clearIfCurrent(activity)
+            }
         })
 
         // 恢复持久化的 Cookie —— 在任何 Activity 启动前执行

@@ -6,7 +6,7 @@ import android.text.InputType
 import android.text.TextUtils
 import android.view.View
 import android.widget.EditText
-import android.widget.Toast
+import com.solosu.mtforum.util.ToastUtil as Toast
 
 import androidx.annotation.Nullable
 import androidx.appcompat.app.AlertDialog

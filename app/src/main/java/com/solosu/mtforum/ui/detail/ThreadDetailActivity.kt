@@ -38,7 +38,7 @@ import android.widget.PopupWindow
 import android.widget.ScrollView
 import android.widget.Spinner
 import android.widget.TextView
-import android.widget.Toast
+import com.solosu.mtforum.util.ToastUtil as Toast
 
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.PickVisualMediaRequest
@@ -192,18 +192,14 @@ class ThreadDetailActivity : AppCompatActivity() {
         binding.btnShare.setOnClickListener { shareThread() }
         binding.btnViewHidden.setOnClickListener { viewHiddenContent() }
         binding.btnLoadMore.setOnClickListener { loadMoreReplies() }
-        binding.nestedScroll.setOnScrollChangeListener { v, _, scrollY, _, _ ->
+        binding.nestedScroll.setOnScrollChangeListener { v, _, scrollY, _, oldScrollY ->
             val scrollView = v as NestedScrollView
             val child = scrollView.getChildAt(0)
-            if (child != null) {
+            if (child != null && scrollY > oldScrollY) {
                 val contentHeight = child.height - scrollView.height
-                val isNearBottom = scrollY >= contentHeight + (-400)
-                if (isNearBottom && binding.btnLoadMore.visibility == View.GONE && postDetail != null) {
-                    val currentPage = postDetail!!.currentPage
-                    val totalPages = postDetail!!.totalPages
-                    if (currentPage < totalPages && !isLoadingMore) {
-                        loadMoreReplies()
-                    }
+                val isNearBottom = scrollY >= contentHeight - 600
+                if (isNearBottom) {
+                    checkAndPreloadReplies()
                 }
             }
         }
@@ -232,6 +228,7 @@ class ThreadDetailActivity : AppCompatActivity() {
 
     private fun setupRecyclerView() {
         replyAdapter = ReplyAdapter(ArrayList())
+        replyAdapter!!.onPreloadListener = { checkAndPreloadReplies() }
         // build73: 评论长按 -> 回复 / 举报 / (本人)删除
         replyAdapter!!.setOnReplyLongClickListener(object : ReplyAdapter.OnReplyLongClickListener {
             override fun onReplyLongClick(item: ReplyItem?, position: Int) {
@@ -617,7 +614,7 @@ class ThreadDetailActivity : AppCompatActivity() {
         } else {
             binding.layoutRewardReviewStats.visibility = View.GONE
         }
-        if (scrollToTop) {
+        if (scrollToTop && binding.nestedScroll.scrollY != 0) {
             binding.nestedScroll.scrollTo(0, 0)
         }
     }
@@ -1090,8 +1087,14 @@ class ThreadDetailActivity : AppCompatActivity() {
     }
 
     private fun updateFavoriteIcon() {
+        val button = binding.btnFavorite
         val res = if (isFavorited) R.drawable.forum_favorite_on else R.drawable.forum_favorite_off
-        binding.btnFavorite.setImageResource(res)
+        button.setImageResource(res)
+        if (isFavorited) {
+            button.setColorFilter(0xFFF59E0B.toInt())
+        } else {
+            button.setColorFilter(getColor(R.color.icon_secondary))
+        }
     }
 
     private fun updateCountBadge(badge: TextView?, count: Int) {
@@ -1917,6 +1920,18 @@ class ThreadDetailActivity : AppCompatActivity() {
                 }
             }
         }, "auto-unlock").start()
+    }
+
+    private var lastRequestedPage = -1
+
+    private fun checkAndPreloadReplies() {
+        if (postDetail == null || isLoadingMore) return
+        val nextPage = postDetail!!.currentPage + 1
+        val totalPages = postDetail!!.totalPages
+        if (nextPage <= totalPages && nextPage != lastRequestedPage) {
+            lastRequestedPage = nextPage
+            loadMoreReplies()
+        }
     }
 
     private fun loadMoreReplies() {

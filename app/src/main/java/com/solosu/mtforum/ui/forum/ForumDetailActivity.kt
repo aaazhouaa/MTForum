@@ -122,6 +122,7 @@ class ForumDetailActivity : AppCompatActivity() {
             }
         })
         binding.recyclerView.adapter = threadAdapter
+        com.solosu.mtforum.util.PerspectiveFoldScrollHelper.attach(binding.recyclerView)
 
 
         // RecyclerView 滚动到底部时加载更多

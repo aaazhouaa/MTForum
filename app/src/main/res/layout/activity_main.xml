@@ -122,27 +122,25 @@
                 android:textSize="10sp" />
         </LinearLayout>
 
-        <!-- 第3项：凸起发布按钮 -->
+        <!-- 第3项：居中发布按钮 -->
         <LinearLayout
             android:id="@+id/nav_post_tab"
             android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="1"
             android:gravity="center"
-            android:orientation="vertical"
-            android:clipChildren="false"
-            android:clipToPadding="false">
+            android:orientation="vertical">
 
             <ImageView
                 android:id="@+id/nav_post_icon"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:layout_gravity="center_horizontal"
-                android:layout_marginTop="-14dp"
+                android:layout_width="42dp"
+                android:layout_height="42dp"
+                android:layout_gravity="center"
+                android:padding="9dp"
                 android:src="@drawable/ic_add"
                 android:background="@drawable/bg_nav_center_button"
                 app:tint="@color/white"
-                android:elevation="4dp"
+                android:elevation="2dp"
                 android:contentDescription="@string/action_post" />
 
         </LinearLayout>
@@ -237,7 +235,7 @@
     <!-- 左侧功能侧边栏 -->
     <include
         layout="@layout/drawer_main"
-        android:layout_width="296dp"
+        android:layout_width="256dp"
         android:layout_height="match_parent"
         android:layout_gravity="start" />
 

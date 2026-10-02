@@ -58,7 +58,11 @@
                 style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
                 app:hintTextColor="?attr/colorPrimary"
                 app:boxStrokeColor="?attr/colorPrimary"
-                app:endIconMode="clear_text">
+                app:endIconMode="clear_text"
+                app:boxCornerRadiusTopStart="14dp"
+                app:boxCornerRadiusTopEnd="14dp"
+                app:boxCornerRadiusBottomStart="14dp"
+                app:boxCornerRadiusBottomEnd="14dp">
 
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/et_username"
@@ -80,7 +84,11 @@
                 app:hintTextColor="?attr/colorPrimary"
                 app:boxStrokeColor="?attr/colorPrimary"
                 app:endIconMode="password_toggle"
-                app:passwordToggleTint="@color/text_secondary">
+                app:passwordToggleTint="@color/text_secondary"
+                app:boxCornerRadiusTopStart="14dp"
+                app:boxCornerRadiusTopEnd="14dp"
+                app:boxCornerRadiusBottomStart="14dp"
+                app:boxCornerRadiusBottomEnd="14dp">
 
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/et_password"

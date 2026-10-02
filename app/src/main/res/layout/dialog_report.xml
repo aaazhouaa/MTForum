@@ -141,8 +141,12 @@
             android:layout_marginTop="6dp"
             android:layout_marginBottom="20dp"
             app:boxBackgroundMode="outline"
-            app:boxStrokeColor="@color/primary"
-            app:hintEnabled="false">
+            app:boxStrokeColor="?attr/colorPrimary"
+            app:hintEnabled="false"
+            app:boxCornerRadiusTopStart="14dp"
+            app:boxCornerRadiusTopEnd="14dp"
+            app:boxCornerRadiusBottomStart="14dp"
+            app:boxCornerRadiusBottomEnd="14dp">
 
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/et_report_message"

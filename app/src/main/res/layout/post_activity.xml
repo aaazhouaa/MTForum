@@ -363,14 +363,13 @@
                 android:textColor="@color/text_primary"
                 android:textSize="14sp" />
 
-            <TextView
+            <com.google.android.material.button.MaterialButton
                 android:id="@+id/btn_at_insert"
                 android:layout_width="wrap_content"
                 android:layout_height="36dp"
                 android:layout_marginTop="8dp"
-                android:background="@color/accent_primary"
-                android:clickable="true"
-                android:focusable="true"
+                app:backgroundTint="?attr/colorPrimary"
+                app:cornerRadius="18dp"
                 android:gravity="center"
                 android:paddingHorizontal="20dp"
                 android:text="插入"
@@ -521,7 +520,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="36dp"
                 android:layout_marginEnd="6dp"
-                android:backgroundTint="@color/accent_primary"
+                app:backgroundTint="?attr/colorPrimary"
                 android:paddingHorizontal="12dp"
                 android:text="AI发帖"
                 android:textColor="@color/white"
@@ -532,7 +531,7 @@
                 android:id="@+id/btn_publish"
                 android:layout_width="wrap_content"
                 android:layout_height="40dp"
-                android:backgroundTint="@color/accent_primary"
+                app:backgroundTint="?attr/colorPrimary"
                 android:paddingHorizontal="24dp"
                 android:text="@string/post_publish"
                 android:textColor="@color/white"

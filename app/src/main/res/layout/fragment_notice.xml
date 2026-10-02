@@ -88,7 +88,7 @@
                         android:background="@drawable/menu_icon_bg"
                         android:padding="8dp"
                         android:src="@drawable/ic_message"
-                        app:tint="@color/primary"
+                        app:tint="?attr/colorPrimary"
                         android:contentDescription="我的消息" />
 
                     <TextView
@@ -265,7 +265,7 @@
                         android:background="@drawable/menu_icon_bg"
                         android:padding="8dp"
                         android:src="@drawable/ic_reply"
-                        app:tint="@color/primary"
+                        app:tint="?attr/colorPrimary"
                         android:contentDescription="坛友互动" />
 
                     <TextView

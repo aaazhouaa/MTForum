@@ -14,7 +14,6 @@ import android.widget.GridLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
-import android.widget.Toast
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.content.ContextCompat
 import com.solosu.mtforum.R
@@ -27,6 +26,7 @@ object ThemeManager {
     private const val PREF_NAME = "app_theme_prefs"
     private const val KEY_THEME_COLOR = "theme_color_index"
     private const val KEY_NIGHT_MODE = "night_mode_setting"
+    const val DEFAULT_THEME_INDEX = 1 // 1: 极光薄荷青
 
     data class ThemeColorItem(
         val id: Int,
@@ -60,10 +60,8 @@ object ThemeManager {
     @JvmStatic
     fun applyTheme(activity: Activity) {
         val index = getThemeColorIndex(activity)
-        val item = THEME_COLORS.getOrNull(index) ?: THEME_COLORS[0]
-        if (item.themeRes != R.style.Theme_AppTheme) {
-            activity.setTheme(item.themeRes)
-        }
+        val item = THEME_COLORS.getOrNull(index) ?: THEME_COLORS[DEFAULT_THEME_INDEX]
+        activity.setTheme(item.themeRes)
         setupWindow(activity)
     }
 
@@ -82,7 +80,7 @@ object ThemeManager {
 
     @JvmStatic
     fun getThemeColorIndex(context: Context): Int {
-        return getPrefs(context).getInt(KEY_THEME_COLOR, 0).coerceIn(0, THEME_COLORS.size - 1)
+        return getPrefs(context).getInt(KEY_THEME_COLOR, DEFAULT_THEME_INDEX).coerceIn(0, THEME_COLORS.size - 1)
     }
 
     @JvmStatic
@@ -93,7 +91,7 @@ object ThemeManager {
     @JvmStatic
     fun getCurrentThemeColor(context: Context): ThemeColorItem {
         val index = getThemeColorIndex(context)
-        return THEME_COLORS.getOrNull(index) ?: THEME_COLORS[0]
+        return THEME_COLORS.getOrNull(index) ?: THEME_COLORS[DEFAULT_THEME_INDEX]
     }
 
     @JvmStatic

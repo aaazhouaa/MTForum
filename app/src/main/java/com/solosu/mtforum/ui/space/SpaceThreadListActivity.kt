@@ -6,7 +6,7 @@ import android.os.Bundle
 import android.text.TextUtils
 import android.view.MotionEvent
 import android.view.View
-import android.widget.Toast
+import com.solosu.mtforum.util.ToastUtil as Toast
 
 import androidx.annotation.NonNull
 import androidx.annotation.Nullable
@@ -424,7 +424,7 @@ class SpaceThreadListActivity : AppCompatActivity() {
         }
 
         binding.swipeRefresh.setOnRefreshListener { loadData() }
-        binding.swipeRefresh.setColorSchemeResources(R.color.primary)
+        binding.swipeRefresh.setColorSchemeColors(com.solosu.mtforum.util.ThemeManager.getThemeColor(this))
 
         loadData()
     }

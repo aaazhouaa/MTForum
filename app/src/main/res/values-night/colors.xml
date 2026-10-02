@@ -81,9 +81,9 @@
     <color name="accent_ai">#2DD4BF</color>
     <color name="accent_ai_fill">#242DD4BF</color>
 
-    <!-- 置顶帖胶囊 (柔和蓝调衬底) -->
-    <color name="sticky_card_bg">#323B49</color>
-    <color name="sticky_stroke">#3B5274</color>
+    <!-- 置顶帖胶囊 (现代暗色中性质感胶囊，搭配动态主题色文字) -->
+    <color name="sticky_card_bg">#34383E</color>
+    <color name="sticky_stroke">#40454D</color>
     <color name="sticky_text">#93C5FD</color>
 
     <!-- 角标系统 -->
