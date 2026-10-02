@@ -1850,10 +1850,24 @@ object ForumParser {
             }
         }
 
-        // === 8. 回复列表(跳过第一个楼主 postli) ===
+        // === 9. 分页信息 ===
+        val pageInput = doc.select("input[name=page]").first()
+        if (pageInput != null) {
+            val curPage = parseIntFromText(pageInput.attr("value"))
+            detail.currentPage = if (curPage > 0) curPage else 1
+        } else {
+            detail.currentPage = 1
+        }
+
+        // === 8. 回复列表 ===
+        // 在 Discuz 移动版中：第 1 页的第 0 个 postli 是楼主帖子（需跳过）；
+        // 而在第 2 页及之后的页面，或者没有楼主区域的独立回复页中，
+        // 第 0 个 postli 本身就是该页的第一条正常评论（例如 16#）！
+        // 如果盲目跳过索引 0，后续每一页都会凭空丢掉第 1 条评论（翻 10 页就会丢 10 条）。
         val replies = ArrayList<ReplyItem>()
         val uidPtn = Pattern.compile("uid=(\\d+)")
-        for (i in 1 until allPostlis.size) {
+        val startIndex = if (detail.currentPage > 1) 0 else 1
+        for (i in startIndex until allPostlis.size) {
             try {
                 val rp = allPostlis.get(i)
                 val reply = ReplyItem()
@@ -1936,14 +1950,6 @@ object ForumParser {
         }
         detail.replies = replies
 
-        // === 9. 分页信息 ===
-        val pageInput = doc.select("input[name=page]").first()
-        if (pageInput != null) {
-            val curPage = parseIntFromText(pageInput.attr("value"))
-            detail.currentPage = if (curPage > 0) curPage else 1
-        } else {
-            detail.currentPage = 1
-        }
         // 从分页组件中提取最大页码
         var maxPage = 1
         // 方式1: 从 <span title="共 N 页"> 提取

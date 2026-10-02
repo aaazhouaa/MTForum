@@ -2006,11 +2006,13 @@ class ThreadDetailActivity : AppCompatActivity() {
                         currentReplies.addAll(nextReplies)
                         detail.replies = currentReplies
                     }
-                    detail.currentPage = nextPageDetail.currentPage
+                    detail.currentPage = maxOf(detail.currentPage, nextPageDetail.currentPage, nextPage)
                     if (nextPageDetail.totalPages > curTotalPages) {
                         curTotalPages = nextPageDetail.totalPages
                         detail.totalPages = curTotalPages
                     }
+                } else {
+                    detail.currentPage = maxOf(detail.currentPage, nextPage)
                 }
             } catch (_: Exception) {
                 break
