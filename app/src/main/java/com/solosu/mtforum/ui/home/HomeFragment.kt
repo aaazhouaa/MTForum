@@ -356,7 +356,8 @@ class HomeFragment : Fragment() {
                 requireActivity().runOnUiThread {
                     if (!isAdded) return@runOnUiThread
                     if (threads != null && !threads.isEmpty()) {
-                        hasMore = threads.size >= PAGE_SIZE
+                        // 只要服务器返回了帖子就继续允许翻页加载下一页，仅当返回空列表时判定无更多
+                        hasMore = true
                         pendingBuffer.addAll(threads)
                         if (isRefresh) {
                             val countToTake = minOf(BATCH_STEP, pendingBuffer.size)
