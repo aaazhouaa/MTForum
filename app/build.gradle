@@ -10,11 +10,22 @@ android {
     buildToolsVersion '36.0.0'
 
     defaultConfig {
-        applicationId 'com.solosu.mtforum'
+        applicationId 'com.solosu.mtforum.tp'
         minSdk 29
         targetSdk 36
-        versionCode 6
-        versionName "2.2"
+        versionCode 7
+        versionName "2.3"
+    }
+
+    signingConfigs {
+        release {
+            storeFile file("release.keystore")
+            storePassword "mtforum123"
+            keyAlias "mtforum"
+            keyPassword "mtforum123"
+            v1SigningEnabled true
+            v2SigningEnabled true
+        }
     }
 
     buildTypes {
@@ -22,8 +33,7 @@ android {
             // 调试包沿用 AGP 默认的 debug 签名
         }
         release {
-            // 用 debug 签名，不为发布单独维护 keystore。
-            signingConfig signingConfigs.debug
+            signingConfig signingConfigs.release
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
             shrinkResources false
