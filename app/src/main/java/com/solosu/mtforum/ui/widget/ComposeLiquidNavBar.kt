@@ -16,20 +16,21 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -47,11 +48,10 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalViewConfiguration
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.IntOffset
-import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.util.fastCoerceIn
@@ -72,8 +72,9 @@ import com.solosu.mtforum.R
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import kotlin.math.abs
-import kotlin.math.roundToInt
 import kotlin.math.sign
+
+private val LocalLiquidBottomTabScale = staticCompositionLocalOf { { 1f } }
 
 data class NavTabItem(
     val titleRes: Int,
@@ -82,12 +83,11 @@ data class NavTabItem(
 )
 
 /**
- * MTForum 液态毛玻璃底栏
- * 1. 底栏与水珠双重彩虹色散：开启 chromaticAberration 与 depthEffect，底栏胶囊与悬浮水珠四周全方位泛出绚丽菲涅尔彩虹光谱；
- * 2. 彻底杜绝背后头像穿透：纯净底色 Backdrop，绝不抓取绘制下层帖子列表与头像；
- * 3. 图标永不消失：顶层清晰绘制 Tab，移除任何隐藏逻辑，全流程清晰稳定呈现；
- * 4. 水珠触碰双 Tab 变色：以图标物理区域为准，长按滑行在两 Tab 之间时，被触碰的 Tab 即时变主题色，未碰触不误亮；
- * 5. 底栏不透明度 65%：浅色/深色统一 65% 纯净磨砂玻璃遮罩。
+ * 完整遵循 Kyant0 官方规范的 LiquidBottomTabs
+ * 1. 底栏与水珠双重彩虹色散（chromaticAberration = true）；
+ * 2. 水珠折射离屏 tabsBackdrop，长按放大时水珠覆盖到的 tab（包括跨 2 个 tab 时）精准呈现主题色与绚丽边缘彩虹光谱；
+ * 3. 底栏不透明度为 65%；
+ * 4. 全局手势覆盖：点击任意 tab 极速响应切换，滑动任意非水珠位置水珠自动吸附跟手。
  */
 @Composable
 fun MTForumLiquidNavBar(
@@ -109,13 +109,14 @@ fun MTForumLiquidNavBar(
 
     val isLightTheme = !isSystemInDarkTheme()
     val containerColor =
-        if (isLightTheme) Color(0xFFFFFFFF.toInt()).copy(0.65f)
-        else Color(0xFF202022.toInt()).copy(0.65f)
-    val contentNormalColor = if (isLightTheme) Color(0x8C000000.toInt()) else Color(0xB8FFFFFF.toInt())
+        if (isLightTheme) Color.White.copy(0.65f)
+        else Color(0xFF1E1E20).copy(0.65f)
+    val contentNormalColor =
+        if (isLightTheme) Color.Black.copy(0.75f)
+        else Color.White.copy(0.75f)
 
-    // 纯净底板 Backdrop：只绘制纯净背景色，绝不抓取下层列表，杜绝水珠中透出头像文字
-    val baseBackdrop = rememberCanvasBackdrop {
-        drawRect(if (isLightTheme) Color(0xFFFAFAFA) else Color(0xFF141416))
+    val backdrop = rememberCanvasBackdrop {
+        drawRect(if (isLightTheme) Color.White else Color(0xFF141416))
     }
     val tabsBackdrop = rememberLayerBackdrop()
 
@@ -145,7 +146,7 @@ fun MTForumLiquidNavBar(
         val animationScope = rememberCoroutineScope()
         var currentIndex by remember { mutableIntStateOf(selectedTabIndex) }
 
-        // 水珠按压放大控制器：56dp 膨胀至 78dp
+        // 水珠按压放大控制器：56dp 膨胀至 78dp (78f / 56f)
         val dampedDragAnimation = remember(animationScope) {
             DampedDragAnimation(
                 animationScope = animationScope,
@@ -176,42 +177,27 @@ fun MTForumLiquidNavBar(
             )
         }
 
-        val isPressed = dampedDragAnimation.pressProgress > 0.05f
-        val dropletCenter = dampedDragAnimation.value + 0.5f
-        val dropletHalfWidth = dampedDragAnimation.scaleX / 2f
-        val dropletLeft = dropletCenter - dropletHalfWidth
-        val dropletRight = dropletCenter + dropletHalfWidth
-
-        // ================= 1. 底栏容器胶囊背景（高度 64dp，不透明度 65%，开启彩虹色散） =================
-        Box(
+        // ================= 1. 底栏容器胶囊背景与普通状态 Tab（带彩虹色散，不透明度 65%） =================
+        Row(
             Modifier
                 .graphicsLayer { translationX = panelOffset }
                 .drawBackdrop(
-                    backdrop = baseBackdrop,
+                    backdrop = backdrop,
                     shape = { CircleShape },
                     effects = {
                         vibrancy()
-                        blur(12f.dp.toPx())
+                        blur(8f.dp.toPx())
                         lens(
-                            refractionHeight = 16f.dp.toPx(),
+                            refractionHeight = 24f.dp.toPx(),
                             refractionAmount = 24f.dp.toPx(),
                             depthEffect = true,
-                            chromaticAberration = true // ★ 底栏彩虹色散效果！
+                            chromaticAberration = true // 底栏彩虹色散效果
                         )
-                    },
-                    highlight = {
-                        Highlight.Default.copy(alpha = 0.60f)
-                    },
-                    shadow = {
-                        Shadow(alpha = 0.22f)
-                    },
-                    innerShadow = {
-                        InnerShadow(radius = 8f.dp, alpha = 0.40f)
                     },
                     layerBlock = {
                         val progress = dampedDragAnimation.pressProgress
                         if (size.width > 0f) {
-                            val scale = lerp(1f, 1f + 12f.dp.toPx() / size.width, progress)
+                            val scale = lerp(1f, 1f + 16f.dp.toPx() / size.width, progress)
                             scaleX = scale
                             scaleY = scale
                         }
@@ -221,72 +207,103 @@ fun MTForumLiquidNavBar(
                 .then(interactiveHighlight.modifier)
                 .height(64.dp)
                 .fillMaxWidth()
-                .padding(horizontal = 4.dp)
-        )
-
-        // ================= 2. 离屏录制层：为水珠透镜提供彩色主题色折射源（透明不直接绘制到屏） =================
-        Row(
-            Modifier
-                .clearAndSetSemantics {}
-                .alpha(0f)
-                .layerBackdrop(tabsBackdrop)
-                .graphicsLayer { translationX = panelOffset }
-                .height(56.dp)
-                .fillMaxWidth()
-                .padding(horizontal = 4.dp),
+                .padding(4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            tabs.forEachIndexed { _, tab ->
+            tabs.forEachIndexed { index, tab ->
+                val isSelected = (index == currentIndex && !tab.isPostButton)
+                val tint = if (isSelected) themeColor else contentNormalColor
+
                 TabItemView(
                     tab = tab,
-                    tint = themeColor,
+                    tint = tint,
                     themeColor = themeColor,
-                    tabScale = 1f,
                     modifier = Modifier.weight(1f)
                 )
             }
         }
 
-        // ================= 3. 真实 78dp 悬浮放大水珠（开启菲涅尔透镜与彩虹色散） =================
+        // ================= 2. 官方离屏图层（录制全部 Tab 的高亮主题色） =================
+        CompositionLocalProvider(
+            LocalLiquidBottomTabScale provides {
+                lerp(1f, 1.20f, dampedDragAnimation.pressProgress)
+            }
+        ) {
+            Row(
+                Modifier
+                    .clearAndSetSemantics {}
+                    .alpha(0f)
+                    .layerBackdrop(tabsBackdrop)
+                    .graphicsLayer { translationX = panelOffset }
+                    .drawBackdrop(
+                        backdrop = backdrop,
+                        shape = { CircleShape },
+                        effects = {
+                            val progress = dampedDragAnimation.pressProgress
+                            vibrancy()
+                            blur(8f.dp.toPx())
+                            lens(
+                                24f.dp.toPx() * progress,
+                                24f.dp.toPx() * progress,
+                                chromaticAberration = true
+                            )
+                        },
+                        highlight = {
+                            val progress = dampedDragAnimation.pressProgress
+                            Highlight.Default.copy(alpha = progress)
+                        },
+                        onDrawSurface = { drawRect(containerColor) }
+                    )
+                    .then(interactiveHighlight.modifier)
+                    .height(56.dp)
+                    .fillMaxWidth()
+                    .padding(horizontal = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                tabs.forEachIndexed { _, tab ->
+                    TabItemView(
+                        tab = tab,
+                        tint = themeColor,
+                        themeColor = themeColor,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
+        }
+
+        // ================= 3. 悬浮放大水珠（折射 backdrop + tabsBackdrop，真实菲涅尔彩虹色散） =================
         Box(
             Modifier
+                .padding(horizontal = 4.dp)
                 .align(Alignment.CenterStart)
-                .offset {
-                    val x = if (isLtr) {
-                        (paddingPx + dampedDragAnimation.value * tabWidth + panelOffset).roundToInt()
-                    } else {
-                        (availableWidth - paddingPx - (dampedDragAnimation.value + 1f) * tabWidth + panelOffset).roundToInt()
-                    }
-                    IntOffset(x, 0)
+                .graphicsLayer {
+                    translationX =
+                        if (isLtr) dampedDragAnimation.value * tabWidth + panelOffset
+                        else availableWidth - paddingPx * 2f - (dampedDragAnimation.value + 1f) * tabWidth + panelOffset
                 }
-                .width(with(density) { tabWidth.toDp() })
-                .height(56.dp)
                 .drawBackdrop(
-                    backdrop = rememberCombinedBackdrop(baseBackdrop, tabsBackdrop),
+                    backdrop = rememberCombinedBackdrop(backdrop, tabsBackdrop),
                     shape = { CircleShape },
                     effects = {
                         val progress = dampedDragAnimation.pressProgress
-                        // 真实菲涅尔透镜物理参数：长按放大至 14dp / 22dp，边缘彩虹色散全力激发
-                        val rHeight = lerp(4f.dp.toPx(), 14f.dp.toPx(), progress)
-                        val rAmount = lerp(6f.dp.toPx(), 22f.dp.toPx(), progress)
                         lens(
-                            refractionHeight = rHeight,
-                            refractionAmount = rAmount,
+                            refractionHeight = 10f.dp.toPx() * progress,
+                            refractionAmount = 14f.dp.toPx() * progress,
                             depthEffect = true,
-                            chromaticAberration = true // ★ 水珠彩虹色散！
+                            chromaticAberration = true // 官方菲涅尔彩虹色散
                         )
                     },
                     highlight = {
                         val progress = dampedDragAnimation.pressProgress
-                        Highlight.Default.copy(alpha = lerp(0.40f, 1f, progress))
+                        Highlight.Default.copy(alpha = progress)
                     },
                     shadow = {
                         val progress = dampedDragAnimation.pressProgress
-                        Shadow(alpha = lerp(0.18f, 0.45f, progress))
+                        Shadow(alpha = progress)
                     },
                     innerShadow = {
                         val progress = dampedDragAnimation.pressProgress
-                        InnerShadow(radius = (4f + 4f * progress).dp, alpha = lerp(0.30f, 0.85f, progress))
+                        InnerShadow(radius = (8f * progress).dp, alpha = progress)
                     },
                     layerBlock = {
                         scaleX = dampedDragAnimation.scaleX
@@ -297,48 +314,18 @@ fun MTForumLiquidNavBar(
                     },
                     onDrawSurface = {
                         val progress = dampedDragAnimation.pressProgress
-                        // 保持底栏连贯的 65% 磨砂遮罩，纯净平滑
-                        drawRect(containerColor)
                         drawRect(
-                            if (isLightTheme) Color.White.copy(0.20f + 0.15f * progress)
-                            else Color.White.copy(0.12f + 0.10f * progress)
+                            if (isLightTheme) Color.Black.copy(0.10f) else Color.White.copy(0.10f),
+                            alpha = 1f - progress
                         )
-                        drawRect(
-                            if (isLightTheme) Color.Black.copy(0.06f * (1f - progress))
-                            else Color.Transparent
-                        )
+                        drawRect(Color.Black.copy(alpha = 0.03f * progress))
                     }
                 )
+                .height(56.dp)
+                .fillMaxWidth(1f / tabsCount)
         )
 
-        // ================= 4. 可见 Tab 内容图层（顶层清晰可见，绝不消失，水珠触碰时变主题色） =================
-        Row(
-            Modifier
-                .graphicsLayer { translationX = panelOffset }
-                .height(56.dp)
-                .fillMaxWidth()
-                .padding(horizontal = 4.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            tabs.forEachIndexed { index, tab ->
-                // 图标物理区域在 [index + 0.30f, index + 0.70f]，水珠边缘真正接触图标时才变色
-                val isTouchedByDroplet = if (isPressed) {
-                    dropletRight >= index + 0.30f && dropletLeft <= (index + 1) - 0.30f
-                } else {
-                    index == currentIndex
-                }
-
-                TabItemView(
-                    tab = tab,
-                    tint = if (isTouchedByDroplet && !tab.isPostButton) themeColor else contentNormalColor,
-                    themeColor = themeColor,
-                    tabScale = if (isTouchedByDroplet) lerp(1f, 1.10f, dampedDragAnimation.pressProgress) else 1f,
-                    modifier = Modifier.weight(1f)
-                )
-            }
-        }
-
-        // ================= 5. 全局手势交互层（挂在最顶层，手势点击与滑动极速响应） =================
+        // ================= 4. 全局手势交互层（点击极速响应，任意非水珠位置滑动水珠自动吸附移动） =================
         Box(
             Modifier
                 .fillMaxSize()
@@ -355,7 +342,7 @@ fun MTForumLiquidNavBar(
                         var isDragging = false
                         var lastX = down.position.x
 
-                        // 按下非水珠当前位置时，水珠立即响应移动并按压膨胀
+                        // 滑动非水珠当前位置水珠自动移动到当前位置
                         val touchCenterFraction = if (isLtr) {
                             (rawDownX / tabWidth - 0.5f).fastCoerceIn(0f, (tabsCount - 1).toFloat())
                         } else {
@@ -373,7 +360,7 @@ fun MTForumLiquidNavBar(
                                 dampedDragAnimation.release()
 
                                 if (!isDragging) {
-                                    // 点击 (Tap)：精确以 downTab 为准
+                                    // 点击底栏 tab 极速响应切换
                                     if (downTab == 2) {
                                         onPostClicked()
                                         dampedDragAnimation.animateToValue(currentIndex.toFloat())
@@ -383,7 +370,7 @@ fun MTForumLiquidNavBar(
                                         onTabSelected(downTab)
                                     }
                                 } else {
-                                    // 拖拽松手 (Release)：以水珠中心最近的 Tab 为准
+                                    // 拖拽松手吸附
                                     val releaseTab = (dampedDragAnimation.value + 0.5f).toInt().coerceIn(0, tabsCount - 1)
                                     if (releaseTab == 2) {
                                         dampedDragAnimation.animateToValue(currentIndex.toFloat())
@@ -441,16 +428,17 @@ private fun TabItemView(
     tab: NavTabItem,
     tint: Color,
     themeColor: Color,
-    tabScale: Float,
     modifier: Modifier = Modifier
 ) {
+    val scale = LocalLiquidBottomTabScale.current
     Column(
         modifier = modifier
             .clip(CircleShape)
             .fillMaxHeight()
             .graphicsLayer {
-                scaleX = tabScale
-                scaleY = tabScale
+                val s = scale()
+                scaleX = s
+                scaleY = s
             },
         verticalArrangement = Arrangement.spacedBy(2f.dp, Alignment.CenterVertically),
         horizontalAlignment = Alignment.CenterHorizontally
