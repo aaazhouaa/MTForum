@@ -33,6 +33,7 @@ import com.solosu.mtforum.ui.space.UserProfileActivity
 import com.solosu.mtforum.util.BBCodeUtil
 import com.solosu.mtforum.util.NavigationHelper
 import com.solosu.mtforum.util.UrlDrawable
+import java.util.Locale
 import java.util.regex.Matcher
 import java.util.regex.Pattern
 
@@ -65,63 +66,68 @@ class ReplyAdapter(rawReplies: List<ReplyItem>?) :
     private var rawReplyList: List<ReplyItem> = rawReplies ?: ArrayList()
 
     /** 已展开的分组。默认全部折叠，只有用户点过「展开」的才在此集合里。 */
-    private val expandedKeys: MutableSet<String> = HashSet()
+    /** 是否已展开折叠评论（默认全部折叠） */
+    var isFoldExpanded: Boolean = false
+        private set
 
-    /** 承载本适配器的 RecyclerView，用于展开/折叠后把视口锚回原行。 */
+    /** 当前被折叠的评论总数 */
+    var foldedCount: Int = 0
+        private set
+
+    /** 折叠状态变更回调，用于通知外部更新顶部的折叠胶囊标签 */
+    var onFoldStateChanged: ((count: Int, isExpanded: Boolean) -> Unit)? = null
+
+    /** 承载本适配器的 RecyclerView */
     private var attachedRecycler: RecyclerView? = null
     private var displayList: MutableList<DisplayRow> = ArrayList()
 
     private var replyClickListener: OnReplyClickListener? = null
     private var userClickListener: OnUserClickListener? = null
-    private var replyLongClickListener: OnReplyLongClickListener? = null // build73: 长按出操作菜单
+    private var replyLongClickListener: OnReplyLongClickListener? = null
 
     init {
         rebuildDisplayList()
     }
 
+    private fun isWaterReply(item: ReplyItem): Boolean {
+        val text = (item.contentText ?: item.contentHtml ?: "").trim()
+        val keywords = arrayOf("感谢", "看看", "隐藏", "分享")
+        for (kw in keywords) {
+            if (text.contains(kw)) return true
+        }
+        return false
+    }
+
     private fun rebuildDisplayList() {
         displayList.clear()
         val n = rawReplyList.size
-        if (n == 0) return
-
-        // 分组键只算一次：groupKeyOf 内部有正则与字符串归一化，逐条重复调用在长帖里很贵。
-        val keys = ArrayList<String>(n)
-        for (item in rawReplyList) keys.add(groupKeyOf(item))
-
-        val groups = LinkedHashMap<String, MutableList<Int>>()
-        for (i in 0 until n) groups.getOrPut(keys[i]) { ArrayList() }.add(i)
-
-        // 只有成员 > 1 的组才有折叠概念；列表刷新后自动丢弃已消失的分组状态。
-        val multiKeys = groups.filterValues { it.size > 1 }.keys
-        expandedKeys.retainAll(HashSet(multiKeys))
-
-        val firstIndex = HashMap<String, Int>()
-        for ((k, idxs) in groups) firstIndex[k] = idxs.first()
-
-        // 输出严格按原始楼层顺序。折叠时只保留该组首条，展开时按原位置列出全部成员。
-        // 不再单独插一行“折叠条”：折叠提示直接挂在首条的回复卡片内（见 bind），
-        // 也就是“就在第一个要折叠的那条下面”。
-        for (i in 0 until n) {
-            val key = keys[i]
-            val idxs = groups[key] ?: continue
-            if (idxs.size == 1) {
-                displayList.add(DisplayRow(item = rawReplyList[i]))
-                continue
-            }
-            val expanded = expandedKeys.contains(key)
-            val isFirst = firstIndex[key] == i
-            // 折叠态只展示首条（其余成员隐藏）；展开态成员各回原位
-            if (!isFirst && !expanded) continue
-            displayList.add(
-                DisplayRow(
-                    item = rawReplyList[i],
-                    foldedCount = if (isFirst) idxs.size - 1 else 0,
-                    isExpanded = expanded,
-                    groupKey = if (isFirst) key else "",
-                    groupLabel = if (isFirst) groupLabelOf(key) else null
-                )
-            )
+        if (n == 0) {
+            foldedCount = 0
+            onFoldStateChanged?.invoke(0, isFoldExpanded)
+            return
         }
+
+        var count = 0
+        for (item in rawReplyList) {
+            val isWater = isWaterReply(item)
+            if (isWater) {
+                count++
+                if (isFoldExpanded) {
+                    displayList.add(DisplayRow(item = item))
+                }
+            } else {
+                displayList.add(DisplayRow(item = item))
+            }
+        }
+        foldedCount = count
+        onFoldStateChanged?.invoke(count, isFoldExpanded)
+    }
+
+    /** 切换展开/折叠状态 */
+    fun toggleFoldExpanded() {
+        isFoldExpanded = !isFoldExpanded
+        rebuildDisplayList()
+        notifyDataSetChanged()
     }
 
     override fun onAttachedToRecyclerView(recyclerView: RecyclerView) {
@@ -132,136 +138,6 @@ class ReplyAdapter(rawReplies: List<ReplyItem>?) :
     override fun onDetachedFromRecyclerView(recyclerView: RecyclerView) {
         super.onDetachedFromRecyclerView(recyclerView)
         if (attachedRecycler === recyclerView) attachedRecycler = null
-    }
-
-    /** 展开/折叠一组，并把视口锚回点击前所在的那一行，避免列表跳位。 */
-    fun toggleGroup(groupKey: String) {
-        if (groupKey.isEmpty()) return
-        val rv = attachedRecycler
-        val lm = rv?.layoutManager as? LinearLayoutManager
-        val firstPos = lm?.findFirstVisibleItemPosition() ?: RecyclerView.NO_POSITION
-        var anchorIdentity: String? = null
-        var anchorOffset = 0
-        if (firstPos != RecyclerView.NO_POSITION) {
-            anchorIdentity = identityAtAdapterPosition(firstPos)
-            val v = lm?.findViewByPosition(firstPos)
-            if (v != null) anchorOffset = v.top - (rv?.paddingTop ?: 0)
-        }
-
-        if (expandedKeys.contains(groupKey)) expandedKeys.remove(groupKey)
-        else expandedKeys.add(groupKey)
-        rebuildDisplayList()
-        notifyDataSetChanged()
-
-        var target = anchorIdentity?.let { adapterPositionOfIdentity(it) } ?: -1
-        if (target < 0) {
-            // 极罕：锚点行本次被收起了。退而锚定该组首条（它始终存在）。
-            target = firstRowPositionOfGroup(groupKey)
-            anchorOffset = 0
-        }
-        if (target >= 0) lm?.scrollToPositionWithOffset(target, anchorOffset)
-    }
-
-    /** 某分组首条在适配器中的位置（折叠条已取消，折叠提示挂在首条上）。 */
-    private fun firstRowPositionOfGroup(groupKey: String): Int {
-        val offset = if (hasHeader()) 1 else 0
-        for (i in displayList.indices) {
-            if (displayList[i].groupKey == groupKey) return i + offset
-        }
-        return -1
-    }
-
-    private fun identityAtAdapterPosition(pos: Int): String? {
-        if (pos < 0) return null
-        if (hasHeader()) {
-            if (pos == 0) return IDENTITY_HEADER
-            val idx = pos - 1
-            return if (idx in displayList.indices) displayList[idx].identity else null
-        }
-        return if (pos in displayList.indices) displayList[pos].identity else null
-    }
-
-    private fun adapterPositionOfIdentity(identity: String): Int {
-        val offset = if (hasHeader()) 1 else 0
-        if (identity == IDENTITY_HEADER) return if (hasHeader()) 0 else -1
-        for (i in displayList.indices) {
-            if (displayList[i].identity == identity) return i + offset
-        }
-        return -1
-    }
-
-    /**
-     * 计算一条回复的分组键；相同键才会被折叠归并。
-     *
-     * 旧实现把「带任何 <img>」的回复一律排除在折叠外，而 Discuz 的内联表情本身就是
-     * <img src=".../static/image/smiley/...">，于是“支持😄 / 顶一个👍”这类最典型的
-     * 灌水回复永远不参与折叠——折叠几乎无效的主因就在这。
-     * 现改为：排除表情后仍无真实图文才允许折叠，并对文本做标点/空白/大小写/全角半角
-     * 归一化，使“看着一样”的回复归为一组。
-     */
-    private fun groupKeyOf(item: ReplyItem): String {
-        if (!isFoldable(item)) return uniqueKeyOf(item)
-        val norm = normalizedTextOf(item)
-        if (norm.isEmpty()) {
-            // 纯表情回复（只有表情、无文字）同属无信息量，归入同一批；
-            // 其余空文本（解析异常、真空白页）不折叠，以免把异常当成内容藏掉。
-            return if (hasExpressionImage(item.contentHtml ?: "")) BATCH_PREFIX + BATCH_EMOJI_SUFFIX
-            else uniqueKeyOf(item)
-        }
-        // 极短回复（“顶”“好”“支持”等）整批折叠
-        if (norm.length <= BATCH_MAX_LEN) return BATCH_PREFIX + norm.length
-        return norm
-    }
-
-    /** 是否含有内联表情（只判定表情，不看是否还有真图）。 */
-    private fun hasExpressionImage(html: String): Boolean {
-        if (!html.contains("<img", ignoreCase = true)) return false
-        var rest = html
-        if (rest.length > MAX_HTML_SCAN) rest = rest.substring(0, MAX_HTML_SCAN)
-        for (tag in IMG_TAG_RE.findAll(rest)) {
-            val src = IMG_SRC_RE.find(tag.value)?.groupValues?.get(1)?.lowercase() ?: continue
-            if (EXPRESSION_HINTS.any { src.contains(it) }) return true
-        }
-        return false
-    }
-
-    /** 是否允许参与折叠：无引用、非代码块、且排除表情后无真实图片。 */
-    private fun isFoldable(item: ReplyItem): Boolean {
-        if (!TextUtils.isEmpty(item.quotedContentHtml) || !TextUtils.isEmpty(item.quotedContentText)) {
-            return false
-        }
-        val html = item.contentHtml ?: ""
-        if (html.contains("comiis_blockcode") || html.contains("<pre")) return false
-        return !hasRealImage(html)
-    }
-
-    /** 排除内联表情后，是否还有真实图片。 */
-    private fun hasRealImage(html: String): Boolean {
-        if (!html.contains("<img", ignoreCase = true)) return false
-        var rest = html
-        if (rest.length > MAX_HTML_SCAN) rest = rest.substring(0, MAX_HTML_SCAN)
-        for (tag in IMG_TAG_RE.findAll(rest)) {
-            val src = IMG_SRC_RE.find(tag.value)?.groupValues?.get(1)?.lowercase() ?: continue
-            if (EXPRESSION_HINTS.any { src.contains(it) }) continue
-            return true
-        }
-        return false
-    }
-
-    /** 归一化文本：优先用 contentText，缺失时从 HTML 剥标签。 */
-    private fun normalizedTextOf(item: ReplyItem): String {
-        val raw = if (!TextUtils.isEmpty(item.contentText)) {
-            item.contentText ?: ""
-        } else {
-            val html = item.contentHtml ?: return ""
-            if (html.length > MAX_HTML_SCAN) return ""
-            html.replace(Regex("<[^>]*>"), " ")
-        }
-        return normalizeText(raw)
-    }
-
-    private fun uniqueKeyOf(item: ReplyItem): String {
-        return "unique_" + (item.pid ?: System.identityHashCode(item))
     }
 
     interface OnReplyClickListener {
@@ -543,94 +419,64 @@ class ReplyAdapter(rawReplies: List<ReplyItem>?) :
                 tvReplyQuote.text = ""
             }
 
-            val contentText = item.contentText
             val htmlContent = item.contentHtml
-            val hasCodeBlock = htmlContent != null &&
-                    (htmlContent.contains("comiis_blockcode") || htmlContent.contains("<pre"))
+            val contentText = item.contentText
 
-            if (!TextUtils.isEmpty(contentText) && !hasCodeBlock) {
+            val replyImageUrls = ArrayList<String>()
+            val sourceHtml = if (!TextUtils.isEmpty(htmlContent)) {
+                extractImagesFromHtml(htmlContent, replyImageUrls)
+            } else if (!TextUtils.isEmpty(contentText)) {
+                contentText!!
+            } else {
+                ""
+            }
+
+            if (sourceHtml.isNotEmpty()) {
                 tvContent.visibility = View.VISIBLE
-                // ★ 修复1：使用 ImageGetter 渲染内联图片（表情等），否则 <img> 标签被静默丢弃
                 tvContent.text = Html.fromHtml(
-                    contentText, Html.FROM_HTML_MODE_COMPACT,
+                    sourceHtml, Html.FROM_HTML_MODE_COMPACT,
                     createInlineImageGetter(tvContent),
                     BBCodeUtil.createTagHandler(itemView.context)
                 )
-                // ★ 修复2：先设置链接，再配置其他属性（避免 setText 覆盖文本）
                 setupClickableLinks(tvContent)
                 attachCopyOnLongClick(tvContent)
-                // 回复内容中的大图处理
-                if (!TextUtils.isEmpty(htmlContent)) {
-                    loadReplyImages(itemView.context, htmlContent, llReplyImages)
-                } else {
-                    llReplyImages.visibility = View.GONE
-                }
-            } else if (!TextUtils.isEmpty(htmlContent)) {
-                tvContent.visibility = View.VISIBLE
-                // 提取图片URL，移除img标签后渲染文本（也保留内联表情）
-                val replyImageUrls = ArrayList<String>()
-                val cleanHtml = extractImagesFromHtml(htmlContent, replyImageUrls)
-                // ★ 修复2：用 ImageGetter 渲染剩下的内联图片
-                tvContent.text = Html.fromHtml(
-                    cleanHtml, Html.FROM_HTML_MODE_COMPACT,
-                    createInlineImageGetter(tvContent),
-                    BBCodeUtil.createTagHandler(itemView.context)
-                )
-                // ★ 修复2：先设置链接，再配置其他属性（避免 setText 覆盖文本）
-                setupClickableLinks(tvContent)
-                attachCopyOnLongClick(tvContent)
-                // 加载图片
-                if (replyImageUrls.isNotEmpty()) {
-                    llReplyImages.removeAllViews()
-                    llReplyImages.visibility = View.VISIBLE
-                    for (imgUrl in replyImageUrls) {
-                        val imageView = ImageView(itemView.context)
-                        imageView.layoutParams = LinearLayout.LayoutParams(
-                            LinearLayout.LayoutParams.MATCH_PARENT,
-                            LinearLayout.LayoutParams.WRAP_CONTENT
-                        )
-                        imageView.adjustViewBounds = true
-                        imageView.scaleType = ImageView.ScaleType.FIT_CENTER
-                        imageView.setBackgroundColor(itemView.context.getColor(R.color.background_secondary))
-                        // 限制图片最大尺寸，防止撑爆屏幕
-                        val maxImgWidth = getMaxImageWidth(itemView.context)
-                        imageView.maxWidth = maxImgWidth
-                        imageView.maxHeight = (maxImgWidth * 1.2f).toInt()
-                        // ★ 添加点击预览
-                        imageView.isClickable = true
-                        imageView.isFocusable = true
-                        setImageClick(itemView.context, imageView, imgUrl)
-                        Glide.with(itemView.context)
-                            .load(imgUrl)
-                            .placeholder(ColorDrawable(itemView.context.getColor(R.color.background_secondary)))
-                            .error(ColorDrawable(itemView.context.getColor(R.color.divider)))
-                            .into(imageView)
-                        llReplyImages.addView(imageView)
-                    }
-                } else {
-                    llReplyImages.visibility = View.GONE
-                }
             } else {
                 tvContent.visibility = View.GONE
+            }
+
+            // 评论区图片展示（支持加载真实附件大图与点击预览）
+            if (replyImageUrls.isNotEmpty()) {
+                llReplyImages.removeAllViews()
+                llReplyImages.visibility = View.VISIBLE
+                val maxImgWidth = getMaxImageWidth(itemView.context)
+                for (imgUrl in replyImageUrls) {
+                    val imageView = ImageView(itemView.context)
+                    imageView.layoutParams = LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT
+                    )
+                    imageView.adjustViewBounds = true
+                    imageView.scaleType = ImageView.ScaleType.FIT_CENTER
+                    imageView.setBackgroundColor(itemView.context.getColor(R.color.background_secondary))
+                    imageView.maxWidth = maxImgWidth
+                    imageView.maxHeight = (maxImgWidth * 1.5f).toInt()
+                    imageView.isClickable = true
+                    imageView.isFocusable = true
+                    setImageClick(itemView.context, imageView, imgUrl)
+                    Glide.with(itemView.context)
+                        .load(imgUrl)
+                        .placeholder(ColorDrawable(itemView.context.getColor(R.color.background_secondary)))
+                        .error(ColorDrawable(itemView.context.getColor(R.color.divider)))
+                        .into(imageView)
+                    llReplyImages.addView(imageView)
+                }
+            } else {
+                llReplyImages.removeAllViews()
                 llReplyImages.visibility = View.GONE
             }
 
-            // 折叠提示：直接挂在被折叠组的首条回复卡片内，
-            // 即“就在第一个要折叠的那条下面”，不再单独占一整行。
-            if (row.foldedCount > 0 && layoutCollapsedHint != null && tvCollapsedText != null) {
-                layoutCollapsedHint.visibility = View.VISIBLE
-                val label = row.groupLabel ?: "相同回复"
-                if (row.isExpanded) {
-                    tvCollapsedText.text = "已展开 ${row.foldedCount} 条$label · 点击折叠"
-                    ivCollapsedIcon?.rotation = 270f
-                } else {
-                    tvCollapsedText.text = "已折叠 ${row.foldedCount} 条$label · 点击展开"
-                    ivCollapsedIcon?.rotation = 90f
-                }
-                layoutCollapsedHint.setOnClickListener { toggleGroup(row.groupKey) }
-            } else {
-                layoutCollapsedHint?.visibility = View.GONE
-            }
+            // 用户要求：废弃原卡片内的折叠胶囊，统一折叠到顶部标题栏
+            layoutCollapsedHint?.visibility = View.GONE
         }
     }
 
@@ -867,35 +713,48 @@ class ReplyAdapter(rawReplies: List<ReplyItem>?) :
         /**
          * 从 HTML 内容中提取所有 img 标签的 src URL，并返回去掉 img 标签后的纯 HTML
          */
+        private fun isSmileyOrIcon(url: String): Boolean {
+            val lower = url.lowercase(Locale.ROOT)
+            return lower.contains("smiley") || lower.contains("emoticon")
+                    || lower.contains("face") || lower.contains("/static/image/smiley")
+                    || lower.contains("stamp") || lower.contains("magic")
+                    || lower.contains("mini") || lower.contains("icon")
+                    || lower.contains("common_")
+        }
+
         private fun extractImagesFromHtml(html: String?, outImageUrls: MutableList<String>): String {
             if (TextUtils.isEmpty(html)) {
                 return ""
             }
-            val pattern = Pattern.compile(
-                "<img[^>]+src\\s*=\\s*['\"]([^'\"]+)['\"][^>]*>",
+            val imgPattern = Pattern.compile("<img\\b[^>]*>", Pattern.CASE_INSENSITIVE)
+            val attrPattern = Pattern.compile(
+                "(?:zoomfile|file|comiis_loadimages|data-original|data-src|data-file|data-lazy-src|src)\\s*=\\s*['\"]([^'\"]+)['\"]",
                 Pattern.CASE_INSENSITIVE
             )
-            val matcher = pattern.matcher(html!!)
+            val matcher = imgPattern.matcher(html!!)
             val sb = StringBuffer()
             while (matcher.find()) {
-                val url = matcher.group(1)
-                // ★ 修复3：补全所有相对路径，否则图片全部丢失
-                var fullUrl = normalizeImageUrl(url)
-                if (fullUrl == null) fullUrl = url
-
-                // 过滤内联小图/表情，保留在文本中
-                if (fullUrl.contains("smiley") || fullUrl.contains("emoticon")
-                    || fullUrl.contains("face") || fullUrl.contains("/static/image/")
-                    || fullUrl.contains("stamp") || fullUrl.contains("magic")
-                    || fullUrl.contains("mini") || fullUrl.contains("icon")
-                ) {
-                    // 生成纯净的 img 标签，去除所有多余属性（如 smilieid、border、alt 等），防止参数外露
-                    matcher.appendReplacement(sb, Matcher.quoteReplacement("<img src=\"$fullUrl\">"))
-                    continue
+                val tag = matcher.group(0)
+                val attrMatcher = attrPattern.matcher(tag)
+                var chosenUrl: String? = null
+                while (attrMatcher.find()) {
+                    val candidate = attrMatcher.group(1)
+                    val fullCandidate = normalizeImageUrl(candidate)
+                    if (fullCandidate != null && !fullCandidate.contains("none.gif") && !fullCandidate.contains("blank.gif")) {
+                        chosenUrl = fullCandidate
+                        break
+                    }
                 }
-                // 大图：只接受 http/https
-                if (fullUrl.startsWith("http://") || fullUrl.startsWith("https://")) {
-                    outImageUrls.add(fullUrl)
+                if (chosenUrl != null) {
+                    if (isSmileyOrIcon(chosenUrl)) {
+                        matcher.appendReplacement(sb, Matcher.quoteReplacement("<img src=\"$chosenUrl\">"))
+                        continue
+                    }
+                    if (chosenUrl.startsWith("http://") || chosenUrl.startsWith("https://")) {
+                        if (!outImageUrls.contains(chosenUrl)) {
+                            outImageUrls.add(chosenUrl)
+                        }
+                    }
                 }
                 matcher.appendReplacement(sb, "")
             }

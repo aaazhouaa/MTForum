@@ -154,10 +154,11 @@
             android:textSize="11sp"
             android:textColor="@color/text_hint" />
     </LinearLayout>
-    <FrameLayout
-        android:id="@+id/frame_content"
+    <LinearLayout
+        android:id="@+id/ll_content_container"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:orientation="vertical"
         android:layout_marginStart="16dp"
         android:layout_marginEnd="16dp"
         android:layout_marginTop="12dp">
@@ -168,7 +169,7 @@
             android:textSize="15sp"
             android:textColor="@color/text_primary"
             android:lineSpacingExtra="6dp" />
-    </FrameLayout>
+    </LinearLayout>
     <!-- 帖子正文中的图片容器(玻璃卡片 + 横向滑动 + 折叠) -->
     <androidx.cardview.widget.CardView
         android:id="@+id/card_image_gallery"
@@ -283,6 +284,20 @@
             android:textSize="13sp"
             android:textColor="@color/text_secondary"
             android:visibility="gone" />
+        <TextView
+            android:id="@+id/tv_folded_badge"
+            android:layout_width="wrap_content"
+            android:layout_height="24dp"
+            android:layout_marginStart="8dp"
+            android:background="@drawable/bg_folded_badge"
+            android:gravity="center"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp"
+            android:textSize="11sp"
+            android:textColor="@color/text_secondary"
+            android:visibility="gone"
+            android:clickable="true"
+            android:focusable="true" />
         <Space
             android:layout_width="0dp"
             android:layout_height="1dp"

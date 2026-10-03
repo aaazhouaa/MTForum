@@ -65,9 +65,8 @@ object BBCodeUtil {
     private val P_LI = Pattern.compile("(?is)\\[\\*](.*?)(?=\\[\\*]|\\[/list])")
     private val P_HR = Pattern.compile("(?i)\\[hr]")
     private val P_TABLE = Pattern.compile("(?is)\\[table(?:\\s*=\\s*[^\\]]+)?](.*?)\\[/table]")
-    private val P_TR = Pattern.compile("(?is)\\[tr](.*?)\\[/tr]")
-    private val P_TD = Pattern.compile("(?i)\\[td(?:\\s*=\\s*[^\\]]+)?]")
-    private val P_TD_END = Pattern.compile("(?i)\\[/td]")
+    private val P_TR = Pattern.compile("(?is)\\[tr(?:\\s*=\\s*[^\\]]+)?](.*?)\\[/tr]")
+    private val P_TD_BLOCK = Pattern.compile("(?is)\\[td(?:\\s*=[^\\]]+)?]((?:(?!\\[td|\\[tr|\\[table).)*?)\\[/td]")
     private val P_INDENT = Pattern.compile("(?is)\\[indent](.*?)\\[/indent]")
     private val P_SUB = Pattern.compile("(?is)\\[sub](.*?)\\[/sub]")
     private val P_SUP = Pattern.compile("(?is)\\[sup](.*?)\\[/sup]")
@@ -250,12 +249,12 @@ object BBCodeUtil {
         result = P_LIST.matcher(result).replaceAll("<ul>$1</ul>")
         result = P_LI.matcher(result).replaceAll("<li>$1</li>")
 
-        // 表格降级:等宽 pre 风格渲染(TextView 不支持 table 布局)
-        // 每行一个 [tr],单元格用竖线分隔,整体以代码块样式展示便于对齐
-        result = P_TD.matcher(result).replaceAll("&nbsp;│&nbsp;")
-        result = P_TD_END.matcher(result).replaceAll("")
-        result = P_TR.matcher(result).replaceAll("<br>$1")
-        result = P_TABLE.matcher(result).replaceAll("<pre class=\"comiis_blockcode\">$1</pre>")
+        // 表格规范化为标准 HTML table（后续由原生 TableLayout 渲染）
+        result = P_TD_BLOCK.matcher(result).replaceAll("<td>$1</td>")
+        result = P_TR.matcher(result).replaceAll("<tr>$1</tr>")
+        result = P_TABLE.matcher(result).replaceAll("<table>$1</table>")
+        // 清理孤立多余的 [td]、[/td]、[tr]、[/tr]、[table]、[/table] 等残存标签（如标题手误加的 [td]）
+        result = result.replace(Regex("(?i)\\[/?(?:td|tr|table)(?:=[^\\]]*)?]"), "")
 
         // 引用 / 隐藏 / 回复可见 / 免费
         result = P_QUOTE.matcher(result).replaceAll("<customquote>$2</customquote>")

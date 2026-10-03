@@ -42,6 +42,10 @@ import android.widget.PopupWindow
 import android.widget.ScrollView
 import android.widget.Spinner
 import android.widget.TextView
+import android.widget.TableLayout
+import android.widget.TableRow
+import android.widget.HorizontalScrollView
+import android.widget.FrameLayout
 import com.solosu.mtforum.util.ToastUtil as Toast
 
 import androidx.activity.result.ActivityResultLauncher
@@ -265,7 +269,13 @@ class ThreadDetailActivity : AppCompatActivity() {
      * 每次重建监听都会丢，所以改为每次绑定重挂；数据回填走 applyHeaderFromDetail()。
      */
     private fun bindThreadHeader(view: View) {
-        val hb = ItemThreadDetailHeaderBinding.bind(view)
+        val hb: ItemThreadDetailHeaderBinding
+        try {
+            hb = ItemThreadDetailHeaderBinding.bind(view)
+        } catch (e: Throwable) {
+            android.util.Log.e("ThreadDetail", "Failed to bind thread header", e)
+            return
+        }
         headerBinding = hb
 
         hb.btnViewHidden.setOnClickListener { viewHiddenContent() }
@@ -694,15 +704,7 @@ class ThreadDetailActivity : AppCompatActivity() {
                 headerBinding!!.layoutHiddenContent.visibility = View.GONE
             }
 
-            headerBinding!!.tvContent.text = safeFromHtml(
-                displayHtml,
-                createInlineImageGetter(headerBinding!!.tvContent),
-                BBCodeUtil.createTagHandler(this)
-            )
-            if (!TextUtils.isEmpty(hiddenNotice)) {
-                applyHiddenNoticeHighlight(headerBinding!!.tvContent.text, hiddenNotice)
-            }
-            setupClickableLinks(headerBinding!!.tvContent)
+            renderContentSections(displayHtml, hiddenNotice)
             rebuildImageGallery(imageList)
         } else {
             headerBinding!!.tvContent.visibility = View.VISIBLE
@@ -759,6 +761,27 @@ class ThreadDetailActivity : AppCompatActivity() {
             headerBinding!!.tvReplyCount.text = "($replyCount)"
         } else {
             headerBinding!!.tvReplyCount.visibility = View.GONE
+        }
+
+        fun updateFoldedBadge(count: Int, isExpanded: Boolean) {
+            val hb = headerBinding ?: return
+            if (count > 0) {
+                hb.tvFoldedBadge.visibility = View.VISIBLE
+                val prefix = if (isExpanded) "▼" else "▶"
+                val stateText = if (isExpanded) "已展开" else "已折叠"
+                hb.tvFoldedBadge.text = "$prefix $stateText${count}条"
+            } else {
+                hb.tvFoldedBadge.visibility = View.GONE
+            }
+        }
+
+        replyAdapter?.onFoldStateChanged = { count, isExpanded ->
+            updateFoldedBadge(count, isExpanded)
+        }
+        updateFoldedBadge(replyAdapter?.foldedCount ?: 0, replyAdapter?.isFoldExpanded ?: false)
+
+        headerBinding!!.tvFoldedBadge.setOnClickListener {
+            replyAdapter?.toggleFoldExpanded()
         }
         binding.layoutReply.visibility = if (httpClient.isLoggedIn()) View.VISIBLE else View.GONE
         // 打赏/踢帖改为顶栏图标，不再按登录态显隐正文里的按钮条
@@ -844,10 +867,15 @@ class ThreadDetailActivity : AppCompatActivity() {
         }
     }
 
-    /** 滚到评论区（正文头之后的第一屏评论）。 */
+    /** 跳转到评论区（正文头之后的第一屏评论，无动画瞬间直达）。 */
     private fun scrollToReplySection() {
         binding.recyclerReplies.post {
-            binding.recyclerReplies.smoothScrollToPosition(ReplyAdapter.HEADER_ITEM_COUNT)
+            val lm = binding.recyclerReplies.layoutManager as? LinearLayoutManager
+            if (lm != null) {
+                lm.scrollToPositionWithOffset(ReplyAdapter.HEADER_ITEM_COUNT, 0)
+            } else {
+                binding.recyclerReplies.scrollToPosition(ReplyAdapter.HEADER_ITEM_COUNT)
+            }
         }
     }
 
@@ -1229,8 +1257,8 @@ class ThreadDetailActivity : AppCompatActivity() {
 
     private fun updateLikeIcon() {
         val button = binding.btnLike
-        // build66: 改用与列表页一致的拇指标(原 forum_like 是心形),用颜色区分已赞/未赞
-        button.setImageResource(R.drawable.ic_like_detail)
+        val iconRes = if (isLiked) R.drawable.ic_like_detail else R.drawable.ic_like_outline
+        button.setImageResource(iconRes)
         val themeColor = com.solosu.mtforum.util.ThemeManager.getThemeColor(this)
         button.setColorFilter(if (isLiked) themeColor else getColor(R.color.icon_secondary))
         updateCountBadge(binding.tvLikeBadge, maxOf(0, likeCount))
@@ -4099,5 +4127,202 @@ class ThreadDetailActivity : AppCompatActivity() {
 
         /** 目标每页回复数；论坛实际每页条数不止由我们决定，故连拉多页凑一屏。 */
         private const val REPLIES_PER_PAGE = 20
+    }
+
+    // ==================== 表格分段与原生 TableLayout 渲染 ====================
+
+    private fun renderContentSections(displayHtml: String, hiddenNotice: String?) {
+        val hb = headerBinding ?: return
+        val container = hb.llContentContainer
+
+        if (!displayHtml.contains("<table", ignoreCase = true)) {
+            // 无表格：保留原单个 tvContent
+            for (i in container.childCount - 1 downTo 0) {
+                val child = container.getChildAt(i)
+                if (child !== hb.tvContent) container.removeViewAt(i)
+            }
+            hb.tvContent.visibility = View.VISIBLE
+            hb.tvContent.text = safeFromHtml(
+                displayHtml,
+                createInlineImageGetter(hb.tvContent),
+                BBCodeUtil.createTagHandler(this)
+            )
+            if (!TextUtils.isEmpty(hiddenNotice)) {
+                applyHiddenNoticeHighlight(hb.tvContent.text, hiddenNotice)
+            }
+            setupClickableLinks(hb.tvContent)
+            return
+        }
+
+        // 包含表格：分段渲染文本与原生 TableLayout
+        // 关键：保留 hb.tvContent 在视图树内（仅设为 GONE），绝不从父容器移除，杜绝 ViewBinding 抛出 Missing required view 崩溃
+        for (i in container.childCount - 1 downTo 0) {
+            val child = container.getChildAt(i)
+            if (child !== hb.tvContent) container.removeViewAt(i)
+        }
+        hb.tvContent.visibility = View.GONE
+
+        val p = Pattern.compile("(?is)(<table\\b.*?</table\\s*>)")
+        val m = p.matcher(displayHtml)
+        var lastIdx = 0
+
+        fun addTextChunk(htmlChunk: String) {
+            val trimmed = htmlChunk.trim()
+            if (trimmed.isEmpty()) return
+            val tv = TextView(this)
+            tv.layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            )
+            tv.textSize = 15f
+            tv.setTextColor(getColor(R.color.text_primary))
+            tv.setLineSpacing(dpToPx(6).toFloat(), 1.0f)
+            tv.text = safeFromHtml(
+                trimmed,
+                createInlineImageGetter(tv),
+                BBCodeUtil.createTagHandler(this)
+            )
+            if (!TextUtils.isEmpty(hiddenNotice)) {
+                applyHiddenNoticeHighlight(tv.text, hiddenNotice)
+            }
+            setupClickableLinks(tv)
+            container.addView(tv)
+        }
+
+        while (m.find()) {
+            val textBefore = displayHtml.substring(lastIdx, m.start())
+            addTextChunk(textBefore)
+
+            val tableHtml = m.group(1) ?: ""
+            val tableCard = createTableLayoutView(tableHtml)
+            if (tableCard != null) {
+                container.addView(tableCard)
+            }
+
+            lastIdx = m.end()
+        }
+
+        val textAfter = displayHtml.substring(lastIdx)
+        addTextChunk(textAfter)
+    }
+
+    private fun createTableLayoutView(tableHtml: String): View? {
+        try {
+            val doc = Jsoup.parseBodyFragment(tableHtml)
+            val tableEl = doc.selectFirst("table") ?: return null
+            val rows = tableEl.select("tr")
+            if (rows.isEmpty()) return null
+
+            var maxCols = 0
+            for (r in rows) {
+                val cols = r.select("th, td").size
+                if (cols > maxCols) maxCols = cols
+            }
+            if (maxCols == 0) return null
+
+            val card = FrameLayout(this)
+            val cardLp = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            )
+            cardLp.setMargins(0, dpToPx(10), 0, dpToPx(10))
+            card.layoutParams = cardLp
+            card.setBackgroundResource(R.drawable.bg_table_border)
+
+            val tableLayout = TableLayout(this)
+            tableLayout.layoutParams = FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            )
+
+            val isTwoCols = maxCols == 2
+            if (isTwoCols) {
+                tableLayout.isStretchAllColumns = false
+                tableLayout.setColumnStretchable(1, true)
+                tableLayout.setColumnShrinkable(1, true)
+            } else {
+                tableLayout.isStretchAllColumns = true
+            }
+
+            val dividerColor = getColor(R.color.divider)
+            val headerBgColor = getColor(R.color.code_block_bg)
+            val textColor = getColor(R.color.text_primary)
+
+            for ((rIdx, r) in rows.withIndex()) {
+                val cells = r.select("th, td")
+                if (cells.isEmpty()) continue
+
+                val isHeaderRow = rIdx == 0 || cells.first()?.tagName()?.equals("th", ignoreCase = true) == true
+                val tr = TableRow(this)
+                tr.layoutParams = TableLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+                )
+                if (isHeaderRow) {
+                    tr.setBackgroundColor(headerBgColor)
+                }
+
+                for ((cIdx, cell) in cells.withIndex()) {
+                    val cellTv = TextView(this)
+                    val lp = TableRow.LayoutParams(
+                        ViewGroup.LayoutParams.WRAP_CONTENT,
+                        ViewGroup.LayoutParams.WRAP_CONTENT
+                    )
+                    cellTv.layoutParams = lp
+                    cellTv.setPadding(dpToPx(10), dpToPx(8), dpToPx(10), dpToPx(8))
+                    cellTv.gravity = Gravity.CENTER_VERTICAL or Gravity.START
+                    cellTv.setTextIsSelectable(true)
+
+                    if (isHeaderRow || (isTwoCols && cIdx == 0)) {
+                        cellTv.setTypeface(null, Typeface.BOLD)
+                        cellTv.textSize = 13.5f
+                        cellTv.setTextColor(textColor)
+                        if (!isHeaderRow && isTwoCols && cIdx == 0) {
+                            cellTv.setBackgroundColor(headerBgColor)
+                        }
+                    } else {
+                        cellTv.textSize = 13.5f
+                        cellTv.setTextColor(textColor)
+                        cellTv.setLineSpacing(dpToPx(2).toFloat(), 1.0f)
+                    }
+
+                    cellTv.text = Html.fromHtml(
+                        cell.html().trim(),
+                        Html.FROM_HTML_MODE_COMPACT,
+                        createInlineImageGetter(cellTv),
+                        null
+                    )
+                    tr.addView(cellTv)
+                }
+                tableLayout.addView(tr)
+
+                if (rIdx < rows.size - 1) {
+                    val div = View(this)
+                    div.layoutParams = TableLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        dpToPx(1)
+                    )
+                    div.setBackgroundColor(dividerColor)
+                    tableLayout.addView(div)
+                }
+            }
+
+            if (maxCols > 2) {
+                val hsv = HorizontalScrollView(this)
+                hsv.layoutParams = FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+                )
+                hsv.isFillViewport = true
+                hsv.addView(tableLayout)
+                card.addView(hsv)
+            } else {
+                card.addView(tableLayout)
+            }
+
+            return card
+        } catch (e: Exception) {
+            return null
+        }
     }
 }
