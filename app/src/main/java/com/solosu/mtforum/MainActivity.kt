@@ -56,8 +56,10 @@ class MainActivity : AppCompatActivity() {
     private var lastNavScrollAt = 0L
     private var navScrollAccum = 0
 
-    // ★ 液态玻璃底栏（FluidGlassTabLayout）
-    private var navTabLayout: com.solosu.mtforum.ui.widget.FluidGlassTabLayout? = null
+    // ★ 基于 Kyant0 Compose 架构的 78dp 悬浮水珠底栏
+    private var composeBottomNav: androidx.compose.ui.platform.ComposeView? = null
+    private val currentSelectedNavTab = androidx.compose.runtime.mutableIntStateOf(0)
+    private val currentNavThemeColor = androidx.compose.runtime.mutableStateOf(androidx.compose.ui.graphics.Color(0xFF0088FF.toInt()))
 
     // ★ 消息角标
     private var tvMessageBadge: TextView? = null
@@ -94,8 +96,7 @@ class MainActivity : AppCompatActivity() {
             override fun onPageSelected(position: Int) {
                 // pager 页 → 液态玻璃 tab（0首页/1版块/3消息/4我的，跳过中间的 + 发帖 tab）
                 val tabIdx = pagerToTabIndex(position)
-                navTabLayout?.selectTab(tabIdx, animate = true)
-                navTabLayout?.refreshTabColors(tabIdx)
+                currentSelectedNavTab.intValue = tabIdx
                 // build71: 切页时底部栏立即恢复显示(用户刚切换,需要看到导航)
                 setBottomNavVisible(true)
             }
@@ -611,47 +612,44 @@ class MainActivity : AppCompatActivity() {
     }
 
     /**
-     * 初始化悬浮胶囊导航栏（5项：首页/版块/中间发帖/消息/我的）
+     * 初始化悬浮胶囊导航栏（基于 Kyant0 Compose 架构，真机 78dp 悬浮溢出水珠）
      */
     private fun initNavigationBar() {
-        navTabLayout = findViewById(R.id.bottom_nav_container)
-        if (navTabLayout == null) {
-            android.util.Log.e("MainActivity", "FluidGlassTabLayout (bottom_nav_container) is null")
+        composeBottomNav = findViewById(R.id.bottom_nav_container)
+        if (composeBottomNav == null) {
+            android.util.Log.e("MainActivity", "ComposeView (bottom_nav_container) is null")
             return
         }
 
+        // 核心防闪退：显式绑定 Activity/ViewTree 的生命周期
+        composeBottomNav!!.setViewCompositionStrategy(
+            androidx.compose.ui.platform.ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed
+        )
+
         val themeColor = com.solosu.mtforum.util.ThemeManager.getThemeColor(this)
-        navTabLayout!!.enableDynamicBackground = true
-        navTabLayout!!.backdropSource = mainPager
-        navTabLayout!!.selectedTintColor = themeColor
+        currentNavThemeColor.value = androidx.compose.ui.graphics.Color(themeColor)
+        currentSelectedNavTab.intValue = pagerToTabIndex(MainPagerAdapter.PAGE_HOME)
 
-        // 配置 5 个 Tab（含中间独立发帖药丸按钮与垂直上下排版）
-        navTabLayout!!.setupTabs(themeColor)
-
-        // tab 选中 → 切对应页；中间 + tab → 发帖
-        navTabLayout!!.addOnTabSelectedListener { tab ->
-            navTabLayout?.refreshTabColors(tab.position)
-            when (tab.position) {
-                0 -> mainPager?.setCurrentItem(MainPagerAdapter.PAGE_HOME, true)
-                1 -> mainPager?.setCurrentItem(MainPagerAdapter.PAGE_COMMUNITY, true)
-                2 -> {
-                    val cur = mainPager?.currentItem ?: MainPagerAdapter.PAGE_HOME
+        composeBottomNav!!.setContent {
+            com.solosu.mtforum.ui.widget.MTForumLiquidNavBar(
+                selectedTabIndex = currentSelectedNavTab.intValue,
+                onTabSelected = { pos ->
+                    currentSelectedNavTab.intValue = pos
+                    when (pos) {
+                        0 -> mainPager?.setCurrentItem(MainPagerAdapter.PAGE_HOME, true)
+                        1 -> mainPager?.setCurrentItem(MainPagerAdapter.PAGE_COMMUNITY, true)
+                        3 -> mainPager?.setCurrentItem(MainPagerAdapter.PAGE_MESSAGE, true)
+                        4 -> mainPager?.setCurrentItem(MainPagerAdapter.PAGE_PROFILE, true)
+                    }
+                    setBottomNavVisible(true)
+                },
+                onPostClicked = {
                     openPost()
-                    navTabLayout?.selectTab(pagerToTabIndex(cur), animate = false)
-                }
-                3 -> mainPager?.setCurrentItem(MainPagerAdapter.PAGE_MESSAGE, true)
-                4 -> mainPager?.setCurrentItem(MainPagerAdapter.PAGE_PROFILE, true)
-            }
-            setBottomNavVisible(true)
+                },
+                themeColor = currentNavThemeColor.value
+            )
         }
 
-        // 手势释放或点击中间发帖按钮
-        navTabLayout!!.onPostClickListener = {
-            openPost()
-        }
-
-        // 初始选中首页
-        navTabLayout!!.selectTab(pagerToTabIndex(MainPagerAdapter.PAGE_HOME), animate = false)
         setupDrawerSwipeConflict()
     }
 
@@ -1061,8 +1059,7 @@ class MainActivity : AppCompatActivity() {
         // 登录状态 / AI 配置可能已变化，刷新侧边栏头部
         refreshDrawerHeader()
         val themeColor = com.solosu.mtforum.util.ThemeManager.getThemeColor(this)
-        navTabLayout?.selectedTintColor = themeColor
-        navTabLayout?.refreshTabColors(navTabLayout?.selectedTabPosition ?: 0)
+        currentNavThemeColor.value = androidx.compose.ui.graphics.Color(themeColor)
     }
 
     override fun onStop() {
