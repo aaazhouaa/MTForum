@@ -57,8 +57,8 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.util.fastCoerceIn
 import androidx.compose.ui.util.fastFirstOrNull
 import androidx.compose.ui.util.lerp
+import com.kyant.backdrop.backdrops.emptyBackdrop
 import com.kyant.backdrop.backdrops.layerBackdrop
-import com.kyant.backdrop.backdrops.rememberCanvasBackdrop
 import com.kyant.backdrop.backdrops.rememberCombinedBackdrop
 import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import com.kyant.backdrop.drawBackdrop
@@ -115,9 +115,7 @@ fun MTForumLiquidNavBar(
         if (isLightTheme) Color.Black.copy(0.75f)
         else Color.White.copy(0.75f)
 
-    val backdrop = rememberCanvasBackdrop {
-        drawRect(if (isLightTheme) Color.White else Color(0xFF141416))
-    }
+    val backdrop = emptyBackdrop()
     val tabsBackdrop = rememberLayerBackdrop()
 
     BoxWithConstraints(
