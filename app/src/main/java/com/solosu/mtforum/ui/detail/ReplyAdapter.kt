@@ -366,6 +366,7 @@ class ReplyAdapter(rawReplies: List<ReplyItem>?) :
         private val tvOpBadge: TextView = itemView.findViewById(R.id.tv_op_badge)
         private val tvLevel: TextView = itemView.findViewById(R.id.tv_reply_level)
         private val tvTime: TextView = itemView.findViewById(R.id.tv_reply_time)
+        private val tvReplyEditFooter: TextView? = itemView.findViewById(R.id.tv_reply_edit_footer)
         private val tvContent: TextView = itemView.findViewById(R.id.tv_reply_content)
         private val layoutReplyQuote: LinearLayout = itemView.findViewById(R.id.layout_reply_quote)
         private val tvReplyQuote: TextView = itemView.findViewById(R.id.tv_reply_quote)
@@ -437,11 +438,12 @@ class ReplyAdapter(rawReplies: List<ReplyItem>?) :
                 tvOpBadge.visibility = View.GONE
             }
 
-            // 等级
+            // 等级/称号（灰白字体）
             val level = item.authorLevel
             if (!TextUtils.isEmpty(level)) {
                 tvLevel.visibility = View.VISIBLE
                 tvLevel.text = level
+                tvLevel.setTextColor(androidx.core.content.ContextCompat.getColor(itemView.context, R.color.text_secondary))
             } else {
                 tvLevel.visibility = View.GONE
             }
@@ -510,10 +512,29 @@ class ReplyAdapter(rawReplies: List<ReplyItem>?) :
                 ""
             }
 
-            if (sourceHtml.isNotEmpty()) {
+            var remainingSource = sourceHtml
+            var editFooterText: String? = null
+            val editPattern = Pattern.compile("(?is)(?:<(?:i|span|font|div|p|em)\\b[^>]*>|\\s)*本[帖贴]最后由[\\s\\S]*?编辑(?:\\s*</(?:i|span|font|div|p|em)>)*")
+            val editMatcher = editPattern.matcher(sourceHtml)
+            if (editMatcher.find()) {
+                val matched = editMatcher.group(0) ?: ""
+                var pureText = Regex("<[^>]+>").replace(matched, "")
+                pureText = Regex("&nbsp;").replace(pureText, " ").trim()
+                editFooterText = pureText
+                remainingSource = editMatcher.replaceFirst("").trim()
+            }
+
+            if (!editFooterText.isNullOrEmpty()) {
+                tvReplyEditFooter?.visibility = View.VISIBLE
+                tvReplyEditFooter?.text = editFooterText
+            } else {
+                tvReplyEditFooter?.visibility = View.GONE
+            }
+
+            if (remainingSource.isNotEmpty()) {
                 tvContent.visibility = View.VISIBLE
                 // 用户要求：去除彩色字体，恢复正常文本颜色
-                val cleanSource = BBCodeUtil.stripHtmlColors(sourceHtml)
+                val cleanSource = BBCodeUtil.stripHtmlColors(remainingSource)
                 val spannedSource = Html.fromHtml(
                     cleanSource, Html.FROM_HTML_MODE_COMPACT,
                     createInlineImageGetter(tvContent),

@@ -81,11 +81,11 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginStart="6dp"
-                    android:background="@drawable/level_badge_bg"
-                    android:paddingHorizontal="8dp"
-                    android:paddingVertical="2dp"
+                    android:background="@drawable/bg_level_badge_gray"
+                    android:paddingHorizontal="7dp"
+                    android:paddingVertical="1.5dp"
                     android:textSize="11sp"
-                    android:textColor="?attr/colorPrimary"
+                    android:textColor="@color/text_secondary"
                     android:maxLines="1"
                     android:ellipsize="end"
                     android:visibility="gone" />
@@ -163,6 +163,19 @@
             android:textSize="13sp"
             android:lineSpacingExtra="2dp" />
     </LinearLayout>
+
+    <!-- 评论编辑标记（本帖最后由...编辑）：灰色斜体小字，与上方发布时间字号(11sp)完全一致 -->
+    <TextView
+        android:id="@+id/tv_reply_edit_footer"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="45dp"
+        android:layout_marginTop="6dp"
+        android:layout_marginBottom="2dp"
+        android:textSize="11sp"
+        android:textColor="@color/text_secondary"
+        android:textStyle="italic"
+        android:visibility="gone" />
 
     <TextView
         android:id="@+id/tv_reply_content"

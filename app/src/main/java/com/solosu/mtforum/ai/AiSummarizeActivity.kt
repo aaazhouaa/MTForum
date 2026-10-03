@@ -35,6 +35,9 @@ class AiSummarizeActivity : AppCompatActivity() {
     private lateinit var scroll: ScrollView
     private lateinit var root: LinearLayout
 
+    private lateinit var contentBox: LinearLayout
+    private var lastConfigured = false
+
     override fun onCreate(savedInstanceState: Bundle?) {
         com.solosu.mtforum.util.ThemeManager.applyTheme(this)
         super.onCreate(savedInstanceState)
@@ -88,9 +91,21 @@ class AiSummarizeActivity : AppCompatActivity() {
         btnCopy.text = "复制"
         btnCopy.setTextColor(com.solosu.mtforum.util.ThemeManager.getThemeColor(this))
         btnCopy.setTextSize(14f)
-        btnCopy.setPadding(dp(10), dp(6), dp(10), dp(6))
+        btnCopy.setPadding(dp(8), dp(6), dp(8), dp(6))
         btnCopy.setOnClickListener { copySummary() }
         bar.addView(btnCopy)
+
+        // AI 接口设置入口
+        val btnConfig = TextView(this)
+        btnConfig.text = "设置"
+        btnConfig.setTextColor(androidx.core.content.ContextCompat.getColor(this, com.solosu.mtforum.R.color.text_secondary))
+        btnConfig.setTextSize(14f)
+        btnConfig.setPadding(dp(8), dp(6), dp(12), dp(6))
+        btnConfig.setOnClickListener {
+            startActivity(android.content.Intent(this, AiConfigActivity::class.java))
+        }
+        bar.addView(btnConfig)
+
         root.addView(bar)
 
         // 状态行（显示进行中的步骤）
@@ -103,7 +118,7 @@ class AiSummarizeActivity : AppCompatActivity() {
 
         // 总结内容区
         scroll = ScrollView(this)
-        val contentBox = LinearLayout(this)
+        contentBox = LinearLayout(this)
         contentBox.orientation = LinearLayout.VERTICAL
         contentBox.setPadding(dp(16), dp(4), dp(16), dp(24))
         tvSummary = TextView(this)
@@ -122,6 +137,17 @@ class AiSummarizeActivity : AppCompatActivity() {
         setContentView(root)
     }
 
+    override fun onResume() {
+        super.onResume()
+        val configured = AiConfigManager.isConfigured(this)
+        if (!lastConfigured && configured && !TextUtils.isEmpty(tid) && TextUtils.isEmpty(tvSummary.text)) {
+            contentBox.removeAllViews()
+            contentBox.addView(tvSummary)
+            startSummarize()
+        }
+        lastConfigured = configured
+    }
+
     private fun dp(v: Int): Int {
         return (v * resources.displayMetrics.density + 0.5f).toInt()
     }
@@ -138,6 +164,23 @@ class AiSummarizeActivity : AppCompatActivity() {
     }
 
     private fun startSummarize() {
+        if (!AiConfigManager.isConfigured(this)) {
+            postStatus("未配置 AI 接口，请点击下方按钮完成配置")
+            runOnUiThread {
+                val btnGo = com.google.android.material.button.MaterialButton(this)
+                btnGo.text = "前往配置 AI 接口 (API Key / 模型)"
+                val lp = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT, dp(48)
+                )
+                lp.setMargins(0, dp(16), 0, 0)
+                btnGo.layoutParams = lp
+                btnGo.setOnClickListener {
+                    startActivity(android.content.Intent(this, AiConfigActivity::class.java))
+                }
+                contentBox.addView(btnGo)
+            }
+            return
+        }
         java.lang.Thread({
             try {
                 doSummarize()

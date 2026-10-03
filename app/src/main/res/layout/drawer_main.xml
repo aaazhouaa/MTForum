@@ -633,6 +633,41 @@
                     app:tint="@color/text_hint" />
             </LinearLayout>
 
+            <!-- AI 接口设置入口 -->
+            <LinearLayout
+                android:id="@+id/drawer_ai_config"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@drawable/bg_drawer_item"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingHorizontal="10dp"
+                android:paddingVertical="12dp">
+
+                <ImageView
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
+                    android:src="@drawable/ic_ai_spark"
+                    android:contentDescription="AI设置"
+                    app:tint="?attr/colorPrimary" />
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="12dp"
+                    android:layout_weight="1"
+                    android:text="AI 接口设置"
+                    android:textColor="@color/text_primary"
+                    android:textSize="14sp" />
+
+                <ImageView
+                    android:layout_width="16dp"
+                    android:layout_height="16dp"
+                    android:src="@drawable/ic_arrow_right"
+                    android:contentDescription="前往"
+                    app:tint="@color/text_hint" />
+            </LinearLayout>
+
             <LinearLayout
                 android:id="@+id/drawer_settings"
                 android:layout_width="match_parent"

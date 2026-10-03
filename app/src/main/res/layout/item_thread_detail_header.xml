@@ -117,7 +117,21 @@
                     android:visibility="gone" />
             </LinearLayout>
         </LinearLayout>
-        <!-- 关注按钮（原 AI 总结按钮已移除） -->
+        <!-- AI 一键总结：拉帖+评论区，有隐藏先回固定模板解锁再总结 -->
+        <TextView
+            android:id="@+id/btn_ai_summary"
+            android:layout_width="wrap_content"
+            android:layout_height="26dp"
+            android:layout_marginEnd="8dp"
+            android:gravity="center"
+            android:paddingHorizontal="10dp"
+            android:text="AI总结"
+            android:textColor="@color/accent_ai"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            android:background="@drawable/thread_ai_summary_bg" />
+
+        <!-- 关注按钮 -->
         <TextView
             android:id="@+id/btn_follow"
             android:layout_width="wrap_content"

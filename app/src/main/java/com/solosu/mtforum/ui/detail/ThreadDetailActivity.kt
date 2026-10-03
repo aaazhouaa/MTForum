@@ -285,6 +285,15 @@ class ThreadDetailActivity : AppCompatActivity() {
         headerBinding = hb
 
         hb.btnViewHidden.setOnClickListener { viewHiddenContent() }
+        hb.btnAiSummary.setOnClickListener {
+            val it = Intent(this, com.solosu.mtforum.ai.AiSummarizeActivity::class.java)
+            it.putExtra("tid", tid)
+            it.putExtra(
+                "title",
+                if (!TextUtils.isEmpty(postDetail?.title)) postDetail?.title else ""
+            )
+            startActivity(it)
+        }
         // 打赏/踢帖已移到顶栏图标（见 onCreate 的 binding.btnReward / binding.btnKick）
         hb.btnCollapseImages.setOnClickListener { toggleImageGallery() }
         hb.btnOnlyOp.setOnClickListener {
@@ -367,20 +376,9 @@ class ThreadDetailActivity : AppCompatActivity() {
     }
 
     /**
-     * 打赏人数角标：挂在顶栏打赏图标右上角。
-     *
-     * 原来正文底部有一整块「X 人打赏 / Y 人好评」+ 头像条，占位大且与顶栏图标重复；
-     * 现改为只在图标角标显示打赏人数。为 0 时角标隐藏（图标本体仍可点）。
+     * 打赏：按用户要求仅保留顶栏红包图标，不再显示任何数字角标
      */
     private fun bindRewardBadge(detail: PostDetail) {
-        val badge = binding.tvRewardBadge
-        val count = detail.rewardCount
-        if (count > 0) {
-            badge.text = if (count > 99) "99+" else count.toString()
-            badge.visibility = View.VISIBLE
-        } else {
-            badge.visibility = View.GONE
-        }
     }
 
     private fun setupRecyclerView() {
@@ -887,6 +885,9 @@ class ThreadDetailActivity : AppCompatActivity() {
 
     // ==================== 回复 ====================
 
+    /** 标记回复面板是否正在打开中，避免初始打开软键盘尚未弹起时的错误联动 */
+    private var isOpeningReplyPanel = false
+
     private fun initReplyPanel() {
         val onBottomReplyBarClick = View.OnClickListener { showReplyBottomSheet(currentReplyTarget) }
         binding.etReply.setOnClickListener(onBottomReplyBarClick)
@@ -906,6 +907,9 @@ class ThreadDetailActivity : AppCompatActivity() {
         mEtReplyDialog = etReplyDialog
         mTvReplyTarget = tvTarget
         mBtnSendReply = btnSend
+
+        val card = panel.findViewById<View>(R.id.dialog_card)
+        card?.setBackgroundResource(R.drawable.bg_reply_sheet)
 
         etReplyDialog?.onImageReceivedListener = { uri ->
             addPendingImages(listOf(uri))
@@ -932,6 +936,15 @@ class ThreadDetailActivity : AppCompatActivity() {
             true
         }
 
+        // 联动全面屏手势返回：当软键盘由系统或手势收起时，回复框自动跟随立刻收起，彻底杜绝悬浮残留
+        androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(binding.containerReplyPanel) { _, insets ->
+            val imeVisible = insets.isVisible(androidx.core.view.WindowInsetsCompat.Type.ime())
+            if (!imeVisible && isReplyPanelShowing() && !isOpeningReplyPanel) {
+                hideReplyPanel()
+            }
+            insets
+        }
+
         // 软键盘未激活但面板展开时的返回键回调
         val callback = object : androidx.activity.OnBackPressedCallback(false) {
             override fun handleOnBackPressed() {
@@ -942,6 +955,16 @@ class ThreadDetailActivity : AppCompatActivity() {
         replyBackPressedCallback = callback
     }
 
+    override fun dispatchKeyEvent(event: android.view.KeyEvent): Boolean {
+        if (event.keyCode == android.view.KeyEvent.KEYCODE_BACK) {
+            if (isReplyPanelShowing()) {
+                hideReplyPanel()
+                return true
+            }
+        }
+        return super.dispatchKeyEvent(event)
+    }
+
     private fun isReplyPanelShowing(): Boolean {
         return binding.containerReplyPanel.visibility == View.VISIBLE
     }
@@ -950,25 +973,22 @@ class ThreadDetailActivity : AppCompatActivity() {
         val panel = binding.containerReplyPanel
         if (panel.visibility != View.VISIBLE) return
 
+        isOpeningReplyPanel = false
         val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
-        mEtReplyDialog?.let { imm?.hideSoftInputFromWindow(it.windowToken, 0) }
+        mEtReplyDialog?.let { et ->
+            imm?.hideSoftInputFromWindow(et.windowToken, 0)
+            et.clearFocus() // 关键：彻底取消回复框中的输入法焦点
+        }
+        binding.root.requestFocus()
 
         replyBackPressedCallback?.isEnabled = false
 
-        binding.vReplyMask.animate().alpha(0f).setDuration(180).withEndAction {
-            binding.vReplyMask.visibility = View.GONE
-        }.start()
+        binding.vReplyMask.animate().cancel()
+        binding.vReplyMask.visibility = View.GONE
 
-        val h = if (panel.height > 0) panel.height.toFloat() else dpToPx(350).toFloat()
-        panel.animate()
-            .translationY(h)
-            .setDuration(180)
-            .setInterpolator(android.view.animation.AccelerateInterpolator())
-            .withEndAction {
-                panel.visibility = View.GONE
-                panel.translationY = 0f
-            }
-            .start()
+        panel.animate().cancel()
+        panel.visibility = View.GONE
+        panel.translationY = 0f
 
         // 用户需求：已输入的内容未发送时暂时保留（草稿暂存），离开当前帖子时才清除
         currentReplyPid = ""
@@ -977,6 +997,7 @@ class ThreadDetailActivity : AppCompatActivity() {
 
     private fun showReplyBottomSheet(prefillText: String?) {
         if (isFinishing || isDestroyed) return
+        isOpeningReplyPanel = true
         val etReplyDialog = mEtReplyDialog
         val tvTarget = mTvReplyTarget
 
@@ -1028,6 +1049,7 @@ class ThreadDetailActivity : AppCompatActivity() {
             etReplyDialog.requestFocus()
             val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
             imm?.showSoftInput(etReplyDialog, InputMethodManager.SHOW_IMPLICIT)
+            etReplyDialog.postDelayed({ isOpeningReplyPanel = false }, 400)
         }
     }
 

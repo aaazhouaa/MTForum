@@ -346,6 +346,15 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+        // AI 接口设置
+        val aiConfigRow = findViewById<View>(R.id.drawer_ai_config)
+        if (aiConfigRow != null) {
+            aiConfigRow.setOnClickListener {
+                drawerLayout!!.closeDrawer(drawerPanel!!)
+                startActivity(Intent(this@MainActivity, AiConfigActivity::class.java))
+            }
+        }
+
         // 设置
         val settings = findViewById<View>(R.id.drawer_settings)
         if (settings != null) {

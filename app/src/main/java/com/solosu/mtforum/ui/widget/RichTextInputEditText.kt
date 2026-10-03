@@ -76,9 +76,16 @@ class RichTextInputEditText @JvmOverloads constructor(
     var onKeyPreImeListener: (() -> Boolean)? = null
 
     override fun onKeyPreIme(keyCode: Int, event: android.view.KeyEvent): Boolean {
-        if (keyCode == android.view.KeyEvent.KEYCODE_BACK && event.action == android.view.KeyEvent.ACTION_UP) {
-            if (onKeyPreImeListener?.invoke() == true) {
-                return true
+        if (keyCode == android.view.KeyEvent.KEYCODE_BACK) {
+            if (event.action == android.view.KeyEvent.ACTION_DOWN) {
+                // 用户按下返回键瞬间立即触发收起，防止输入法拦截吞掉事件
+                if (onKeyPreImeListener?.invoke() == true) {
+                    return true
+                }
+            } else if (event.action == android.view.KeyEvent.ACTION_UP) {
+                if (onKeyPreImeListener?.invoke() == true) {
+                    return true
+                }
             }
         }
         return super.onKeyPreIme(keyCode, event)

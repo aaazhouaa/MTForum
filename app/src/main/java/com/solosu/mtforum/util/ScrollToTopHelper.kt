@@ -48,21 +48,26 @@ object ScrollToTopHelper {
     @JvmStatic
     fun attachRecyclerView(topBar: View?, recyclerView: RecyclerView?) {
         attach(topBar) {
-            recyclerView?.smoothScrollToPosition(0)
+            val lm = recyclerView?.layoutManager as? androidx.recyclerview.widget.LinearLayoutManager
+            if (lm != null) {
+                lm.scrollToPositionWithOffset(0, 0)
+            } else {
+                recyclerView?.scrollToPosition(0)
+            }
         }
     }
 
     @JvmStatic
     fun attachNestedScrollView(topBar: View?, scrollView: NestedScrollView?) {
         attach(topBar) {
-            scrollView?.smoothScrollTo(0, 0)
+            scrollView?.scrollTo(0, 0)
         }
     }
 
     @JvmStatic
     fun attachScrollView(topBar: View?, scrollView: ScrollView?) {
         attach(topBar) {
-            scrollView?.smoothScrollTo(0, 0)
+            scrollView?.scrollTo(0, 0)
         }
     }
 }

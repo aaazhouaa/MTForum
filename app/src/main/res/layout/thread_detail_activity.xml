@@ -38,40 +38,19 @@
                 app:tint="@color/text_primary"
                 android:padding="12dp" />
 
-            <!-- 打赏图标 + 右下角人数角标（纯数字无背景边框） -->
-            <FrameLayout
-                android:id="@+id/layout_reward"
-                android:layout_width="wrap_content"
+            <!-- 打赏图标（红包带¥符号，纯图标无数字） -->
+            <ImageButton
+                android:id="@+id/btn_reward"
+                android:layout_width="48dp"
                 android:layout_height="?attr/actionBarSize"
-                android:layout_gravity="end">
-
-                <ImageButton
-                    android:id="@+id/btn_reward"
-                    android:layout_width="48dp"
-                    android:layout_height="match_parent"
-                    android:minWidth="0dp"
-                    android:src="@drawable/ic_reward_packet"
-                    android:scaleType="fitCenter"
-                    android:background="?attr/selectableItemBackgroundBorderless"
-                    android:contentDescription="@string/reward_title"
-                    app:tint="@color/text_primary"
-                    android:padding="12dp" />
-
-                <!-- 打赏人数：右下角纯数字角标，无背景无边框，简约直观 -->
-                <TextView
-                    android:id="@+id/tv_reward_badge"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_gravity="bottom|end"
-                    android:layout_marginBottom="6dp"
-                    android:layout_marginEnd="6dp"
-                    android:gravity="center"
-                    android:singleLine="true"
-                    android:textColor="@color/text_secondary"
-                    android:textSize="10.5sp"
-                    android:textStyle="bold"
-                    android:visibility="gone" />
-            </FrameLayout>
+                android:layout_gravity="end"
+                android:minWidth="0dp"
+                android:src="@drawable/ic_reward_packet_cny"
+                android:scaleType="fitCenter"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="@string/reward_title"
+                app:tint="@color/text_primary"
+                android:padding="12dp" />
 
             <ImageButton
                 android:id="@+id/btn_kick"

@@ -43,6 +43,12 @@ class SettingsActivity : AppCompatActivity() {
         binding.toolbar.setNavigationIcon(R.drawable.ic_arrow_left)
         binding.toolbar.setNavigationOnClickListener { finish() }
 
+        // AI 接口配置
+        binding.layoutAiConfig.setOnClickListener {
+            startActivity(Intent(this, com.solosu.mtforum.ai.AiConfigActivity::class.java))
+        }
+        updateAiConfigStatus()
+
         // 错误日志查看
         binding.layoutErrorLog.setOnClickListener { showErrorLogDialog() }
         updateErrorLogCount()
@@ -61,6 +67,21 @@ class SettingsActivity : AppCompatActivity() {
             } catch (e: Exception) {
                 Toast.makeText(this, "清除失败: " + e.message, Toast.LENGTH_SHORT).show()
             }
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        updateAiConfigStatus()
+    }
+
+    private fun updateAiConfigStatus() {
+        val configured = com.solosu.mtforum.ai.AiConfigManager.isConfigured(this)
+        if (configured) {
+            val model = com.solosu.mtforum.ai.AiConfigManager.getModel(this)
+            binding.tvAiConfigStatus.text = "已配置：$model"
+        } else {
+            binding.tvAiConfigStatus.text = "未配置，点击前往设置 API Key 与模型"
         }
     }
 
