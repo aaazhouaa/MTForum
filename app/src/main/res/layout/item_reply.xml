@@ -147,12 +147,12 @@
         android:visibility="gone">
 
         <TextView
+            android:id="@+id/tv_reply_quote_title"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="回复原文"
-            android:textColor="?attr/colorPrimary"
-            android:textSize="11sp"
-            android:textStyle="bold" />
+            android:text=""
+            android:textColor="@color/text_secondary"
+            android:textSize="11sp" />
 
         <TextView
             android:id="@+id/tv_reply_quote"

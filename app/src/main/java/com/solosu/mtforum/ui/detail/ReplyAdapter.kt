@@ -369,6 +369,7 @@ class ReplyAdapter(rawReplies: List<ReplyItem>?) :
         private val tvReplyEditFooter: TextView? = itemView.findViewById(R.id.tv_reply_edit_footer)
         private val tvContent: TextView = itemView.findViewById(R.id.tv_reply_content)
         private val layoutReplyQuote: LinearLayout = itemView.findViewById(R.id.layout_reply_quote)
+        private val tvReplyQuoteTitle: TextView? = itemView.findViewById(R.id.tv_reply_quote_title)
         private val tvReplyQuote: TextView = itemView.findViewById(R.id.tv_reply_quote)
         private val llReplyImages: LinearLayout = itemView.findViewById(R.id.ll_reply_images)
         private val btnReplyTo: View = itemView.findViewById(R.id.btn_reply_to)
@@ -487,17 +488,63 @@ class ReplyAdapter(rawReplies: List<ReplyItem>?) :
             val quotedText = item.quotedContentText
             if (!TextUtils.isEmpty(quotedText)) {
                 layoutReplyQuote.visibility = View.VISIBLE
-                val cleanQuote = BBCodeUtil.stripHtmlColors(quotedText)
+                val rawQuote = quotedText!!.trim()
+                var meta: String? = null
+                var body: String = rawQuote
+
+                val m1 = P_QUOTE_META.matcher(rawQuote)
+                if (m1.find()) {
+                    meta = m1.group(1)?.trim()
+                    body = m1.group(2)?.trim() ?: ""
+                } else {
+                    val m2 = P_QUOTE_META_FALLBACK.matcher(rawQuote)
+                    if (m2.find()) {
+                        meta = m2.group(1)?.trim()
+                        body = m2.group(2)?.trim() ?: ""
+                    }
+                }
+
+                if (!meta.isNullOrEmpty()) {
+                    tvReplyQuoteTitle?.visibility = View.VISIBLE
+                    tvReplyQuoteTitle?.text = meta
+                } else {
+                    tvReplyQuoteTitle?.visibility = View.GONE
+                }
+
+                val cleanBody = stripLeadingHtmlBreak(BBCodeUtil.stripHtmlColors(body))
                 val spannedQuote = Html.fromHtml(
-                    cleanQuote, Html.FROM_HTML_MODE_COMPACT,
+                    cleanBody, Html.FROM_HTML_MODE_COMPACT,
                     createInlineImageGetter(tvReplyQuote),
                     BBCodeUtil.createTagHandler(itemView.context)
                 )
-                tvReplyQuote.text = BBCodeUtil.stripForegroundColorSpans(spannedQuote)
+                val processedQuote = BBCodeUtil.stripForegroundColorSpans(spannedQuote)
+                val trimmedBody = trimSpanned(processedQuote ?: spannedQuote)
+
+                val primaryColor = com.solosu.mtforum.util.ThemeManager.getThemeColor(itemView.context)
+
+                val label = "原文"
+                val prefixSpan = SpannableString(if (trimmedBody.isNotEmpty()) "$label " else label)
+                prefixSpan.setSpan(
+                    android.text.style.ForegroundColorSpan(primaryColor),
+                    0, label.length,
+                    Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
+                )
+                prefixSpan.setSpan(
+                    android.text.style.StyleSpan(android.graphics.Typeface.BOLD),
+                    0, label.length,
+                    Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
+                )
+
+                val fullQuote = android.text.SpannableStringBuilder()
+                fullQuote.append(prefixSpan)
+                fullQuote.append(trimmedBody)
+
+                tvReplyQuote.text = fullQuote
                 attachCopyOnLongClick(tvReplyQuote)
             } else {
                 layoutReplyQuote.visibility = View.GONE
                 tvReplyQuote.text = ""
+                tvReplyQuoteTitle?.visibility = View.GONE
             }
 
             val htmlContent = item.contentHtml
@@ -995,6 +1042,15 @@ class ReplyAdapter(rawReplies: List<ReplyItem>?) :
                 placeholder
             }
         }
+
+        private val P_QUOTE_META = Pattern.compile(
+            "^((?:回复\\s+)?.+?\\s+发表于\\s+(?:\\d{4}[-/]\\d{1,2}[-/]\\d{1,2}(?:\\s+\\d{1,2}:\\d{2}(?::\\d{2})?)?|(?:\\d+\\s*(?:秒|分钟|小时|天)前)|(?:半小时前)|(?:昨天|前天)\\s+\\d{1,2}:\\d{2}(?::\\d{2})?))\\s*([\\s\\S]*)",
+            Pattern.CASE_INSENSITIVE
+        )
+        private val P_QUOTE_META_FALLBACK = Pattern.compile(
+            "^((?:回复\\s+)?.+?\\s+发表于[^\\r\\n]+)[\\r\\n]+\\s*([\\s\\S]*)",
+            Pattern.CASE_INSENSITIVE
+        )
 
         private fun stripLeadingHtmlBreak(html: String?): String {
             if (html.isNullOrEmpty()) return ""
