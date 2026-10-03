@@ -6,18 +6,30 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:layout_margin="0dp"
+    app:cardCornerRadius="0dp"
     app:shapeAppearanceOverlay="@style/ShapeAppearance.BottomSheetCardTopOnly"
-    app:cardElevation="2dp"
-    app:strokeWidth="1dp"
-    app:strokeColor="@color/divider"
+    app:cardElevation="0dp"
+    app:strokeWidth="0dp"
     app:cardBackgroundColor="@color/surface">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:padding="16dp"
-        android:paddingBottom="24dp">
+        android:orientation="vertical">
+
+        <!-- 顶部柔和细分割线，界定顶部圆角卡片边界 -->
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="@color/divider" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingHorizontal="16dp"
+            android:paddingTop="14dp"
+            android:paddingBottom="12dp">
 
         <!-- 顶部标题栏：左侧“回复消息”与回复目标，右侧水平靠右显示“添加图片”和“发送”按钮 -->
         <LinearLayout
@@ -128,6 +140,6 @@
                 android:padding="4dp" />
         </HorizontalScrollView>
 
-
+    </LinearLayout>
     </LinearLayout>
 </com.google.android.material.card.MaterialCardView>

@@ -89,30 +89,87 @@ class ReplyAdapter(rawReplies: List<ReplyItem>?) :
         rebuildDisplayList()
     }
 
+    private fun isSequentialOrRepeatedDigits(s: String): Boolean {
+        if (s.length < 2 || !s.all { it.isDigit() }) return false
+        // 全部相同重复数字, 如 1111, 66666, 88888
+        if (s.all { it == s[0] }) return true
+        // 连续递增数字, 如 123456
+        if (s.length >= 3) {
+            var isInc = true
+            for (i in 0 until s.length - 1) {
+                if (s[i + 1] - s[i] != 1) {
+                    isInc = false
+                    break
+                }
+            }
+            if (isInc) return true
+
+            // 连续递减数字, 如 654321
+            var isDec = true
+            for (i in 0 until s.length - 1) {
+                if (s[i] - s[i + 1] != 1) {
+                    isDec = false
+                    break
+                }
+            }
+            if (isDec) return true
+        }
+        return false
+    }
+
     private fun isWaterReply(item: ReplyItem): Boolean {
         val rawHtml = item.contentHtml ?: item.contentText ?: ""
         // 1. 提取实际纯文本字符（剔除所有 HTML 标签、实体和空白符）
         val textOnly = org.jsoup.Jsoup.parse(rawHtml).text().trim()
-        val cleanText = textOnly.replace(Regex("[\\s\\u00A0\\u3000]"), "")
 
-        // 2. 关键词匹配：原有关键词 + 用户指定扩展关键词
-        val keywords = arrayOf(
+        // 剔除 Discuz 表情码（形如 {:4_111:} 或 [em:01:]）与空白
+        var clean = textOnly.replace(Regex("\\{:\\d+_\\d+:\\}"), "")
+            .replace(Regex("\\[em:\\d+\\]"), "")
+            .replace(Regex("[\\s\\u00A0\\u3000]"), "")
+
+        // 剔除 emoji 字符
+        val emojiRegex = Regex("[\uD83C-\uDBFF\uDC00-\uDFFF\u2600-\u27BF\u2300-\u23FF\u2B50\u2B55\u200D\uFE0F]")
+        val textWithoutEmoji = clean.replace(emojiRegex, "")
+
+        // 剔除标点符号后的纯文字内容
+        val textWithoutPunct = textWithoutEmoji.replace(Regex("[\\p{P}\\p{S}，。！？!?,.~～、_—\\-+=\\[\\](){};；:：“”\"'/\\\\`]"), "")
+
+        // 2. 关键词匹配：包含即折叠（如感谢、看看、隐藏、分享、学习学习、论坛有你更精彩等）
+        val containKeywords = arrayOf(
             "感谢", "看看", "隐藏", "分享",
             "学习学习", "学习一下", "论坛有你更精彩", "支持一下", "66666"
         )
-        for (kw in keywords) {
+        for (kw in containKeywords) {
             if (textOnly.contains(kw, ignoreCase = true)) return true
         }
 
         // 3. 用户规则：纯文字字数 <= 2 个字的全部折叠
-        if (cleanText.length <= 2) {
+        if (clean.length <= 2) {
             return true
         }
 
-        // 4. 用户规则：纯表情（仅表情图片或无实质汉字/字母/数字等有效文字内容）全部折叠
-        val effectiveWordText = cleanText.replace(Regex("[\\p{P}\\p{S}]"), "")
-        if (effectiveWordText.isEmpty()) {
+        // 4. 用户规则：纯表情（仅表情图片/emoji或无实质汉字/字母/数字等有效文字内容）全部折叠
+        if (textWithoutPunct.isEmpty()) {
             return true
+        }
+
+        // 5. 用户规则：完全匹配指定灌水短语（注意：要求完全匹配，不是包含）
+        val exactMatchPhrases = hashSetOf(
+            "拿走试试", "大佬牛逼", "拿走了", "查看内容", "这么牛逼啊",
+            "大佬厉害了", "牛逼啊大佬", "我来了", "谢谢大佬", "我来试一试",
+            "哇哇哇", "啊啊啊", "膜拜大佬", "严肃学习", "大佬牛批",
+            "谢谢啦", "谢谢了", "来了来了", "回复一下表示支持",
+            "谢谢楼主", "可以可以", "小飞机来了", "小飞机来喽", "小飞机来咯"
+        )
+        if (exactMatchPhrases.contains(textWithoutPunct) || exactMatchPhrases.contains(clean)) {
+            return true
+        }
+
+        // 6. 用户规则：连续的数字、重复的数字、以及连续/重复数字+表情（无其它实质文字）全部折叠
+        if (textWithoutPunct.isNotEmpty() && textWithoutPunct.all { it.isDigit() }) {
+            if (isSequentialOrRepeatedDigits(textWithoutPunct) || textWithoutPunct.length >= 3) {
+                return true
+            }
         }
 
         return false

@@ -926,7 +926,13 @@ class ThreadDetailActivity : AppCompatActivity() {
 
         btnPickImage?.setOnClickListener { pickImage() }
 
-        // 返回键单次直接收起回复输入框，不再需要按两次
+        // 输入法激活时，拦截系统返回键一步同时收起键盘与回复面板，不再需要按两次
+        etReplyDialog?.onKeyPreImeListener = {
+            hideReplyPanel()
+            true
+        }
+
+        // 软键盘未激活但面板展开时的返回键回调
         val callback = object : androidx.activity.OnBackPressedCallback(false) {
             override fun handleOnBackPressed() {
                 hideReplyPanel()
@@ -941,11 +947,29 @@ class ThreadDetailActivity : AppCompatActivity() {
     }
 
     private fun hideReplyPanel() {
+        val panel = binding.containerReplyPanel
+        if (panel.visibility != View.VISIBLE) return
+
         val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
         mEtReplyDialog?.let { imm?.hideSoftInputFromWindow(it.windowToken, 0) }
-        binding.containerReplyPanel.visibility = View.GONE
-        binding.vReplyMask.visibility = View.GONE
+
         replyBackPressedCallback?.isEnabled = false
+
+        binding.vReplyMask.animate().alpha(0f).setDuration(180).withEndAction {
+            binding.vReplyMask.visibility = View.GONE
+        }.start()
+
+        val h = if (panel.height > 0) panel.height.toFloat() else dpToPx(350).toFloat()
+        panel.animate()
+            .translationY(h)
+            .setDuration(180)
+            .setInterpolator(android.view.animation.AccelerateInterpolator())
+            .withEndAction {
+                panel.visibility = View.GONE
+                panel.translationY = 0f
+            }
+            .start()
+
         // 用户需求：已输入的内容未发送时暂时保留（草稿暂存），离开当前帖子时才清除
         currentReplyPid = ""
         currentReplyTarget = ""
@@ -979,10 +1003,24 @@ class ThreadDetailActivity : AppCompatActivity() {
             updateDialogImagePreview()
         }
 
-        // 显示遮罩与输入面板，随输入法平滑升起贴合
-        binding.vReplyMask.visibility = View.VISIBLE
-        binding.containerReplyPanel.visibility = View.VISIBLE
+        // 像与输入法融为一体一样，从屏幕底部自然平滑升起，消除弹窗生硬感
+        val panel = binding.containerReplyPanel
+        panel.visibility = View.VISIBLE
         replyBackPressedCallback?.isEnabled = true
+
+        binding.vReplyMask.visibility = View.VISIBLE
+        binding.vReplyMask.alpha = 0f
+        binding.vReplyMask.animate().alpha(1f).setDuration(220).start()
+
+        panel.post {
+            val h = if (panel.height > 0) panel.height.toFloat() else dpToPx(350).toFloat()
+            panel.translationY = h
+            panel.animate()
+                .translationY(0f)
+                .setDuration(220)
+                .setInterpolator(android.view.animation.DecelerateInterpolator())
+                .start()
+        }
 
         etReplyDialog?.post {
             etReplyDialog.isFocusable = true
@@ -1913,56 +1951,17 @@ class ThreadDetailActivity : AppCompatActivity() {
     }
 
     private fun splitEditFooter(html: String?): Array<String> {
-        if (html == null) {
+        if (html.isNullOrEmpty()) {
             return arrayOf("", "")
         }
-        var marker = "本帖最后由"
-        var idx = html.indexOf("本帖最后由")
-        if (idx < 0) {
-            marker = "本贴最后由"
-            idx = html.indexOf("本贴最后由")
-        }
-        if (idx >= 0) {
-            val endIdx = html.indexOf("编辑", marker.length + idx)
-            if (endIdx >= 0) {
-                var start = idx
-                while (true) {
-                    val lt2 = html.lastIndexOf(60.toChar(), start - 1)
-                    if (lt2 < 0) break
-                    val gt = html.indexOf(62.toChar(), lt2)
-                    if (gt < 0 || gt > start) break
-                    if (html.substring(gt + 1, start).trim().isNotEmpty()) break
-                    val tag = html.substring(lt2 + 1, gt).trim()
-                    if (!tag.startsWith("span") && !tag.startsWith("b") && !tag.startsWith("br")
-                        && !tag.startsWith("font") && !tag.startsWith("i")
-                        && !tag.startsWith("em") && !tag.startsWith("strong")
-                    ) {
-                        break
-                    }
-                    start = lt2
-                }
-                val editEnd = endIdx + 2
-                var end = editEnd
-                while (true) {
-                    val gt2 = html.indexOf(62.toChar(), end)
-                    if (gt2 < 0) break
-                    val lt = html.lastIndexOf(60.toChar(), gt2)
-                    if (lt < end) break
-                    if (html.substring(end, lt).trim().isNotEmpty()) break
-                    val tag2 = html.substring(lt + 1, gt2).trim()
-                    if (!tag2.startsWith("/span") && !tag2.startsWith("/b") && !tag2.startsWith("/font")
-                        && !tag2.startsWith("/i") && !tag2.startsWith("/em")
-                        && !tag2.startsWith("/strong") && !tag2.startsWith("br") && !tag2.endsWith("/")
-                    ) {
-                        break
-                    }
-                    end = gt2 + 1
-                }
-                var footer = Regex("<[^>]+>").replace(html.substring(idx, editEnd), "")
-                footer = Regex("&nbsp;").replace(footer, " ").trim()
-                val clean = html.substring(0, start) + html.substring(end)
-                return arrayOf(clean, footer)
-            }
+        val pattern = Pattern.compile("(?is)(?:<(?:i|span|font|div|p|em)\\b[^>]*>|\\s)*本[帖贴]最后由[\\s\\S]*?编辑(?:\\s*</(?:i|span|font|div|p|em)>)*")
+        val matcher = pattern.matcher(html)
+        if (matcher.find()) {
+            val matched = matcher.group(0) ?: ""
+            var pureText = Regex("<[^>]+>").replace(matched, "")
+            pureText = Regex("&nbsp;").replace(pureText, " ").trim()
+            val clean = matcher.replaceFirst("").trim()
+            return arrayOf(clean, pureText)
         }
         return arrayOf(html, "")
     }
@@ -4135,11 +4134,30 @@ class ThreadDetailActivity : AppCompatActivity() {
 
     // ==================== 表格分段与原生 TableLayout 渲染 ====================
 
+    private fun stripPostRedundantElements(rawHtml: String): String {
+        if (rawHtml.isEmpty()) return ""
+        try {
+            val doc = Jsoup.parseBodyFragment(rawHtml)
+            doc.select(
+                "div.comiis_rate, div[class*=comiis_rate], " +
+                "div.comiis_praise, div[class*=praise], " +
+                "ul.comiis_recommend_list_a, ul.comiis_recommend_list_t, ul[class*=recommend_list], " +
+                "em.comiis_recommend_num, a.comiis_recommend_addkey, " +
+                "div.comiis_favshare, div[class*=favshare], a.followmod, " +
+                "div.comiis_postli_time, div.manage, div.modact"
+            ).remove()
+            return doc.body().html()
+        } catch (_: Exception) {
+            return rawHtml
+        }
+    }
+
     private fun renderContentSections(displayHtml: String, hiddenNotice: String?) {
         val hb = headerBinding ?: return
         val container = hb.llContentContainer
+        val cleanedHtml = stripPostRedundantElements(displayHtml)
 
-        if (!displayHtml.contains("<table", ignoreCase = true)) {
+        if (!cleanedHtml.contains("<table", ignoreCase = true)) {
             // 无表格：保留原单个 tvContent
             for (i in container.childCount - 1 downTo 0) {
                 val child = container.getChildAt(i)
@@ -4147,7 +4165,7 @@ class ThreadDetailActivity : AppCompatActivity() {
             }
             hb.tvContent.visibility = View.VISIBLE
             hb.tvContent.text = safeFromHtml(
-                displayHtml,
+                cleanedHtml,
                 createInlineImageGetter(hb.tvContent),
                 BBCodeUtil.createTagHandler(this)
             )
@@ -4167,7 +4185,7 @@ class ThreadDetailActivity : AppCompatActivity() {
         hb.tvContent.visibility = View.GONE
 
         val p = Pattern.compile("(?is)(<table\\b.*?</table\\s*>)")
-        val m = p.matcher(displayHtml)
+        val m = p.matcher(cleanedHtml)
         var lastIdx = 0
 
         fun addTextChunk(htmlChunk: String) {
@@ -4194,7 +4212,7 @@ class ThreadDetailActivity : AppCompatActivity() {
         }
 
         while (m.find()) {
-            val textBefore = displayHtml.substring(lastIdx, m.start())
+            val textBefore = cleanedHtml.substring(lastIdx, m.start())
             addTextChunk(textBefore)
 
             val tableHtml = m.group(1) ?: ""
@@ -4206,7 +4224,7 @@ class ThreadDetailActivity : AppCompatActivity() {
             lastIdx = m.end()
         }
 
-        val textAfter = displayHtml.substring(lastIdx)
+        val textAfter = cleanedHtml.substring(lastIdx)
         addTextChunk(textAfter)
     }
 

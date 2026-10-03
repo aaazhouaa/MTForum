@@ -73,6 +73,17 @@ class RichTextInputEditText @JvmOverloads constructor(
         return InputConnectionCompat.createWrapper(ic, editorInfo, callback)
     }
 
+    var onKeyPreImeListener: (() -> Boolean)? = null
+
+    override fun onKeyPreIme(keyCode: Int, event: android.view.KeyEvent): Boolean {
+        if (keyCode == android.view.KeyEvent.KEYCODE_BACK && event.action == android.view.KeyEvent.ACTION_UP) {
+            if (onKeyPreImeListener?.invoke() == true) {
+                return true
+            }
+        }
+        return super.onKeyPreIme(keyCode, event)
+    }
+
     override fun onTextContextMenuItem(id: Int): Boolean {
         if (id == android.R.id.paste) {
             val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager

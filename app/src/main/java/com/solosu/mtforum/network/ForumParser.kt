@@ -1761,7 +1761,19 @@ object ForumParser {
                 }
             }
             if (contentDiv != null) {
-                var content = contentDiv.html().trim()
+                // 深度清理正文容器中的赞赏模块、点赞列表、分享模块等网页附加元素，
+                // 避免作者被屏蔽或被删除时残留“赞赏、打赏、好评、点赞列表”等杂乱内容
+                val cleanDiv = contentDiv.clone()
+                cleanDiv.select(
+                    "div.comiis_rate, div[class*=comiis_rate], " +
+                    "div.comiis_praise, div[class*=praise], " +
+                    "ul.comiis_recommend_list_a, ul.comiis_recommend_list_t, ul[class*=recommend_list], " +
+                    "em.comiis_recommend_num, a.comiis_recommend_addkey, " +
+                    "div.comiis_favshare, div[class*=favshare], a.followmod, " +
+                    "div.comiis_postli_time, div.manage, div.modact"
+                ).remove()
+
+                var content = cleanDiv.html().trim()
                 // 如果内容太短可能只是干扰文本，尝试更精确提取
                 val tf = opMsg.select("td.t_f").first()
                 if (content.length < 10 && tf != null) {
@@ -1769,9 +1781,16 @@ object ForumParser {
                 }
                 detail.contentHtml = normalizeCodeBlocks(content)
             } else {
-                // 兜底：直接取整个消息区，并移除操作区域
+                // 兜底：直接取整个消息区，并移除操作区域与赞赏点赞残留
                 val msgClone = opMsg.clone()
-                msgClone.select("div.comiis_favshare, a.followmod, div.comiis_postli_time").remove()
+                msgClone.select(
+                    "div.comiis_rate, div[class*=comiis_rate], " +
+                    "div.comiis_praise, div[class*=praise], " +
+                    "ul.comiis_recommend_list_a, ul.comiis_recommend_list_t, ul[class*=recommend_list], " +
+                    "em.comiis_recommend_num, a.comiis_recommend_addkey, " +
+                    "div.comiis_favshare, div[class*=favshare], a.followmod, " +
+                    "div.comiis_postli_time, div.manage, div.modact"
+                ).remove()
                 val fallbackHtml = msgClone.html().trim()
                 if (fallbackHtml.length > 30) {
                     detail.contentHtml = normalizeCodeBlocks(fallbackHtml)
