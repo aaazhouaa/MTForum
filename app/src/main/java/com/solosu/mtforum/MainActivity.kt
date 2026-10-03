@@ -151,18 +151,23 @@ class MainActivity : AppCompatActivity() {
         drawerLayout = root
         // 遮罩加深，抽屉打开时右侧主内容不会透出文字
         drawerLayout!!.setScrimColor(0xC0000000.toInt())
-        enhanceDrawerEdgeSwipe(drawerLayout!!)
+        // 移除右滑弹出侧边栏功能：关闭手势滑动唤出，仅支持左上角按钮点击打开
+        drawerLayout!!.setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_CLOSED)
 
         // 打开侧边栏时藏掉底部悬浮导航栏，否则两边的文字会叠在一起
         drawerLayout!!.addDrawerListener(object : DrawerLayout.SimpleDrawerListener() {
             override fun onDrawerOpened(dv: View) {
                 // build71: 改走统一入口,保证 navHidden 标记与实际可见性永远一致
                 setBottomNavVisible(false)
+                // 打开后允许滑动关闭
+                drawerLayout?.setDrawerLockMode(DrawerLayout.LOCK_MODE_UNLOCKED)
             }
 
             override fun onDrawerClosed(dv: View) {
                 // build71: 抽屉关闭强制恢复(navHidden 为 true 时不会被短路判断挡掉)
                 setBottomNavVisible(true)
+                // 关闭后恢复锁定，杜绝手势右滑唤出
+                drawerLayout?.setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_CLOSED)
             }
         })
 
@@ -650,8 +655,6 @@ class MainActivity : AppCompatActivity() {
                 backdropSourceView = mainPager
             )
         }
-
-        setupDrawerSwipeConflict()
     }
 
     /** 中间 + tab：打开发帖页 */
@@ -666,65 +669,6 @@ class MainActivity : AppCompatActivity() {
         MainPagerAdapter.PAGE_MESSAGE -> 3
         MainPagerAdapter.PAGE_PROFILE -> 4
         else -> 0
-    }
-
-    /**
-     * 扩大 DrawerLayout 的边缘触摸滑动呼出范围，让右滑呼出侧边栏更灵敏
-     */
-    private fun enhanceDrawerEdgeSwipe(drawer: androidx.drawerlayout.widget.DrawerLayout) {
-        try {
-            val leftDraggerField = androidx.drawerlayout.widget.DrawerLayout::class.java.getDeclaredField("mLeftDragger")
-            leftDraggerField.isAccessible = true
-            val leftDragger = leftDraggerField.get(drawer) as? androidx.customview.widget.ViewDragHelper ?: return
-
-            val edgeSizeField = leftDragger.javaClass.getDeclaredField("mEdgeSize")
-            edgeSizeField.isAccessible = true
-            val defaultEdge = edgeSizeField.getInt(leftDragger)
-
-            val density = resources.displayMetrics.density
-            val newEdge = (72 * density).toInt().coerceAtLeast(defaultEdge)
-            edgeSizeField.setInt(leftDragger, newEdge)
-
-            try {
-                val defaultEdgeSizeField = leftDragger.javaClass.getDeclaredField("mDefaultEdgeSize")
-                defaultEdgeSizeField.isAccessible = true
-                defaultEdgeSizeField.setInt(leftDragger, newEdge)
-            } catch (_: Throwable) {}
-        } catch (e: Throwable) {
-            android.util.Log.w("MainActivity", "Failed to enhance drawer edge swipe: ${e.message}")
-        }
-    }
-
-    /**
-     * 解决 ViewPager2 与 DrawerLayout 右滑手势冲突：在首页左边缘向右滑时优先拉出侧边栏
-     */
-    private fun setupDrawerSwipeConflict() {
-        val pager = mainPager ?: return
-        val density = resources.displayMetrics.density
-        val edgeThreshold = 80 * density
-        var startX = 0f
-        var startY = 0f
-
-        val recyclerView = pager.getChildAt(0) as? androidx.recyclerview.widget.RecyclerView
-        recyclerView?.addOnItemTouchListener(object : androidx.recyclerview.widget.RecyclerView.SimpleOnItemTouchListener() {
-            override fun onInterceptTouchEvent(rv: androidx.recyclerview.widget.RecyclerView, e: android.view.MotionEvent): Boolean {
-                when (e.actionMasked) {
-                    android.view.MotionEvent.ACTION_DOWN -> {
-                        startX = e.rawX
-                        startY = e.rawY
-                    }
-                    android.view.MotionEvent.ACTION_MOVE -> {
-                        val dx = e.rawX - startX
-                        val dy = e.rawY - startY
-                        if (pager.currentItem == 0 && startX <= edgeThreshold && dx > 0 && Math.abs(dx) > Math.abs(dy)) {
-                            rv.parent?.requestDisallowInterceptTouchEvent(false)
-                            return false
-                        }
-                    }
-                }
-                return false
-            }
-        })
     }
 
     /**

@@ -60,6 +60,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.util.fastCoerceIn
 import androidx.compose.ui.util.fastFirstOrNull
 import androidx.compose.ui.util.lerp
+import com.kyant.backdrop.backdrops.emptyBackdrop
 import com.kyant.backdrop.backdrops.layerBackdrop
 import com.kyant.backdrop.backdrops.rememberCanvasBackdrop
 import com.kyant.backdrop.backdrops.rememberCombinedBackdrop
@@ -298,7 +299,7 @@ fun MTForumLiquidNavBar(
                         else availableWidth - paddingPx * 2f - (dampedDragAnimation.value + 1f) * tabWidth + panelOffset
                 }
                 .drawBackdrop(
-                    backdrop = rememberCombinedBackdrop(hostBackdrop, tabsBackdrop),
+                    backdrop = rememberCombinedBackdrop(emptyBackdrop(), tabsBackdrop),
                     shape = { CircleShape },
                     effects = {
                         val progress = dampedDragAnimation.pressProgress
