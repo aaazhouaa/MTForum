@@ -54,6 +54,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.util.fastCoerceIn
 import androidx.compose.ui.util.fastFirstOrNull
 import androidx.compose.ui.util.lerp
+import com.kyant.backdrop.backdrops.layerBackdrop
 import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import com.kyant.backdrop.drawBackdrop
 import com.kyant.backdrop.effects.blur
@@ -102,11 +103,12 @@ fun MTForumLiquidNavBar(
 
     val isLightTheme = !isSystemInDarkTheme()
     val containerColor =
-        if (isLightTheme) Color(0xFFFAFAFA.toInt()).copy(0.45f)
-        else Color(0xFF161616.toInt()).copy(0.45f)
+        if (isLightTheme) Color(0xFFFFFFFF.toInt()).copy(0.65f)
+        else Color(0xFF202022.toInt()).copy(0.65f)
     val contentNormalColor = if (isLightTheme) Color(0x8C000000.toInt()) else Color(0xB8FFFFFF.toInt())
 
     val baseBackdrop = rememberLayerBackdrop()
+    val barBackdrop = rememberLayerBackdrop()
 
     BoxWithConstraints(
         modifier = modifier
@@ -172,16 +174,24 @@ fun MTForumLiquidNavBar(
             )
         }
 
-        // ================= 1. 底栏容器胶囊背景（高度 64dp） =================
+        // ================= 1. 底栏容器胶囊背景（高度 64dp，不透明度 65%） =================
         Box(
             Modifier
                 .graphicsLayer { translationX = panelOffset }
+                .layerBackdrop(barBackdrop)
                 .drawBackdrop(
                     backdrop = baseBackdrop,
                     shape = { CircleShape },
                     effects = {
                         vibrancy()
-                        blur(8f.dp.toPx())
+                        blur(10f.dp.toPx())
+                        lens(20f.dp.toPx(), 20f.dp.toPx())
+                    },
+                    highlight = {
+                        Highlight.Default.copy(alpha = 0.45f)
+                    },
+                    shadow = {
+                        Shadow(alpha = 0.2f)
                     },
                     layerBlock = {
                         val progress = dampedDragAnimation.pressProgress
@@ -199,7 +209,7 @@ fun MTForumLiquidNavBar(
                 .padding(horizontal = 4.dp)
         )
 
-        // ================= 2. 真实 78dp 悬浮放大水珠（位于底栏背景与图标之间） =================
+        // ================= 2. 真实 78dp 悬浮放大水珠（位于底栏背景与图标之间，完整菲涅尔透镜与色散） =================
         Box(
             Modifier
                 .align(Alignment.CenterStart)
@@ -214,27 +224,29 @@ fun MTForumLiquidNavBar(
                 .width(with(density) { tabWidth.toDp() })
                 .height(56.dp)
                 .drawBackdrop(
-                    backdrop = baseBackdrop,
+                    backdrop = barBackdrop,
                     shape = { CircleShape },
                     effects = {
                         val progress = dampedDragAnimation.pressProgress
+                        val rHeight = lerp(4f.dp.toPx(), 18f.dp.toPx(), progress)
+                        val rAmount = lerp(8f.dp.toPx(), 26f.dp.toPx(), progress)
                         lens(
-                            10f.dp.toPx() * progress,
-                            14f.dp.toPx() * progress,
-                            chromaticAberration = false
+                            refractionHeight = rHeight,
+                            refractionAmount = rAmount,
+                            chromaticAberration = true
                         )
                     },
                     highlight = {
                         val progress = dampedDragAnimation.pressProgress
-                        Highlight.Default.copy(alpha = progress)
+                        Highlight.Default.copy(alpha = lerp(0.40f, 1f, progress))
                     },
                     shadow = {
                         val progress = dampedDragAnimation.pressProgress
-                        Shadow(alpha = progress)
+                        Shadow(alpha = lerp(0.15f, 0.45f, progress))
                     },
                     innerShadow = {
                         val progress = dampedDragAnimation.pressProgress
-                        InnerShadow(radius = 8f.dp * progress, alpha = progress)
+                        InnerShadow(radius = (4f + 4f * progress).dp, alpha = lerp(0.30f, 0.85f, progress))
                     },
                     layerBlock = {
                         scaleX = dampedDragAnimation.scaleX
@@ -245,13 +257,11 @@ fun MTForumLiquidNavBar(
                     },
                     onDrawSurface = {
                         val progress = dampedDragAnimation.pressProgress
-                        // 静止普通状态显示 8% 半透明指示器胶囊，长按展开时渐隐并透出液态高光
                         drawRect(
-                            if (isLightTheme) Color.Black.copy(0.08f) else Color.White.copy(0.08f),
-                            alpha = 1f - progress
+                            if (isLightTheme) Color.White.copy(0.20f + 0.15f * progress) else Color.White.copy(0.12f + 0.10f * progress)
                         )
                         drawRect(
-                            if (isLightTheme) Color.White.copy(0.12f * progress) else Color.White.copy(0.08f * progress)
+                            if (isLightTheme) Color.Black.copy(0.06f * (1f - progress)) else Color.Transparent
                         )
                     }
                 )
@@ -356,11 +366,23 @@ fun MTForumLiquidNavBar(
                 },
             verticalAlignment = Alignment.CenterVertically
         ) {
+            val isPressed = dampedDragAnimation.pressProgress > 0.05f
+            val dropletCenter = dampedDragAnimation.value + 0.5f
+            val dropletHalfWidth = dampedDragAnimation.scaleX / 2f
+            val dropletLeft = dropletCenter - dropletHalfWidth
+            val dropletRight = dropletCenter + dropletHalfWidth
+
             tabs.forEachIndexed { index, tab ->
-                val isActive = (index == activeTabIndex && !tab.isPostButton)
+                val isTouchedByDroplet = if (isPressed) {
+                    dropletRight >= index + 0.16f && dropletLeft <= (index + 1) - 0.16f
+                } else {
+                    index == currentIndex
+                }
+
+                val isActive = isTouchedByDroplet && !tab.isPostButton
                 val tint = if (isActive) themeColor else contentNormalColor
-                val tabScale = if (index == activeTabIndex) {
-                    lerp(1f, 1.15f, dampedDragAnimation.pressProgress)
+                val tabScale = if (isTouchedByDroplet) {
+                    lerp(1f, 1.12f, dampedDragAnimation.pressProgress)
                 } else {
                     1f
                 }
