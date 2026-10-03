@@ -1,5 +1,6 @@
 package com.solosu.mtforum.ui.widget
 
+import android.view.View
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.EaseOut
 import androidx.compose.animation.core.spring
@@ -38,12 +39,14 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.input.pointer.changedToUpIgnoreConsumed
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.LocalViewConfiguration
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -58,6 +61,7 @@ import androidx.compose.ui.util.fastCoerceIn
 import androidx.compose.ui.util.fastFirstOrNull
 import androidx.compose.ui.util.lerp
 import com.kyant.backdrop.backdrops.layerBackdrop
+import com.kyant.backdrop.backdrops.rememberCanvasBackdrop
 import com.kyant.backdrop.backdrops.rememberCombinedBackdrop
 import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import com.kyant.backdrop.drawBackdrop
@@ -82,8 +86,8 @@ data class NavTabItem(
 
 /**
  * MTForum 液态毛玻璃底栏
- * 1. 真实菲涅尔透镜与彩虹色散：水珠折射离屏彩色 Backdrop，在凸透镜边缘激发出纯正菲涅尔彩虹光谱；
- * 2. 彻底根除重影：水珠覆盖某个 Tab 时，底层对应静态 Tab 渐隐，完全由水珠菲涅尔透镜折射呈现，绝无双重叠影；
+ * 1. 真实菲涅尔透镜与彩虹色散：捕获背部 ViewPager2 真实内容与离屏色彩，水珠与底栏边缘激发纯正菲涅尔彩虹色散与凸透镜折射；
+ * 2. 图标绝不消失：保留顶层清晰 Tab，移除了错误的全透明隐藏逻辑，图标无论何时都清晰呈现；
  * 3. 精准触碰判定：以 Tab 图标实际物理区域为准，长按未碰到相邻 Tab 图标时绝不误亮，移近触碰时可同时点亮 2 个 Tab；
  * 4. 底栏不透明度 65%：浅色/深色统一 65% 纯净磨砂玻璃遮罩；
  * 5. 全局极速响应：顶层手势状态机，点按/滑动随心掌控。
@@ -94,7 +98,8 @@ fun MTForumLiquidNavBar(
     onTabSelected: (index: Int) -> Unit,
     onPostClicked: () -> Unit,
     themeColor: Color,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    backdropSourceView: View? = null
 ) {
     val tabs = remember {
         listOf(
@@ -112,7 +117,23 @@ fun MTForumLiquidNavBar(
         else Color(0xFF202022.toInt()).copy(0.65f)
     val contentNormalColor = if (isLightTheme) Color(0x8C000000.toInt()) else Color(0xB8FFFFFF.toInt())
 
-    val baseBackdrop = rememberLayerBackdrop()
+    val navView = LocalView.current
+    val canvasBackdrop = rememberCanvasBackdrop {
+        val source = backdropSourceView ?: return@rememberCanvasBackdrop
+        val canvas = drawContext.canvas.nativeCanvas
+        canvas.save()
+        val navLoc = IntArray(2)
+        val sourceLoc = IntArray(2)
+        navView.getLocationInWindow(navLoc)
+        source.getLocationInWindow(sourceLoc)
+        val dx = (sourceLoc[0] - navLoc[0]).toFloat()
+        val dy = (sourceLoc[1] - navLoc[1]).toFloat()
+        canvas.translate(dx, dy)
+        try {
+            source.draw(canvas)
+        } catch (_: Throwable) {}
+        canvas.restore()
+    }
     val tabsBackdrop = rememberLayerBackdrop()
 
     BoxWithConstraints(
@@ -178,23 +199,23 @@ fun MTForumLiquidNavBar(
         val dropletLeft = dropletCenter - dropletHalfWidth
         val dropletRight = dropletCenter + dropletHalfWidth
 
-        // ================= 1. 底栏容器胶囊背景与普通可见 Tab（高度 64dp，不透明度 65%） =================
-        Row(
+        // ================= 1. 底栏容器胶囊背景（高度 64dp，不透明度 65%，真实折射背后页面内容） =================
+        Box(
             Modifier
                 .graphicsLayer { translationX = panelOffset }
                 .drawBackdrop(
-                    backdrop = baseBackdrop,
+                    backdrop = canvasBackdrop,
                     shape = { CircleShape },
                     effects = {
                         vibrancy()
-                        blur(10f.dp.toPx())
-                        lens(20f.dp.toPx(), 20f.dp.toPx())
+                        blur(16f.dp.toPx())
+                        lens(16f.dp.toPx(), 28f.dp.toPx())
                     },
                     highlight = {
-                        Highlight.Default.copy(alpha = 0.45f)
+                        Highlight.Default.copy(alpha = 0.50f)
                     },
                     shadow = {
-                        Shadow(alpha = 0.2f)
+                        Shadow(alpha = 0.25f)
                     },
                     layerBlock = {
                         val progress = dampedDragAnimation.pressProgress
@@ -209,31 +230,8 @@ fun MTForumLiquidNavBar(
                 .then(interactiveHighlight.modifier)
                 .height(64.dp)
                 .fillMaxWidth()
-                .padding(horizontal = 4.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            tabs.forEachIndexed { index, tab ->
-                // 图标物理区域约在 [index + 0.30f, index + 0.70f]，水珠边缘真正接触图标时才判定为碰到
-                val isTouchedByDroplet = if (isPressed) {
-                    dropletRight >= index + 0.30f && dropletLeft <= (index + 1) - 0.30f
-                } else {
-                    index == currentIndex
-                }
-
-                // 核心防重影：长按被水珠覆盖时，底层对应静态 Tab 隐形，完全交由上层水珠透镜折射呈现，彻底消除双重重影！
-                val itemAlpha = if (isPressed && isTouchedByDroplet) 0f else 1f
-
-                TabItemView(
-                    tab = tab,
-                    tint = if (isTouchedByDroplet && !tab.isPostButton) themeColor else contentNormalColor,
-                    themeColor = themeColor,
-                    tabScale = 1f,
-                    modifier = Modifier
-                        .weight(1f)
-                        .alpha(itemAlpha)
-                )
-            }
-        }
+                .padding(horizontal = 4.dp)
+        )
 
         // ================= 2. 离屏录制层：为水珠透镜提供彩色主题色折射源（透明不直接绘制到屏） =================
         Row(
@@ -258,7 +256,7 @@ fun MTForumLiquidNavBar(
             }
         }
 
-        // ================= 3. 真实 78dp 悬浮放大水珠（折射 tabsBackdrop，显现图二绚丽菲涅尔透镜与彩虹色散） =================
+        // ================= 3. 真实 78dp 悬浮放大水珠（折射 canvasBackdrop + tabsBackdrop，绚丽菲涅尔透镜与彩虹色散） =================
         Box(
             Modifier
                 .align(Alignment.CenterStart)
@@ -273,13 +271,13 @@ fun MTForumLiquidNavBar(
                 .width(with(density) { tabWidth.toDp() })
                 .height(56.dp)
                 .drawBackdrop(
-                    backdrop = rememberCombinedBackdrop(baseBackdrop, tabsBackdrop),
+                    backdrop = rememberCombinedBackdrop(canvasBackdrop, tabsBackdrop),
                     shape = { CircleShape },
                     effects = {
                         val progress = dampedDragAnimation.pressProgress
-                        // 真实菲涅尔透镜物理参数：长按放大至 12dp / 18dp，边缘彩虹色散全力激发
-                        val rHeight = lerp(2f.dp.toPx(), 14f.dp.toPx(), progress)
-                        val rAmount = lerp(4f.dp.toPx(), 20f.dp.toPx(), progress)
+                        // 真实菲涅尔透镜物理参数：长按放大至 14dp / 22dp，边缘彩虹色散全力激发
+                        val rHeight = lerp(4f.dp.toPx(), 14f.dp.toPx(), progress)
+                        val rAmount = lerp(6f.dp.toPx(), 22f.dp.toPx(), progress)
                         lens(
                             refractionHeight = rHeight,
                             refractionAmount = rAmount,
@@ -289,11 +287,11 @@ fun MTForumLiquidNavBar(
                     },
                     highlight = {
                         val progress = dampedDragAnimation.pressProgress
-                        Highlight.Default.copy(alpha = lerp(0.35f, 1f, progress))
+                        Highlight.Default.copy(alpha = lerp(0.40f, 1f, progress))
                     },
                     shadow = {
                         val progress = dampedDragAnimation.pressProgress
-                        Shadow(alpha = lerp(0.15f, 0.45f, progress))
+                        Shadow(alpha = lerp(0.18f, 0.45f, progress))
                     },
                     innerShadow = {
                         val progress = dampedDragAnimation.pressProgress
@@ -313,12 +311,41 @@ fun MTForumLiquidNavBar(
                             if (isLightTheme) Color.Black.copy(0.08f) else Color.White.copy(0.08f),
                             alpha = 1f - progress
                         )
-                        drawRect(Color.Black.copy(alpha = 0.03f * progress))
+                        drawRect(
+                            if (isLightTheme) Color.White.copy(0.16f * progress) else Color.White.copy(0.10f * progress)
+                        )
                     }
                 )
         )
 
-        // ================= 4. 全局手势交互层（挂在最顶层，手势点击与滑动极速响应） =================
+        // ================= 4. 可见 Tab 内容图层（顶层清晰可见，绝不消失，水珠触碰时变主题色） =================
+        Row(
+            Modifier
+                .graphicsLayer { translationX = panelOffset }
+                .height(56.dp)
+                .fillMaxWidth()
+                .padding(horizontal = 4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            tabs.forEachIndexed { index, tab ->
+                // 图标物理区域在 [index + 0.30f, index + 0.70f]，水珠边缘真正接触图标时才变色
+                val isTouchedByDroplet = if (isPressed) {
+                    dropletRight >= index + 0.30f && dropletLeft <= (index + 1) - 0.30f
+                } else {
+                    index == currentIndex
+                }
+
+                TabItemView(
+                    tab = tab,
+                    tint = if (isTouchedByDroplet && !tab.isPostButton) themeColor else contentNormalColor,
+                    themeColor = themeColor,
+                    tabScale = if (isTouchedByDroplet) lerp(1f, 1.10f, dampedDragAnimation.pressProgress) else 1f,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        }
+
+        // ================= 5. 全局手势交互层（挂在最顶层，手势点击与滑动极速响应） =================
         Box(
             Modifier
                 .fillMaxSize()
