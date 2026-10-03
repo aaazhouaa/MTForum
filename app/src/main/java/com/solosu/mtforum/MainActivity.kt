@@ -646,8 +646,7 @@ class MainActivity : AppCompatActivity() {
                 onPostClicked = {
                     openPost()
                 },
-                themeColor = currentNavThemeColor.value,
-                backdropSourceView = mainPager
+                themeColor = currentNavThemeColor.value
             )
         }
 

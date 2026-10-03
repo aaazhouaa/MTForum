@@ -1,6 +1,5 @@
 package com.solosu.mtforum.ui.widget
 
-import android.view.View
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.EaseOut
 import androidx.compose.animation.core.spring
@@ -39,14 +38,12 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.input.pointer.changedToUpIgnoreConsumed
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
-import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.LocalViewConfiguration
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -86,11 +83,11 @@ data class NavTabItem(
 
 /**
  * MTForum 液态毛玻璃底栏
- * 1. 真实菲涅尔透镜与彩虹色散：捕获背部 ViewPager2 真实内容与离屏色彩，水珠与底栏边缘激发纯正菲涅尔彩虹色散与凸透镜折射；
- * 2. 图标绝不消失：保留顶层清晰 Tab，移除了错误的全透明隐藏逻辑，图标无论何时都清晰呈现；
- * 3. 精准触碰判定：以 Tab 图标实际物理区域为准，长按未碰到相邻 Tab 图标时绝不误亮，移近触碰时可同时点亮 2 个 Tab；
- * 4. 底栏不透明度 65%：浅色/深色统一 65% 纯净磨砂玻璃遮罩；
- * 5. 全局极速响应：顶层手势状态机，点按/滑动随心掌控。
+ * 1. 底栏与水珠双重彩虹色散：开启 chromaticAberration 与 depthEffect，底栏胶囊与悬浮水珠四周全方位泛出绚丽菲涅尔彩虹光谱；
+ * 2. 彻底杜绝背后头像穿透：纯净底色 Backdrop，绝不抓取绘制下层帖子列表与头像；
+ * 3. 图标永不消失：顶层清晰绘制 Tab，移除任何隐藏逻辑，全流程清晰稳定呈现；
+ * 4. 水珠触碰双 Tab 变色：以图标物理区域为准，长按滑行在两 Tab 之间时，被触碰的 Tab 即时变主题色，未碰触不误亮；
+ * 5. 底栏不透明度 65%：浅色/深色统一 65% 纯净磨砂玻璃遮罩。
  */
 @Composable
 fun MTForumLiquidNavBar(
@@ -98,8 +95,7 @@ fun MTForumLiquidNavBar(
     onTabSelected: (index: Int) -> Unit,
     onPostClicked: () -> Unit,
     themeColor: Color,
-    modifier: Modifier = Modifier,
-    backdropSourceView: View? = null
+    modifier: Modifier = Modifier
 ) {
     val tabs = remember {
         listOf(
@@ -117,22 +113,9 @@ fun MTForumLiquidNavBar(
         else Color(0xFF202022.toInt()).copy(0.65f)
     val contentNormalColor = if (isLightTheme) Color(0x8C000000.toInt()) else Color(0xB8FFFFFF.toInt())
 
-    val navView = LocalView.current
-    val canvasBackdrop = rememberCanvasBackdrop {
-        val source = backdropSourceView ?: return@rememberCanvasBackdrop
-        val canvas = drawContext.canvas.nativeCanvas
-        canvas.save()
-        val navLoc = IntArray(2)
-        val sourceLoc = IntArray(2)
-        navView.getLocationInWindow(navLoc)
-        source.getLocationInWindow(sourceLoc)
-        val dx = (sourceLoc[0] - navLoc[0]).toFloat()
-        val dy = (sourceLoc[1] - navLoc[1]).toFloat()
-        canvas.translate(dx, dy)
-        try {
-            source.draw(canvas)
-        } catch (_: Throwable) {}
-        canvas.restore()
+    // 纯净底板 Backdrop：只绘制纯净背景色，绝不抓取下层列表，杜绝水珠中透出头像文字
+    val baseBackdrop = rememberCanvasBackdrop {
+        drawRect(if (isLightTheme) Color(0xFFFAFAFA) else Color(0xFF141416))
     }
     val tabsBackdrop = rememberLayerBackdrop()
 
@@ -199,12 +182,12 @@ fun MTForumLiquidNavBar(
         val dropletLeft = dropletCenter - dropletHalfWidth
         val dropletRight = dropletCenter + dropletHalfWidth
 
-        // ================= 1. 底栏容器胶囊背景（高度 64dp，不透明度 65%，真实折射背后页面内容并带彩虹色散） =================
+        // ================= 1. 底栏容器胶囊背景（高度 64dp，不透明度 65%，开启彩虹色散） =================
         Box(
             Modifier
                 .graphicsLayer { translationX = panelOffset }
                 .drawBackdrop(
-                    backdrop = canvasBackdrop,
+                    backdrop = baseBackdrop,
                     shape = { CircleShape },
                     effects = {
                         vibrancy()
@@ -213,14 +196,14 @@ fun MTForumLiquidNavBar(
                             refractionHeight = 16f.dp.toPx(),
                             refractionAmount = 24f.dp.toPx(),
                             depthEffect = true,
-                            chromaticAberration = true // 底栏彩虹色散效果
+                            chromaticAberration = true // ★ 底栏彩虹色散效果！
                         )
                     },
                     highlight = {
-                        Highlight.Default.copy(alpha = 0.65f)
+                        Highlight.Default.copy(alpha = 0.60f)
                     },
                     shadow = {
-                        Shadow(alpha = 0.25f)
+                        Shadow(alpha = 0.22f)
                     },
                     innerShadow = {
                         InnerShadow(radius = 8f.dp, alpha = 0.40f)
@@ -264,7 +247,7 @@ fun MTForumLiquidNavBar(
             }
         }
 
-        // ================= 3. 真实 78dp 悬浮放大水珠（折射 canvasBackdrop + tabsBackdrop，绚丽菲涅尔透镜与彩虹色散） =================
+        // ================= 3. 真实 78dp 悬浮放大水珠（开启菲涅尔透镜与彩虹色散） =================
         Box(
             Modifier
                 .align(Alignment.CenterStart)
@@ -279,7 +262,7 @@ fun MTForumLiquidNavBar(
                 .width(with(density) { tabWidth.toDp() })
                 .height(56.dp)
                 .drawBackdrop(
-                    backdrop = rememberCombinedBackdrop(canvasBackdrop, tabsBackdrop),
+                    backdrop = rememberCombinedBackdrop(baseBackdrop, tabsBackdrop),
                     shape = { CircleShape },
                     effects = {
                         val progress = dampedDragAnimation.pressProgress
@@ -290,7 +273,7 @@ fun MTForumLiquidNavBar(
                             refractionHeight = rHeight,
                             refractionAmount = rAmount,
                             depthEffect = true,
-                            chromaticAberration = true // 菲涅尔透镜彩色色散
+                            chromaticAberration = true // ★ 水珠彩虹色散！
                         )
                     },
                     highlight = {
@@ -314,9 +297,8 @@ fun MTForumLiquidNavBar(
                     },
                     onDrawSurface = {
                         val progress = dampedDragAnimation.pressProgress
-                        // 1. 保持底栏连贯的 65% 磨砂遮罩，杜绝水珠区域穿透挖空露出背后头像
+                        // 保持底栏连贯的 65% 磨砂遮罩，纯净平滑
                         drawRect(containerColor)
-                        // 2. 叠加水珠菲涅尔液态表面微光反射
                         drawRect(
                             if (isLightTheme) Color.White.copy(0.20f + 0.15f * progress)
                             else Color.White.copy(0.12f + 0.10f * progress)
