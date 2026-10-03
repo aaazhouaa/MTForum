@@ -371,7 +371,7 @@ class ReplyAdapter(rawReplies: List<ReplyItem>?) :
         private val layoutReplyQuote: LinearLayout = itemView.findViewById(R.id.layout_reply_quote)
         private val tvReplyQuote: TextView = itemView.findViewById(R.id.tv_reply_quote)
         private val llReplyImages: LinearLayout = itemView.findViewById(R.id.ll_reply_images)
-        private val btnReplyTo: TextView = itemView.findViewById(R.id.btn_reply_to)
+        private val btnReplyTo: View = itemView.findViewById(R.id.btn_reply_to)
         private val ivReplyMore: ImageView? = itemView.findViewById(R.id.iv_reply_more)
         private val layoutCollapsedHint: View? = itemView.findViewById(R.id.layout_collapsed_hint)
         private val ivCollapsedIcon: ImageView? = itemView.findViewById(R.id.iv_collapsed_icon)

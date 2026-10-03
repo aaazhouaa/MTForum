@@ -38,7 +38,7 @@
                 app:tint="@color/text_primary"
                 android:padding="12dp" />
 
-            <!-- 打赏图标（红包带¥符号，纯图标无数字） -->
+            <!-- 打赏图标（线框镂空带¥符号，大小减1，纯图标无数字） -->
             <ImageButton
                 android:id="@+id/btn_reward"
                 android:layout_width="48dp"
@@ -50,7 +50,7 @@
                 android:background="?attr/selectableItemBackgroundBorderless"
                 android:contentDescription="@string/reward_title"
                 app:tint="@color/text_primary"
-                android:padding="12dp" />
+                android:padding="13dp" />
 
             <ImageButton
                 android:id="@+id/btn_kick"

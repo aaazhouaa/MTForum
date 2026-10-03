@@ -65,15 +65,14 @@ class AiConfigActivity : AppCompatActivity() {
      * 地址或 Key 有改动时先把它们落盘，AiClient 读的是 SharedPreferences。
      */
     private fun fetchModels() {
-        if (TextUtils.isEmpty(text(b.etApiKey))) {
+        val baseUrl = if (TextUtils.isEmpty(text(b.etBaseUrl))) "https://api.openai.com/v1" else text(b.etBaseUrl)
+        val apiKey = text(b.etApiKey)
+        if (TextUtils.isEmpty(apiKey) && !AiClient.isLocalEndpoint(baseUrl)) {
             toast("请先填写 API Key")
             return
         }
-        AiConfigManager.setBaseUrl(
-            this,
-            if (TextUtils.isEmpty(text(b.etBaseUrl))) "https://api.openai.com/v1" else text(b.etBaseUrl)
-        )
-        AiConfigManager.setApiKey(this, text(b.etApiKey))
+        AiConfigManager.setBaseUrl(this, baseUrl)
+        AiConfigManager.setApiKey(this, apiKey)
 
         b.btnFetchModels.isEnabled = false
         b.tvModelStatus.text = "正在获取…"
@@ -188,7 +187,7 @@ class AiConfigActivity : AppCompatActivity() {
         val apiKey = text(b.etApiKey)
         val model = text(b.etModel)
 
-        if (TextUtils.isEmpty(apiKey)) {
+        if (TextUtils.isEmpty(apiKey) && !AiClient.isLocalEndpoint(baseUrl)) {
             toast("请填写 API Key")
             return
         }
@@ -234,16 +233,14 @@ class AiConfigActivity : AppCompatActivity() {
     // ==================== 测试连接 ====================
 
     private fun testConnection() {
+        val baseUrl = if (TextUtils.isEmpty(text(b.etBaseUrl))) "https://api.openai.com/v1" else text(b.etBaseUrl)
         val apiKey = text(b.etApiKey)
-        if (TextUtils.isEmpty(apiKey)) {
+        if (TextUtils.isEmpty(apiKey) && !AiClient.isLocalEndpoint(baseUrl)) {
             toast("请先填写 API Key")
             return
         }
         // 先落盘，AiClient 读的是 SharedPreferences
-        AiConfigManager.setBaseUrl(
-            this,
-            if (TextUtils.isEmpty(text(b.etBaseUrl))) "https://api.openai.com/v1" else text(b.etBaseUrl)
-        )
+        AiConfigManager.setBaseUrl(this, baseUrl)
         AiConfigManager.setApiKey(this, apiKey)
         AiConfigManager.setModel(this, text(b.etModel))
         AiConfigManager.setMaxTokens(this, intOf(b.etMaxTokens, 8192, 1, 128000))
@@ -288,15 +285,14 @@ class AiConfigActivity : AppCompatActivity() {
      * 结果直接写明是"支持"还是"不支持"，并给出当前模型更适合走哪条路。
      */
     private fun checkToolCalling() {
-        if (TextUtils.isEmpty(text(b.etApiKey))) {
+        val baseUrl = if (TextUtils.isEmpty(text(b.etBaseUrl))) "https://api.openai.com/v1" else text(b.etBaseUrl)
+        val apiKey = text(b.etApiKey)
+        if (TextUtils.isEmpty(apiKey) && !AiClient.isLocalEndpoint(baseUrl)) {
             toast("请先填写 API Key")
             return
         }
-        AiConfigManager.setBaseUrl(
-            this,
-            if (TextUtils.isEmpty(text(b.etBaseUrl))) "https://api.openai.com/v1" else text(b.etBaseUrl)
-        )
-        AiConfigManager.setApiKey(this, text(b.etApiKey))
+        AiConfigManager.setBaseUrl(this, baseUrl)
+        AiConfigManager.setApiKey(this, apiKey)
         AiConfigManager.setModel(this, text(b.etModel))
         AiConfigManager.setMaxTokens(this, intOf(b.etMaxTokens, 8192, 1, 128000))
 

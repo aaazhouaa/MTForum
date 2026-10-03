@@ -112,6 +112,23 @@ object AiClient {
         var models: MutableList<String>? = null
     }
 
+    @JvmStatic
+    fun isLocalEndpoint(url: String?): Boolean {
+        if (url == null) return false
+        val lower = url.lowercase(java.util.Locale.ROOT).trim()
+        return lower.contains("127.0.0.1") ||
+                lower.contains("localhost") ||
+                lower.contains("192.168.") ||
+                lower.contains("10.") ||
+                lower.contains("172.16.") ||
+                lower.contains("172.17.") ||
+                lower.contains("172.18.") ||
+                lower.contains("172.19.") ||
+                lower.contains("172.2") ||
+                lower.contains("172.3") ||
+                lower.startsWith("http://")
+    }
+
     private fun buildClient(timeoutSeconds: Int): OkHttpClient {
         return OkHttpClient.Builder()
             .connectTimeout(30, TimeUnit.SECONDS)
@@ -145,7 +162,7 @@ object AiClient {
         val key = AiConfigManager.getApiKey(context)
         val model = AiConfigManager.getModel(context)
 
-        if (TextUtils.isEmpty(key)) {
+        if (TextUtils.isEmpty(key) && !isLocalEndpoint(base)) {
             r.error = "未配置 API Key"
             return r
         }
@@ -266,10 +283,13 @@ object AiClient {
     /** 发送一次 POST /chat/completions */
     @Throws(Exception::class)
     private fun post(client: OkHttpClient, url: String, key: String?, body: String): Response {
-        val request = Request.Builder()
+        val reqBuilder = Request.Builder()
             .url(url)
-            .header("Authorization", "Bearer " + key)
             .header("Content-Type", "application/json")
+        if (!TextUtils.isEmpty(key)) {
+            reqBuilder.header("Authorization", "Bearer " + key)
+        }
+        val request = reqBuilder
             .post(body.toRequestBody(JSON_TYPE))
             .build()
         return client.newCall(request).execute()
@@ -353,19 +373,22 @@ object AiClient {
     @JvmStatic
     fun listModels(context: Context): Result {
         val r = Result()
+        val base = AiConfigManager.getBaseUrl(context)
         val key = AiConfigManager.getApiKey(context)
-        if (TextUtils.isEmpty(key)) {
+        if (TextUtils.isEmpty(key) && !isLocalEndpoint(base)) {
             r.error = "未配置 API Key"
             return r
         }
-        val url = normalizeModelsEndpoint(AiConfigManager.getBaseUrl(context))
+        val url = normalizeModelsEndpoint(base)
         try {
-            val request = Request.Builder()
+            val reqBuilder = Request.Builder()
                 .url(url)
-                .header("Authorization", "Bearer " + key)
                 .header("Accept", "application/json")
                 .get()
-                .build()
+            if (!TextUtils.isEmpty(key)) {
+                reqBuilder.header("Authorization", "Bearer " + key)
+            }
+            val request = reqBuilder.build()
             val client = buildClient(Math.max(30, AiConfigManager.getTimeoutSeconds(context)))
             client.newCall(request).execute().use { response ->
                 val resp = if (response.body != null) response.body!!.string() else ""

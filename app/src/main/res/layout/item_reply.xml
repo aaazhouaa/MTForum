@@ -107,15 +107,15 @@
                     android:textColor="@color/text_secondary"
                     android:visibility="gone" />
 
-                <TextView
+                <ImageView
                     android:id="@+id/btn_reply_to"
-                    android:layout_width="52dp"
+                    android:layout_width="30dp"
                     android:layout_height="27dp"
-                    android:gravity="center"
-                    android:text="回复"
-                    android:textSize="11sp"
-                    android:textColor="?attr/colorPrimary"
-                    android:background="@drawable/rounded_btn_outline"
+                    android:padding="3.5dp"
+                    android:src="@drawable/ic_reply_arrow"
+                    android:scaleType="fitCenter"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:contentDescription="回复"
                     android:visibility="gone" />
 
                 <ImageView

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 评论区：单条评论回复图标（经典向左弯曲回复箭头，灰白色） -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#9CA3AF"
+        android:pathData="M10,9V5l-7,7l7,7v-4.1c5,0 8.5,1.6 11,5.1c-1,-5 -4,-10 -11,-11z" />
+</vector>
