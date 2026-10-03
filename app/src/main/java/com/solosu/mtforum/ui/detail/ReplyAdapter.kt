@@ -521,7 +521,9 @@ class ReplyAdapter(rawReplies: List<ReplyItem>?) :
                 var pureText = Regex("<[^>]+>").replace(matched, "")
                 pureText = Regex("&nbsp;").replace(pureText, " ").trim()
                 editFooterText = pureText
-                remainingSource = editMatcher.replaceFirst("").trim()
+                remainingSource = stripLeadingHtmlBreak(editMatcher.replaceFirst(""))
+            } else {
+                remainingSource = stripLeadingHtmlBreak(sourceHtml)
             }
 
             if (!editFooterText.isNullOrEmpty()) {
@@ -540,7 +542,8 @@ class ReplyAdapter(rawReplies: List<ReplyItem>?) :
                     createInlineImageGetter(tvContent),
                     BBCodeUtil.createTagHandler(itemView.context)
                 )
-                tvContent.text = BBCodeUtil.stripForegroundColorSpans(spannedSource)
+                val uncolored = BBCodeUtil.stripForegroundColorSpans(spannedSource)
+                tvContent.text = trimSpanned(uncolored ?: spannedSource)
                 setupClickableLinks(tvContent)
                 attachCopyOnLongClick(tvContent)
             } else {
@@ -991,6 +994,39 @@ class ReplyAdapter(rawReplies: List<ReplyItem>?) :
                     })
                 placeholder
             }
+        }
+
+        private fun stripLeadingHtmlBreak(html: String?): String {
+            if (html.isNullOrEmpty()) return ""
+            var s = html.trim()
+            val leadPattern = Pattern.compile(
+                "^(?:\\s|&nbsp;|<br\\s*/?>|<p>(?:\\s|&nbsp;|<br\\s*/?>)*</p>|<div>(?:\\s|&nbsp;|<br\\s*/?>)*</div>)+",
+                Pattern.CASE_INSENSITIVE
+            )
+            while (true) {
+                val m = leadPattern.matcher(s)
+                if (m.find()) {
+                    s = s.substring(m.end()).trim()
+                } else {
+                    break
+                }
+            }
+            return s
+        }
+
+        private fun trimSpanned(spanned: CharSequence): CharSequence {
+            var start = 0
+            var end = spanned.length
+            while (start < end && (spanned[start].isWhitespace() || spanned[start] == '\u00A0')) {
+                start++
+            }
+            while (end > start && (spanned[end - 1].isWhitespace() || spanned[end - 1] == '\u00A0')) {
+                end--
+            }
+            if (start == 0 && end == spanned.length) {
+                return spanned
+            }
+            return spanned.subSequence(start, end)
         }
 
         private fun dpToPx(context: Context, dp: Int): Int {

@@ -1972,6 +1972,24 @@ class ThreadDetailActivity : AppCompatActivity() {
         }
     }
 
+    private fun stripLeadingHtmlBreak(html: String?): String {
+        if (html.isNullOrEmpty()) return ""
+        var s = html.trim()
+        val leadPattern = Pattern.compile(
+            "^(?:\\s|&nbsp;|<br\\s*/?>|<p>(?:\\s|&nbsp;|<br\\s*/?>)*</p>|<div>(?:\\s|&nbsp;|<br\\s*/?>)*</div>)+",
+            Pattern.CASE_INSENSITIVE
+        )
+        while (true) {
+            val m = leadPattern.matcher(s)
+            if (m.find()) {
+                s = s.substring(m.end()).trim()
+            } else {
+                break
+            }
+        }
+        return s
+    }
+
     private fun splitEditFooter(html: String?): Array<String> {
         if (html.isNullOrEmpty()) {
             return arrayOf("", "")
@@ -1982,10 +2000,10 @@ class ThreadDetailActivity : AppCompatActivity() {
             val matched = matcher.group(0) ?: ""
             var pureText = Regex("<[^>]+>").replace(matched, "")
             pureText = Regex("&nbsp;").replace(pureText, " ").trim()
-            val clean = matcher.replaceFirst("").trim()
+            val clean = stripLeadingHtmlBreak(matcher.replaceFirst(""))
             return arrayOf(clean, pureText)
         }
-        return arrayOf(html, "")
+        return arrayOf(stripLeadingHtmlBreak(html), "")
     }
 
     private fun renderHiddenContent(hiddenHtml: String?) {
@@ -3792,7 +3810,25 @@ class ThreadDetailActivity : AppCompatActivity() {
             }
         }
         val processed = BBCodeUtil.stripForegroundColorSpans(rawSpanned)
-        return (processed as? Spanned) ?: rawSpanned
+        val finalSpanned = (processed as? Spanned) ?: rawSpanned
+        return trimSpanned(finalSpanned)
+    }
+
+    private fun trimSpanned(spanned: CharSequence): Spanned {
+        var start = 0
+        var end = spanned.length
+        while (start < end && (spanned[start].isWhitespace() || spanned[start] == '\u00A0')) {
+            start++
+        }
+        while (end > start && (spanned[end - 1].isWhitespace() || spanned[end - 1] == '\u00A0')) {
+            end--
+        }
+        val sub = if (start == 0 && end == spanned.length) {
+            spanned
+        } else {
+            spanned.subSequence(start, end)
+        }
+        return if (sub is Spanned) sub else SpannedStringValueOf(sub.toString())
     }
 
     private fun SpannedStringValueOf(s: String): Spanned {
@@ -4168,9 +4204,9 @@ class ThreadDetailActivity : AppCompatActivity() {
                 "div.comiis_favshare, div[class*=favshare], a.followmod, " +
                 "div.comiis_postli_time, div.manage, div.modact"
             ).remove()
-            return doc.body().html()
+            return stripLeadingHtmlBreak(doc.body().html())
         } catch (_: Exception) {
-            return rawHtml
+            return stripLeadingHtmlBreak(rawHtml)
         }
     }
 

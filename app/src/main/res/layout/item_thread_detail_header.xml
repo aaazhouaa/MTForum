@@ -162,8 +162,8 @@
             android:layout_height="wrap_content"
             android:layout_marginStart="16dp"
             android:layout_marginEnd="16dp"
-            android:layout_marginTop="8dp"
-            android:layout_marginBottom="4dp"
+            android:layout_marginTop="6dp"
+            android:layout_marginBottom="0dp"
             android:gravity="start"
             android:textSize="11sp"
             android:textColor="@color/text_secondary"
@@ -176,7 +176,7 @@
         android:orientation="vertical"
         android:layout_marginStart="16dp"
         android:layout_marginEnd="16dp"
-        android:layout_marginTop="12dp">
+        android:layout_marginTop="8dp">
         <TextView
             android:id="@+id/tv_content"
             android:layout_width="match_parent"
