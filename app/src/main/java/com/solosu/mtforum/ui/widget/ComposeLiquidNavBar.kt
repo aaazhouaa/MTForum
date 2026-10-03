@@ -199,7 +199,7 @@ fun MTForumLiquidNavBar(
         val dropletLeft = dropletCenter - dropletHalfWidth
         val dropletRight = dropletCenter + dropletHalfWidth
 
-        // ================= 1. 底栏容器胶囊背景（高度 64dp，不透明度 65%，真实折射背后页面内容） =================
+        // ================= 1. 底栏容器胶囊背景（高度 64dp，不透明度 65%，真实折射背后页面内容并带彩虹色散） =================
         Box(
             Modifier
                 .graphicsLayer { translationX = panelOffset }
@@ -208,14 +208,22 @@ fun MTForumLiquidNavBar(
                     shape = { CircleShape },
                     effects = {
                         vibrancy()
-                        blur(16f.dp.toPx())
-                        lens(16f.dp.toPx(), 28f.dp.toPx())
+                        blur(12f.dp.toPx())
+                        lens(
+                            refractionHeight = 16f.dp.toPx(),
+                            refractionAmount = 24f.dp.toPx(),
+                            depthEffect = true,
+                            chromaticAberration = true // 底栏彩虹色散效果
+                        )
                     },
                     highlight = {
-                        Highlight.Default.copy(alpha = 0.50f)
+                        Highlight.Default.copy(alpha = 0.65f)
                     },
                     shadow = {
                         Shadow(alpha = 0.25f)
+                    },
+                    innerShadow = {
+                        InnerShadow(radius = 8f.dp, alpha = 0.40f)
                     },
                     layerBlock = {
                         val progress = dampedDragAnimation.pressProgress
@@ -306,13 +314,16 @@ fun MTForumLiquidNavBar(
                     },
                     onDrawSurface = {
                         val progress = dampedDragAnimation.pressProgress
-                        // 静止时半透明胶囊，长按展开时完全透亮，完美透出内部彩虹色散与透镜折射
+                        // 1. 保持底栏连贯的 65% 磨砂遮罩，杜绝水珠区域穿透挖空露出背后头像
+                        drawRect(containerColor)
+                        // 2. 叠加水珠菲涅尔液态表面微光反射
                         drawRect(
-                            if (isLightTheme) Color.Black.copy(0.08f) else Color.White.copy(0.08f),
-                            alpha = 1f - progress
+                            if (isLightTheme) Color.White.copy(0.20f + 0.15f * progress)
+                            else Color.White.copy(0.12f + 0.10f * progress)
                         )
                         drawRect(
-                            if (isLightTheme) Color.White.copy(0.16f * progress) else Color.White.copy(0.10f * progress)
+                            if (isLightTheme) Color.Black.copy(0.06f * (1f - progress))
+                            else Color.Transparent
                         )
                     }
                 )
