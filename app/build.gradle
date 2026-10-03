@@ -69,4 +69,5 @@ dependencies {
     implementation libs.recyclerview
     implementation libs.androidx.viewpager2
     implementation libs.androidx.drawerlayout
+    implementation libs.liquidglass
 }

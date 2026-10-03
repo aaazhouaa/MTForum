@@ -12,6 +12,7 @@ swiperefreshlayout = "1.1.0"
 recyclerview = "1.3.2"
 viewpager2 = "1.0.0"
 drawerlayout = "1.2.0"
+liquidglass = "v2.0.11"
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
@@ -30,3 +31,4 @@ swiperefreshlayout = { group = "androidx.swiperefreshlayout", name = "swiperefre
 recyclerview = { group = "androidx.recyclerview", name = "recyclerview", version.ref = "recyclerview" }
 androidx-viewpager2 = { group = "androidx.viewpager2", name = "viewpager2", version.ref = "viewpager2" }
 androidx-drawerlayout = { group = "androidx.drawerlayout", name = "drawerlayout", version.ref = "drawerlayout" }
+liquidglass = { group = "com.github.QWEA0", name = "liquidglass", version.ref = "liquidglass" }

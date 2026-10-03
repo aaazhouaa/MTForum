@@ -56,25 +56,8 @@ class MainActivity : AppCompatActivity() {
     private var lastNavScrollAt = 0L
     private var navScrollAccum = 0
 
-    // 导航项（5项）
-    private var navHome: View? = null
-    private var navCommunity: View? = null
-    private var navPost: View? = null
-    private var navMessage: View? = null
-    private var navProfile: View? = null
-
-    // 图标（含凸起发布按钮图标）
-    private var ivHomeIcon: ImageView? = null
-    private var ivCommunityIcon: ImageView? = null
-    private var ivPostIcon: ImageView? = null
-    private var ivMessageIcon: ImageView? = null
-    private var ivProfileIcon: ImageView? = null
-
-    // 文字
-    private var tvHomeText: TextView? = null
-    private var tvCommunityText: TextView? = null
-    private var tvMessageText: TextView? = null
-    private var tvProfileText: TextView? = null
+    // ★ 液态玻璃底栏（FluidGlassTabLayout）
+    private var navTabLayout: com.solosu.mtforum.ui.widget.FluidGlassTabLayout? = null
 
     // ★ 消息角标
     private var tvMessageBadge: TextView? = null
@@ -89,7 +72,6 @@ class MainActivity : AppCompatActivity() {
 
     // 双击返回退出
     private var lastBackPressTime = 0L
-    private var frostedNavBackground: FrostedGlassDrawable? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         com.solosu.mtforum.util.ThemeManager.applyTheme(this)
@@ -99,9 +81,7 @@ class MainActivity : AppCompatActivity() {
         binding.mainDrawer.setStatusBarBackgroundColor(ContextCompat.getColor(this, R.color.background))
         com.solosu.mtforum.util.ThemeManager.setupWindow(this)
 
-        // 底部导航栏统一使用纯净圆润大胶囊
-        frostedNavBackground = FrostedGlassDrawable.create(this, 32f)
-        binding.bottomNavContainer.background = frostedNavBackground
+        // 底部导航栏：QWEA0 液态玻璃 TabLayout（initNavigationBar 里初始化）
 
         // 初始化 ViewPager2：首页/版块/消息/我的 四页快速切换
         mainPager = binding.mainPager
@@ -112,7 +92,10 @@ class MainActivity : AppCompatActivity() {
         reduceViewPager2Sensitivity(mainPager!!, 3.2f)
         mainPager!!.registerOnPageChangeCallback(object : ViewPager2.OnPageChangeCallback() {
             override fun onPageSelected(position: Int) {
-                updateNavSelectionByPosition(position)
+                // pager 页 → 液态玻璃 tab（0首页/1版块/3消息/4我的，跳过中间的 + 发帖 tab）
+                val tabIdx = pagerToTabIndex(position)
+                navTabLayout?.selectTab(tabIdx, animate = true)
+                navTabLayout?.refreshTabColors(tabIdx)
                 // build71: 切页时底部栏立即恢复显示(用户刚切换,需要看到导航)
                 setBottomNavVisible(true)
             }
@@ -628,110 +611,62 @@ class MainActivity : AppCompatActivity() {
     }
 
     /**
-     * 初始化悬浮胶囊导航栏（5项：首页/版块/凸起发布/消息/我的）
+     * 初始化悬浮胶囊导航栏（5项：首页/版块/中间发帖/消息/我的）
      */
     private fun initNavigationBar() {
-        navHome = findViewById(R.id.nav_home_tab)
-        navCommunity = findViewById(R.id.nav_community_tab)
-        navPost = findViewById(R.id.nav_post_tab)
-        navMessage = findViewById(R.id.nav_message_tab)
-        navProfile = findViewById(R.id.nav_profile_tab)
-
-        ivHomeIcon = findViewById(R.id.nav_home_icon)
-        ivCommunityIcon = findViewById(R.id.nav_community_icon)
-        ivPostIcon = findViewById(R.id.nav_post_icon)
-        ivMessageIcon = findViewById(R.id.nav_message_icon)
-        ivProfileIcon = findViewById(R.id.nav_profile_icon)
-
-        tvHomeText = findViewById(R.id.nav_home_text)
-        tvCommunityText = findViewById(R.id.nav_community_text)
-        tvMessageText = findViewById(R.id.nav_message_text)
-        tvProfileText = findViewById(R.id.nav_profile_text)
-
-        // 空指针保护
-        if (navHome == null || navCommunity == null || navPost == null || navMessage == null || navProfile == null) {
-            android.util.Log.e("MainActivity", "Navigation bar views are null")
-            return
-        }
-        if (ivHomeIcon == null || ivCommunityIcon == null || ivPostIcon == null || ivMessageIcon == null || ivProfileIcon == null) {
-            android.util.Log.e("MainActivity", "Navigation bar icons are null")
-            return
-        }
-        if (tvHomeText == null || tvCommunityText == null || tvMessageText == null || tvProfileText == null) {
-            android.util.Log.e("MainActivity", "Navigation bar texts are null")
+        navTabLayout = findViewById(R.id.bottom_nav_container)
+        if (navTabLayout == null) {
+            android.util.Log.e("MainActivity", "FluidGlassTabLayout (bottom_nav_container) is null")
             return
         }
 
-        // 前4项 — 首页/版块/我的使用NavController导航；带现代回弹微动效
-        val applyTabClick: (View, Int) -> Unit = { view, pos ->
-            view.animate()
-                .scaleX(0.88f)
-                .scaleY(0.88f)
-                .setDuration(90)
-                .withEndAction {
-                    view.animate()
-                        .scaleX(1.0f)
-                        .scaleY(1.0f)
-                        .setDuration(160)
-                        .setInterpolator(OvershootInterpolator(2.2f))
-                        .start()
-                    switchPage(pos)
-                }
-                .start()
-        }
-
-        navHome!!.setOnClickListener { applyTabClick(it, MainPagerAdapter.PAGE_HOME) }
-        navCommunity!!.setOnClickListener { applyTabClick(it, MainPagerAdapter.PAGE_COMMUNITY) }
-        navMessage!!.setOnClickListener { applyTabClick(it, MainPagerAdapter.PAGE_MESSAGE) }
-        navProfile!!.setOnClickListener { applyTabClick(it, MainPagerAdapter.PAGE_PROFILE) }
-
-        // 中间凸起发布按钮 — 带旋转回弹微动效
-        navPost!!.setOnClickListener {
-            navPost!!.animate()
-                .scaleX(0.86f)
-                .scaleY(0.86f)
-                .rotation(45f)
-                .setDuration(110)
-                .withEndAction {
-                    navPost!!.animate()
-                        .scaleX(1.0f)
-                        .scaleY(1.0f)
-                        .rotation(0f)
-                        .setDuration(200)
-                        .setInterpolator(OvershootInterpolator(2.5f))
-                        .start()
-                    val intent = Intent(this@MainActivity, PostActivity::class.java)
-                    startActivity(intent)
-                }
-                .start()
-        }
-
-        // 中间发布按钮动态应用当前主题色微渐变
         val themeColor = com.solosu.mtforum.util.ThemeManager.getThemeColor(this)
-        val themeLight = com.solosu.mtforum.util.ThemeManager.getThemeLightColor(this)
-        val centerBg = android.graphics.drawable.GradientDrawable(
-            android.graphics.drawable.GradientDrawable.Orientation.TL_BR,
-            intArrayOf(themeColor, themeLight)
-        ).apply {
-            shape = android.graphics.drawable.GradientDrawable.OVAL
-        }
-        ivPostIcon?.background = centerBg
+        navTabLayout!!.enableDynamicBackground = true
+        navTabLayout!!.backdropSource = mainPager
+        navTabLayout!!.selectedTintColor = themeColor
 
-        // 初始选中状态
-        updateNavSelectionByPosition(MainPagerAdapter.PAGE_HOME)
+        // 配置 5 个 Tab（含中间独立发帖药丸按钮与垂直上下排版）
+        navTabLayout!!.setupTabs(themeColor)
+
+        // tab 选中 → 切对应页；中间 + tab → 发帖
+        navTabLayout!!.addOnTabSelectedListener { tab ->
+            navTabLayout?.refreshTabColors(tab.position)
+            when (tab.position) {
+                0 -> mainPager?.setCurrentItem(MainPagerAdapter.PAGE_HOME, true)
+                1 -> mainPager?.setCurrentItem(MainPagerAdapter.PAGE_COMMUNITY, true)
+                2 -> {
+                    val cur = mainPager?.currentItem ?: MainPagerAdapter.PAGE_HOME
+                    openPost()
+                    navTabLayout?.selectTab(pagerToTabIndex(cur), animate = false)
+                }
+                3 -> mainPager?.setCurrentItem(MainPagerAdapter.PAGE_MESSAGE, true)
+                4 -> mainPager?.setCurrentItem(MainPagerAdapter.PAGE_PROFILE, true)
+            }
+            setBottomNavVisible(true)
+        }
+
+        // 手势释放或点击中间发帖按钮
+        navTabLayout!!.onPostClickListener = {
+            openPost()
+        }
+
+        // 初始选中首页
+        navTabLayout!!.selectTab(pagerToTabIndex(MainPagerAdapter.PAGE_HOME), animate = false)
         setupDrawerSwipeConflict()
     }
 
-    /**
-     * 导航到指定目的地（仅用于导航栏非发布项）
-     */
-    private fun switchPage(position: Int) {
-        if (mainPager != null) {
-            mainPager!!.setCurrentItem(position, true)
-        }
-        updateNavSelectionByPosition(position)
-        // build71: 用户主动点标签 -> 底部栏必须显示
-        setBottomNavVisible(true)
+    /** 中间 + tab：打开发帖页 */
+    private fun openPost() {
+        startActivity(Intent(this@MainActivity, PostActivity::class.java))
+    }
+
+    /** ViewPager2 页 → 液态玻璃 tab 索引（跳过中间的 + 发帖 tab：0→0,1→1,2→3,3→4） */
+    private fun pagerToTabIndex(pagerPos: Int): Int = when (pagerPos) {
+        MainPagerAdapter.PAGE_HOME -> 0
+        MainPagerAdapter.PAGE_COMMUNITY -> 1
+        MainPagerAdapter.PAGE_MESSAGE -> 3
+        MainPagerAdapter.PAGE_PROFILE -> 4
+        else -> 0
     }
 
     /**
@@ -862,96 +797,6 @@ class MainActivity : AppCompatActivity() {
                 setBottomNavVisible(true)
             }
         }
-    }
-
-    /**
-     * 更新导航栏选中状态
-     */
-    private fun updateNavSelectionByPosition(position: Int) {
-        resetAllSelection()
-
-        when (position) {
-            MainPagerAdapter.PAGE_HOME -> setItemActive(ivHomeIcon, tvHomeText)
-            MainPagerAdapter.PAGE_COMMUNITY -> setItemActive(ivCommunityIcon, tvCommunityText)
-            MainPagerAdapter.PAGE_MESSAGE -> setItemActive(ivMessageIcon, tvMessageText)
-            MainPagerAdapter.PAGE_PROFILE -> setItemActive(ivProfileIcon, tvProfileText)
-            else -> {
-            }
-        }
-    }
-
-    /**
-     * 重置所有导航项为未选中状态
-     */
-    private fun resetAllSelection() {
-        setItemInactive(ivHomeIcon, tvHomeText)
-        setItemInactive(ivCommunityIcon, tvCommunityText)
-        setItemInactive(ivMessageIcon, tvMessageText)
-        setItemInactive(ivProfileIcon, tvProfileText)
-    }
-
-    private fun setItemActive(icon: ImageView?, text: TextView?) {
-        if (icon == null || text == null) return
-        val activeColor = com.solosu.mtforum.util.ThemeManager.getThemeColor(this)
-        ImageViewCompat.setImageTintList(icon, ColorStateList.valueOf(activeColor))
-        text.setTextColor(activeColor)
-        text.setTypeface(null, Typeface.BOLD)
-
-        // 现代弹性微缩放与微上浮动效
-        icon.animate()
-            .scaleX(1.15f)
-            .scaleY(1.15f)
-            .translationY(-dp(2f))
-            .setDuration(190)
-            .setInterpolator(OvershootInterpolator(2.2f))
-            .start()
-
-        text.animate()
-            .scaleX(1.05f)
-            .scaleY(1.05f)
-            .translationY(-dp(1f))
-            .setDuration(190)
-            .start()
-    }
-
-    private fun setItemInactive(icon: ImageView?, text: TextView?) {
-        if (icon == null || text == null) return
-        val defaultColor = ContextCompat.getColor(this, R.color.nav_icon_default)
-        ImageViewCompat.setImageTintList(icon, ColorStateList.valueOf(defaultColor))
-        text.setTextColor(ContextCompat.getColor(this, R.color.nav_text_default))
-        text.setTypeface(null, Typeface.NORMAL)
-
-        icon.animate()
-            .scaleX(1.0f)
-            .scaleY(1.0f)
-            .translationY(0f)
-            .setDuration(160)
-            .setInterpolator(DecelerateInterpolator())
-            .start()
-
-        text.animate()
-            .scaleX(1.0f)
-            .scaleY(1.0f)
-            .translationY(0f)
-            .setDuration(160)
-            .start()
-    }
-
-    private fun getActiveIconRes(viewId: Int): Int {
-        if (viewId == R.id.nav_home_icon) {
-            return R.drawable.ic_home
-        } else if (viewId == R.id.nav_community_icon) {
-            return R.drawable.ic_discover
-        } else if (viewId == R.id.nav_message_icon) {
-            return R.drawable.ic_message
-        } else if (viewId == R.id.nav_profile_icon) {
-            return R.drawable.ic_profile
-        }
-        return 0
-    }
-
-    private fun getInactiveIconRes(viewId: Int): Int {
-        return getActiveIconRes(viewId)
     }
 
     // ==================== 消息角标 ====================
@@ -1215,6 +1060,9 @@ class MainActivity : AppCompatActivity() {
         }
         // 登录状态 / AI 配置可能已变化，刷新侧边栏头部
         refreshDrawerHeader()
+        val themeColor = com.solosu.mtforum.util.ThemeManager.getThemeColor(this)
+        navTabLayout?.selectedTintColor = themeColor
+        navTabLayout?.refreshTabColors(navTabLayout?.selectedTabPosition ?: 0)
     }
 
     override fun onStop() {
@@ -1223,9 +1071,6 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
-        if (frostedNavBackground != null) {
-            frostedNavBackground!!.setVisible(false, false)
-        }
         if (sInstance === this) {
             sInstance = null
             NoticeBadgeManager.setOnViewedListener(null)

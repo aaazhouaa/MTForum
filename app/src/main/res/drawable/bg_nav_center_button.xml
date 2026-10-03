@@ -8,7 +8,7 @@
                 android:startColor="@color/gradient_start"
                 android:endColor="@color/gradient_end"
                 android:type="linear" />
-            <size android:width="48dp" android:height="48dp" />
+            <size android:width="52dp" android:height="52dp" />
         </shape>
     </item>
 </ripple>
