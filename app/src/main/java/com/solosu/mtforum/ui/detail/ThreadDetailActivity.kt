@@ -24,6 +24,7 @@ import android.text.Spanned
 import android.text.TextPaint
 import android.text.TextUtils
 import android.text.style.ClickableSpan
+import android.text.style.ImageSpan
 import android.text.style.ReplacementSpan
 import android.text.style.URLSpan
 import android.view.Gravity
@@ -104,6 +105,7 @@ import java.io.File
 import java.io.FileOutputStream
 import java.io.InputStream
 import java.util.Locale
+import java.util.regex.Matcher
 import java.util.regex.Pattern
 
 /**
@@ -343,33 +345,9 @@ class ThreadDetailActivity : AppCompatActivity() {
      */
     private fun rebuildImageGallery(imageList: List<String>?) {
         val hb = headerBinding ?: return
-        if (imageList == null || imageList.isEmpty()) {
-            hb.cardImageGallery.visibility = View.GONE
-            hb.llImageGallery.removeAllViews()
-            return
-        }
-        hb.cardImageGallery.visibility = View.VISIBLE
-        hb.hsvImageGallery.visibility = View.VISIBLE
+        // 正文中大图已原位图文混排呈现，隐藏底部冗余重复的横向缩略图卡片
+        hb.cardImageGallery.visibility = View.GONE
         hb.llImageGallery.removeAllViews()
-        FrostedGlassHelper.applyToCardViews(hb.cardImageGallery, this)
-        val height = dpToPx(ItemTouchHelper.Callback.DEFAULT_DRAG_ANIMATION_DURATION)
-        val margin = dpToPx(4)
-        for (url in imageList) {
-            val imageView = ImageView(this)
-            imageView.layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT, height
-            )
-            imageView.adjustViewBounds = true
-            imageView.scaleType = ImageView.ScaleType.FIT_CENTER
-            (imageView.layoutParams as LinearLayout.LayoutParams).setMargins(margin, 0, margin, 0)
-            imageView.setOnClickListener { openImagePreview(url) }
-            Glide.with(this as FragmentActivity).load(url)
-                .placeholder(ColorDrawable(getColor(R.color.background_secondary)))
-                .error(ColorDrawable(getColor(R.color.divider)))
-                .into(imageView)
-            hb.llImageGallery.addView(imageView)
-        }
-        hb.btnCollapseImages.setOnClickListener { toggleImageGallery() }
     }
 
     /**
@@ -639,12 +617,23 @@ class ThreadDetailActivity : AppCompatActivity() {
             val footerSplit = splitEditFooter(converted)
             val cleaned = extractAndSeparateImages(footerSplit[0], imageList)
             val imageUrls = postDetail.imageUrls
+            val missingImages = ArrayList<String>()
             if (imageUrls != null && !imageUrls.isEmpty()) {
                 for (str in imageUrls) {
                     if (!imageList.contains(str)) {
                         imageList.add(str)
+                        missingImages.add(str)
                     }
                 }
+            }
+            // 自动补全不在正文 HTML 内的附件大图，防止发帖附件图片在正文中丢失
+            var fullHtml = cleaned
+            if (missingImages.isNotEmpty()) {
+                val sbAttach = StringBuilder()
+                for (imgUrl in missingImages) {
+                    sbAttach.append("<br><br><img src=\"").append(imgUrl).append("\">")
+                }
+                fullHtml += sbAttach.toString()
             }
             if (!TextUtils.isEmpty(footerSplit[1])) {
                 headerBinding!!.layoutEditFooter.visibility = View.VISIBLE
@@ -654,17 +643,65 @@ class ThreadDetailActivity : AppCompatActivity() {
             }
             // 收集当前帖全部图片供全屏翻页
             currentImageList = ArrayList(imageList)
-            val placeholders = replaceHiddenQuoteWithPlaceholder(cleaned)
+
             val unlocked = postDetail.hasHiddenContent && httpClient.isLoggedIn()
                     && !TextUtils.isEmpty(postDetail.hiddenContentHtml)
                     && !AutoReplyEngine.isLockedHidden(postDetail.hiddenContentHtml)
-            hiddenNotice = if (unlocked) "隐藏内容(已解锁)" else placeholders[1]
+
+            val displayHtml: String
+            if (unlocked) {
+                // 已解锁：保留正文中的所有隐藏内容/引用块原位展示（与网页端排版顺序一致）
+                // 统一将正文中的 comiis_quote / locked 转换为带有金黄色高亮标题的 customquote 质感卡片
+                val quotePattern = Pattern.compile(
+                    "<div\\s+class=[\"'](?:comiis_quote|locked)[^\"']*[\"']>(.*?)</div>",
+                    Pattern.CASE_INSENSITIVE or Pattern.DOTALL
+                )
+                val qMatcher = quotePattern.matcher(fullHtml)
+                val sbQuote = StringBuffer()
+                var quoteFound = false
+                while (qMatcher.find()) {
+                    quoteFound = true
+                    var inner = qMatcher.group(1) ?: ""
+                    inner = inner.replace(
+                        Regex("(?i)(本帖隐藏的内容[:：]?)"),
+                        "<font color=\"#F59E0B\"><b>$1</b></font>"
+                    )
+                    qMatcher.appendReplacement(sbQuote, Matcher.quoteReplacement("<br><customquote>$inner</customquote><br>"))
+                }
+                qMatcher.appendTail(sbQuote)
+                var resolvedHtml = sbQuote.toString()
+                if (!quoteFound && !TextUtils.isEmpty(postDetail.hiddenContentHtml)) {
+                    val fallbackHidden = postDetail.hiddenContentHtml!!.replace(
+                        Regex("(?i)(本帖隐藏的内容[:：]?)"),
+                        "<font color=\"#F59E0B\"><b>$1</b></font>"
+                    )
+                    resolvedHtml = "<br><customquote>$fallbackHidden</customquote><br><br>" + resolvedHtml
+                }
+                displayHtml = resolvedHtml
+                headerBinding!!.layoutHiddenContent.visibility = View.GONE
+            } else if (postDetail.hasHiddenContent) {
+                // 未解锁：将正文中的隐藏内容替换为锁定占位，并在底部显示提示回复解锁引导
+                val placeholders = replaceHiddenQuoteWithPlaceholder(fullHtml)
+                displayHtml = placeholders[0]
+                hiddenNotice = placeholders[1]
+                headerBinding!!.layoutHiddenContent.visibility = View.VISIBLE
+                headerBinding!!.tvHiddenContentHint.visibility = View.VISIBLE
+                headerBinding!!.btnViewHidden.visibility = View.VISIBLE
+                headerBinding!!.tvHiddenContent.visibility = View.GONE
+                maybeAutoUnlock()
+            } else {
+                displayHtml = fullHtml
+                headerBinding!!.layoutHiddenContent.visibility = View.GONE
+            }
+
             headerBinding!!.tvContent.text = safeFromHtml(
-                placeholders[0],
+                displayHtml,
                 createInlineImageGetter(headerBinding!!.tvContent),
                 BBCodeUtil.createTagHandler(this)
             )
-            applyHiddenNoticeHighlight(headerBinding!!.tvContent.text, hiddenNotice)
+            if (!TextUtils.isEmpty(hiddenNotice)) {
+                applyHiddenNoticeHighlight(headerBinding!!.tvContent.text, hiddenNotice)
+            }
             setupClickableLinks(headerBinding!!.tvContent)
             rebuildImageGallery(imageList)
         } else {
@@ -674,26 +711,6 @@ class ThreadDetailActivity : AppCompatActivity() {
             headerBinding!!.tvContent.setTextColor(getColor(R.color.text_hint))
             headerBinding!!.tvContent.textSize = 14.0f
             headerBinding!!.tvContent.gravity = Gravity.CENTER
-        }
-        val hasHidden = postDetail.hasHiddenContent
-        val hiddenUnlocked = hasHidden && httpClient.isLoggedIn()
-                && !TextUtils.isEmpty(postDetail.hiddenContentHtml)
-                && !AutoReplyEngine.isLockedHidden(postDetail.hiddenContentHtml)
-        if (hiddenUnlocked) {
-            // 已登录且可获取隐藏内容:正文中的胶囊只显示短提示,下方直接展示完整内容
-            headerBinding!!.layoutHiddenContent.visibility = View.VISIBLE
-            headerBinding!!.tvHiddenContentHint.visibility = View.GONE
-            headerBinding!!.btnViewHidden.visibility = View.GONE
-            renderHiddenContent(postDetail.hiddenContentHtml)
-        } else if (hasHidden) {
-            // 未登录或暂无内容:显示按钮引导查看(点击会提示登录或重新加载)
-            headerBinding!!.layoutHiddenContent.visibility = View.VISIBLE
-            headerBinding!!.tvHiddenContentHint.visibility = View.VISIBLE
-            headerBinding!!.btnViewHidden.visibility = View.VISIBLE
-            headerBinding!!.tvHiddenContent.visibility = View.GONE
-            // 自动解锁：进入帖子发现是「回复可见」时，后台直接回复解锁
-            maybeAutoUnlock()
-        } else {
             headerBinding!!.layoutHiddenContent.visibility = View.GONE
         }
         if (postDetail.likedStateKnown) {
@@ -1921,34 +1938,27 @@ class ThreadDetailActivity : AppCompatActivity() {
         if (TextUtils.isEmpty(hiddenHtml)) {
             return
         }
-        headerBinding!!.tvHiddenContent.visibility = View.VISIBLE
-        val bbcodeConverted = BBCodeUtil.convertBBCodeToHtml(hiddenHtml!!)
+        val hb = headerBinding ?: return
+        hb.tvHiddenContent.visibility = View.VISIBLE
+        // 高亮“本帖隐藏的内容:”为金橙色粗体，还原论坛醒目标题视觉
+        val highlighted = hiddenHtml!!.replace(
+            Regex("(?i)(本帖隐藏的内容[:：]?)"),
+            "<font color=\"#F59E0B\"><b>$1</b></font><br>"
+        )
+        val bbcodeConverted = BBCodeUtil.convertBBCodeToHtml(highlighted)
         val hiddenImageUrls = ArrayList<String>()
         val cleanHiddenHtml = extractAndSeparateImages(bbcodeConverted, hiddenImageUrls)
-        headerBinding!!.tvHiddenContent.text = Html.fromHtml(
-            cleanHiddenHtml, Html.FROM_HTML_MODE_COMPACT,
-            createInlineImageGetter(headerBinding!!.tvHiddenContent),
+        for (u in hiddenImageUrls) {
+            if (!currentImageList.contains(u)) {
+                currentImageList.add(u)
+            }
+        }
+        hb.tvHiddenContent.text = safeFromHtml(
+            cleanHiddenHtml,
+            createInlineImageGetter(hb.tvHiddenContent),
             BBCodeUtil.createTagHandler(this)
         )
-        setupClickableLinks(headerBinding!!.tvHiddenContent)
-        for (imgUrl in hiddenImageUrls) {
-            val imageView = ImageView(this)
-            imageView.layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-                dpToPx(ItemTouchHelper.Callback.DEFAULT_DRAG_ANIMATION_DURATION)
-            )
-            imageView.adjustViewBounds = true
-            imageView.scaleType = ImageView.ScaleType.FIT_CENTER
-            (imageView.layoutParams as LinearLayout.LayoutParams).setMargins(dpToPx(4), 0, dpToPx(4), 0)
-            imageView.setOnClickListener { openImagePreview(imgUrl) }
-            Glide.with(this as FragmentActivity).load(imgUrl)
-                .placeholder(ColorDrawable(getColor(R.color.background_secondary)))
-                .error(ColorDrawable(getColor(R.color.divider)))
-                .into(imageView)
-            headerBinding!!.llImageGallery.addView(imageView)
-        }
-        headerBinding!!.cardImageGallery.visibility = View.VISIBLE
-        FrostedGlassHelper.applyToCardViews(headerBinding!!.cardImageGallery, this)
+        setupClickableLinks(hb.tvHiddenContent)
     }
 
     private fun viewHiddenContent() {
@@ -3624,47 +3634,73 @@ class ThreadDetailActivity : AppCompatActivity() {
 
     // ==================== 链接与内容处理 ====================
 
-    /** 内嵌图片 getter：UrlDrawable 占位 + Glide 异步回填（修复旧空壳实现图片不显示问题） */
+    /** 内嵌图片 getter：表情小图固定/正文插图自适应屏幕宽度 + Glide 异步回填 */
     private fun createInlineImageGetter(textView: TextView): Html.ImageGetter {
         return Html.ImageGetter { source ->
-            var imgUrl = normalizeImageUrl(source)
-            if (imgUrl == null) {
-                imgUrl = source
-            }
+            val imgUrl = normalizeImageUrl(source) ?: source
             val tv = textView
-            val maxW = maxOf(
-                dpToPx(200),
-                (if (tv.width > 0) tv.width * 0.92f
-                else resources.displayMetrics.widthPixels * 0.92f).toInt()
-            )
-            val placeholder = UrlDrawable(tv, dpToPx(120))
-            Glide.with(this)
-                .load(imgUrl)
-                .into(object : com.bumptech.glide.request.target.CustomTarget<Drawable?>() {
-                    override fun onResourceReady(
-                        resource: Drawable,
-                        transition: com.bumptech.glide.request.transition.Transition<in Drawable?>?
-                    ) {
-                        var w = resource.intrinsicWidth
-                        var h = resource.intrinsicHeight
-                        if (w <= 0) {
-                            w = maxW
+            val isSmiley = isSmileyOrIcon(imgUrl)
+            if (isSmiley) {
+                val emojiSize = dpToPx(24)
+                val placeholder = UrlDrawable(tv, emojiSize)
+                placeholder.setBounds(0, 0, emojiSize, emojiSize)
+                Glide.with(this)
+                    .load(imgUrl)
+                    .into(object : com.bumptech.glide.request.target.CustomTarget<Drawable?>() {
+                        override fun onResourceReady(
+                            resource: Drawable,
+                            transition: com.bumptech.glide.request.transition.Transition<in Drawable?>?
+                        ) {
+                            resource.setBounds(0, 0, emojiSize, emojiSize)
+                            placeholder.setBounds(0, 0, emojiSize, emojiSize)
+                            placeholder.setReal(resource, tv)
                         }
-                        if (h <= 0) {
-                            h = maxW
-                        }
-                        if (w > maxW) {
-                            h = (h.toLong() * maxW / maxOf(1, w)).toInt()
-                            w = maxW
-                        }
-                        resource.setBounds(0, 0, w, h)
-                        placeholder.setReal(resource, tv)
-                    }
 
-                    override fun onLoadCleared(ph: Drawable?) {
-                    }
-                })
-            placeholder
+                        override fun onLoadCleared(ph: Drawable?) {}
+                    })
+                placeholder
+            } else {
+                val availableWidth = (if (tv.width > 0) tv.width else resources.displayMetrics.widthPixels) - tv.paddingLeft - tv.paddingRight
+                val maxW = maxOf(dpToPx(200), availableWidth)
+                val defaultH = dpToPx(160)
+                val placeholder = UrlDrawable(tv, maxW)
+                placeholder.setBounds(0, 0, maxW, defaultH)
+
+                Glide.with(this)
+                    .load(imgUrl)
+                    .into(object : com.bumptech.glide.request.target.CustomTarget<Drawable?>() {
+                        override fun onResourceReady(
+                            resource: Drawable,
+                            transition: com.bumptech.glide.request.transition.Transition<in Drawable?>?
+                        ) {
+                            val srcW = resource.intrinsicWidth
+                            val srcH = resource.intrinsicHeight
+                            val finalW: Int
+                            val finalH: Int
+                            if (srcW > 0 && srcH > 0) {
+                                if (srcW >= maxW) {
+                                    finalW = maxW
+                                    finalH = (srcH.toLong() * maxW / srcW).toInt()
+                                } else if (srcW < dpToPx(100)) {
+                                    finalW = srcW
+                                    finalH = srcH
+                                } else {
+                                    finalW = maxW
+                                    finalH = (srcH.toLong() * maxW / srcW).toInt()
+                                }
+                            } else {
+                                finalW = maxW
+                                finalH = defaultH
+                            }
+                            resource.setBounds(0, 0, finalW, finalH)
+                            placeholder.setBounds(0, 0, finalW, finalH)
+                            placeholder.setReal(resource, tv)
+                        }
+
+                        override fun onLoadCleared(ph: Drawable?) {}
+                    })
+                placeholder
+            }
         }
     }
 
@@ -3793,6 +3829,26 @@ class ThreadDetailActivity : AppCompatActivity() {
                 index = fullStr.indexOf(kw, index + kw.length)
             }
         }
+        // 为正文大图增加点击全屏大图预览手势
+        val imageSpans = spannable.getSpans(0, spannable.length, ImageSpan::class.java)
+        for (imgSpan in imageSpans) {
+            val src = imgSpan.source
+            if (!TextUtils.isEmpty(src) && !isSmileyOrIcon(src!!)) {
+                val start = spannable.getSpanStart(imgSpan)
+                val end = spannable.getSpanEnd(imgSpan)
+                if (start >= 0 && end > start) {
+                    spannable.setSpan(object : ClickableSpan() {
+                        override fun onClick(widget: View) {
+                            openImagePreview(src)
+                        }
+
+                        override fun updateDrawState(ds: TextPaint) {
+                            ds.isUnderlineText = false
+                        }
+                    }, start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+                }
+            }
+        }
         textView.movementMethod = FixNestedScrollLinkMovementMethod()
         textView.autoLinkMask = 0
     }
@@ -3897,48 +3953,59 @@ class ThreadDetailActivity : AppCompatActivity() {
         return null
     }
 
+    private fun isSmileyOrIcon(url: String): Boolean {
+        val lower = url.lowercase(Locale.ROOT)
+        return lower.contains("smiley") || lower.contains("emoticon")
+                || lower.contains("face") || lower.contains("/static/image/smiley")
+                || lower.contains("stamp") || lower.contains("magic")
+                || lower.contains("mini") || lower.contains("icon")
+                || lower.contains("common_")
+    }
+
     private fun extractAndSeparateImages(html: String?, imageUrls: MutableList<String>): String {
         if (TextUtils.isEmpty(html)) {
             return ""
         }
         try {
-            val doc = Jsoup.parse(html!!)
+            val doc = Jsoup.parseBodyFragment(html!!)
             doc.select("script").remove()
             doc.select("style").remove()
-            doc.select("ignore_js_op").remove()
-            doc.select("*:matchesOwn(^border\\s*=\\s*[\"']?\\d)").remove()
+            // 展开附件图片外壳 <ignore_js_op>，保留内部的 img 节点
+            for (ignoreOp in doc.select("ignore_js_op")) {
+                ignoreOp.unwrap()
+            }
             val imgs = doc.select("img")
             for (img in imgs) {
-                // 属性优先级与列表页（ForumParser.firstNonEmptyAttr）保持一致：
-                // comiis_loadimages 才是 Comiis 模板下懒加载的**真实图**地址，
-                // 其余属性/ src 可能只是占位或尺寸不符的缩略图。
                 val realUrl: String? = firstNonEmptyAttr(
                     img,
-                    "comiis_loadimages", "file", "data-original", "data-src",
+                    "zoomfile", "file", "comiis_loadimages", "data-original", "data-src",
                     "data-file", "data-lazy-src", "src"
                 )
                 if (!TextUtils.isEmpty(realUrl)) {
                     val fullUrl = normalizeImageUrl(realUrl)
-                    if (fullUrl != null && !fullUrl.contains("smiley") && !fullUrl.contains("emoticon")
-                        && !fullUrl.contains("face") && !fullUrl.contains("/static/image/smiley")
-                        && !fullUrl.contains("stamp") && !fullUrl.contains("magic")
-                        && !fullUrl.contains("mini") && !fullUrl.contains("icon")
-                        && !fullUrl.contains("none.gif") && !fullUrl.contains("common_")
-                        && !imageUrls.contains(fullUrl)
-                    ) {
-                        imageUrls.add(fullUrl)
+                    if (fullUrl != null && !fullUrl.contains("none.gif") && !fullUrl.contains("blank.gif")) {
+                        if (!isSmileyOrIcon(fullUrl) && !imageUrls.contains(fullUrl)) {
+                            imageUrls.add(fullUrl)
+                        }
+                        // 彻底纯化 img 属性：清空全部多余参数，仅保留标准 src，杜绝 smilieid/border/alt 等参数外露
+                        val attrKeys = ArrayList<String>()
+                        for (a in img.attributes()) {
+                            attrKeys.add(a.key)
+                        }
+                        for (k in attrKeys) {
+                            img.removeAttr(k)
+                        }
+                        img.attr("src", fullUrl)
+                        continue
                     }
                 }
+                // 无效或占位图安全移除
+                img.remove()
             }
-            doc.select("img").remove()
             val cleanedText = doc.body().html()
-            var out = Regex("(?i)replyreload\\s*\\+?\\s*=\\s*'[^']*'").replace(cleanedText, "")
-            out = Regex("(?i)replyreload\\s*\\+?\\s*=\\s*\"[^\"]*\"").replace(out, "")
-            out = Regex("(?i)replyreload\\s*\\+?\\s*=\\s*[^;\\s<]+").replace(out, "")
-            out = Regex("\\s*border\\s*=\\s*[\"'][^\"']*[\"']").replace(out, "")
-            out = Regex("\\s*alt\\s*=\\s*[\"'][^\"']*[\"']").replace(out, "")
-            out = Regex("\\s*title\\s*=\\s*[\"'][^\"']*[\"']").replace(out, "")
-            out = Regex("<[^>]*>\\s*<").replace(out, "<")
+            var out = Regex("(?i)replyreload\\s*\\+?\\s*='[^']*'").replace(cleanedText, "")
+            out = Regex("(?i)replyreload\\s*\\+?\\s*=\"[^\"]*\"").replace(out, "")
+            out = Regex("(?i)replyreload\\s*\\+?\\s*=[^;\\s<]+").replace(out, "")
             return out
         } catch (e: Exception) {
             return fallbackExtractImages(html!!, imageUrls)
@@ -3948,23 +4015,37 @@ class ThreadDetailActivity : AppCompatActivity() {
     private fun fallbackExtractImages(html: String, imageUrls: MutableList<String>): String {
         var cleaned = Regex("(?i)<script[^>]*>.*?</script>").replace(html, "")
         cleaned = Regex("(?i)<style[^>]*>.*?</style>").replace(cleaned, "")
-        val imgPattern = Pattern.compile(
-            "<img[^>]*(?:file|comiis_loadimages|data-original|data-src|data-file|src)=[\"']([^\"']+)[\"']",
+        // 匹配完整整个 <img ...> 标签，防止漏掉结尾属性导致参数外露
+        val imgPattern = Pattern.compile("<img\\b[^>]*>", Pattern.CASE_INSENSITIVE)
+        val attrPattern = Pattern.compile(
+            "(?:zoomfile|file|comiis_loadimages|data-original|data-src|data-file|data-lazy-src|src)\\s*=\\s*['\"]([^'\"]+)['\"]",
             Pattern.CASE_INSENSITIVE
         )
         val matcher = imgPattern.matcher(cleaned)
+        val sb = StringBuffer()
         while (matcher.find()) {
-            val url = matcher.group(1)
-            val fullUrl = normalizeImageUrl(url)
-            if (fullUrl != null && !fullUrl.contains("smiley") && !fullUrl.contains("face")
-                && !fullUrl.contains("emoticon") && !fullUrl.contains("icon")
-                && !fullUrl.contains("none.gif") && !fullUrl.contains("common_")
-                && !imageUrls.contains(fullUrl)
-            ) {
-                imageUrls.add(fullUrl)
+            val tag = matcher.group(0)
+            val attrMatcher = attrPattern.matcher(tag)
+            var chosenUrl: String? = null
+            while (attrMatcher.find()) {
+                val candidate = attrMatcher.group(1)
+                val fullCandidate = normalizeImageUrl(candidate)
+                if (fullCandidate != null && !fullCandidate.contains("none.gif") && !fullCandidate.contains("blank.gif")) {
+                    chosenUrl = fullCandidate
+                    break
+                }
+            }
+            if (chosenUrl != null) {
+                if (!isSmileyOrIcon(chosenUrl) && !imageUrls.contains(chosenUrl)) {
+                    imageUrls.add(chosenUrl)
+                }
+                matcher.appendReplacement(sb, Matcher.quoteReplacement("<img src=\"$chosenUrl\">"))
+            } else {
+                matcher.appendReplacement(sb, "")
             }
         }
-        return Regex("(?i)<img[^>]*>").replace(cleaned, "")
+        matcher.appendTail(sb)
+        return sb.toString()
     }
 
     private fun normalizeImageUrl(url: String?): String? {

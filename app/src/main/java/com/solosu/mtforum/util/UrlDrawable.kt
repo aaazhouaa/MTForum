@@ -29,14 +29,20 @@ class UrlDrawable(targetView: View, sizePx: Int) : ColorDrawable(0x00000000) {
         this.target = targetView
         val drawableLocal = drawable
         if (drawableLocal != null) {
-            drawableLocal.setBounds(getBounds())
+            val db = drawableLocal.bounds
+            if (db.width() > 0 && db.height() > 0) {
+                setBounds(db)
+            } else {
+                drawableLocal.bounds = getBounds()
+            }
         }
         if (targetView is android.widget.TextView) {
             // 图片尺寸变化后必须重新排版，否则图片框停留占位大小
             val tv: android.widget.TextView = targetView
             tv.post(Runnable {
                 try {
-                    tv.setText(tv.getText())
+                    val cs = tv.text
+                    tv.text = cs
                 } catch (ignore: Exception) {
                 }
             })
@@ -62,7 +68,7 @@ class UrlDrawable(targetView: View, sizePx: Int) : ColorDrawable(0x00000000) {
     override fun draw(canvas: Canvas) {
         val realLocal = real
         if (realLocal != null) {
-            realLocal.setBounds(getBounds())
+            realLocal.bounds = bounds
             realLocal.draw(canvas)
         } else {
             super.draw(canvas)

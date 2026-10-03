@@ -889,13 +889,8 @@ class ReplyAdapter(rawReplies: List<ReplyItem>?) :
                     || fullUrl.contains("stamp") || fullUrl.contains("magic")
                     || fullUrl.contains("mini") || fullUrl.contains("icon")
                 ) {
-                    // 将原img标签中的src替换为补全后的完整URL
-                    val origTag = matcher.group(0)
-                    val newTag = origTag.replaceFirst(
-                        "src\\s*=\\s*['\"][^'\"]*['\"]".toRegex(),
-                        "src=\"$fullUrl\""
-                    )
-                    matcher.appendReplacement(sb, Matcher.quoteReplacement(newTag))
+                    // 生成纯净的 img 标签，去除所有多余属性（如 smilieid、border、alt 等），防止参数外露
+                    matcher.appendReplacement(sb, Matcher.quoteReplacement("<img src=\"$fullUrl\">"))
                     continue
                 }
                 // 大图：只接受 http/https

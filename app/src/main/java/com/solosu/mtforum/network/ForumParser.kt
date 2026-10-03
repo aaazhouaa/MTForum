@@ -23,6 +23,7 @@ import java.net.URLEncoder
 import java.util.ArrayList
 import java.util.HashMap
 import java.util.HashSet
+import java.util.Locale
 import java.util.regex.Pattern
 
 /**
@@ -1454,52 +1455,84 @@ object ForumParser {
             for (pre in doc.select("pre")) {
                 escapeSpacesInTree(pre)
             }
-            // 2. div.comiis_blockcode:提取行并重建为 <pre>
-            for (code in doc.select("div.comiis_blockcode")) {
+            // 2. div.comiis_blockcode 与 div.blockcode:提取行并重建为带两位对齐行号的 <pre>
+            for (code in doc.select("div.comiis_blockcode, div.blockcode")) {
                 var target = code
                 val lines = ArrayList<String>()
-                // 优先 ol>li(移动版,每行一个 li)
                 val lis = code.select("ol > li")
                 if (!lis.isEmpty()) {
                     var lineNo = 1
                     for (li in lis) {
-                        val t = collectRawText(li).replace('\u00a0', ' ')
-                        if (t.trim().isEmpty()) {
+                        val t = collectRawText(li).replace('\u00a0', ' ').trim()
+                        if (t.isEmpty()) {
                             lineNo++
                             continue
                         }
-                        lines.add("$lineNo $t")
+                        val lineMatcher = Pattern.compile("^([0-9]{1,3})\\.?\\s*(.*)$").matcher(t)
+                        val numStr: String
+                        val codeText: String
+                        if (lineMatcher.find()) {
+                            val n = lineMatcher.group(1)?.toIntOrNull() ?: lineNo
+                            numStr = String.format(Locale.US, "%02d.", n)
+                            codeText = lineMatcher.group(2) ?: ""
+                        } else {
+                            numStr = String.format(Locale.US, "%02d.", lineNo)
+                            codeText = t
+                        }
+                        val escapedCode = escapeHtml(codeText).replace(" ", "&nbsp;")
+                        lines.add("<font color=\"#94A3B8\">$numStr</font>&nbsp;&nbsp;$escapedCode")
                         lineNo++
                     }
                 } else {
-                    // 无 li:从叶子文本+br 拆行
                     val inner = code.selectFirst("pre")
                     if (inner != null) target = inner
                     val raw = splitLinesByBr(target)
                     var lineNo = 1
                     for (s in raw) {
-                        val t = s.replace('\u00a0', ' ')
-                        if (t.trim().isEmpty()) {
+                        val t = s.replace('\u00a0', ' ').trim()
+                        if (t.isEmpty()) {
                             lineNo++
                             continue
                         }
-                        lines.add("$lineNo $t")
+                        val lineMatcher = Pattern.compile("^([0-9]{1,3})\\.?\\s*(.*)$").matcher(t)
+                        val numStr: String
+                        val codeText: String
+                        if (lineMatcher.find()) {
+                            val n = lineMatcher.group(1)?.toIntOrNull() ?: lineNo
+                            numStr = String.format(Locale.US, "%02d.", n)
+                            codeText = lineMatcher.group(2) ?: ""
+                        } else {
+                            numStr = String.format(Locale.US, "%02d.", lineNo)
+                            codeText = t
+                        }
+                        val escapedCode = escapeHtml(codeText).replace(" ", "&nbsp;")
+                        lines.add("<font color=\"#94A3B8\">$numStr</font>&nbsp;&nbsp;$escapedCode")
                         lineNo++
                     }
                 }
-                val sb = StringBuilder("<pre class=\"comiis_blockcode\">")
+                val sb = StringBuilder("<br><pre class=\"comiis_blockcode\">")
                 for (line in lines) {
-                    sb.append(escapeNbsp(line)).append("<br>")
+                    sb.append(line).append("<br>")
                 }
-                sb.append("</pre>")
-                val preNew = Jsoup.parseBodyFragment(sb.toString()).body().child(0)
-                code.replaceWith(preNew)
+                sb.append("</pre><br>")
+                val parsed = Jsoup.parseBodyFragment(sb.toString()).body()
+                val nodes = ArrayList(parsed.childNodes())
+                for (node in nodes) {
+                    code.before(node)
+                }
+                code.remove()
             }
             return doc.body().html()
         } catch (e: Exception) {
-            // 标准化失败时返回原文,不阻断正文显示
             return html
         }
+    }
+
+    private fun escapeHtml(text: String): String {
+        return text.replace("&", "&amp;")
+            .replace("<", "&lt;")
+            .replace(">", "&gt;")
+            .replace("\"", "&quot;")
     }
 
     /** 收集元素下所有文本节点原文(保留 \u00a0、连续空格,不做空白规范化) */
@@ -1752,7 +1785,7 @@ object ForumParser {
             for (img in messagesDiv.select("img")) {
                 val realSrc = firstNonEmptyAttr(
                     img,
-                    "comiis_loadimages", "file", "data-original", "data-src",
+                    "zoomfile", "file", "comiis_loadimages", "data-original", "data-src",
                     "data-file", "data-lazy-src", "src"
                 )
                 val fullUrl = resolveAttachmentUrl(realSrc)

@@ -158,15 +158,18 @@ object BBCodeUtil {
             val content = codeM.group(2)
             val inner = StringBuilder()
             val lines = splitCodeLines(content)
+            var lineNo = 1
             for (line in lines) {
-                // 空行也保留(防止 Html 合并)
-                inner.append(escapeCodeText(line)).append("<br>")
+                val numStr = String.format(Locale.US, "%02d.", lineNo)
+                inner.append("<font color=\"#94A3B8\">").append(numStr).append("</font>&nbsp;&nbsp;")
+                    .append(escapeCodeText(line)).append("<br>")
+                lineNo++
             }
             val langLabel = if (!TextUtils.isEmpty(lang) && !"code".equals(lang.trim(), ignoreCase = true))
                 "<span style=\"color:#9CA3AF;font-size:12px\">" + escapeHtml(lang.trim()) + "</span><br>"
             else
                 ""
-            codeBlocks.add("<pre class=\"comiis_blockcode\">" + langLabel + inner + "</pre>")
+            codeBlocks.add("<br><pre class=\"comiis_blockcode\">" + langLabel + inner + "</pre><br>")
             codeM.appendReplacement(sb1, "\u0001CODE" + (codeBlocks.size - 1) + "\u0001")
         }
         codeM.appendTail(sb1)
@@ -255,10 +258,10 @@ object BBCodeUtil {
         result = P_TABLE.matcher(result).replaceAll("<pre class=\"comiis_blockcode\">$1</pre>")
 
         // 引用 / 隐藏 / 回复可见 / 免费
-        result = P_QUOTE.matcher(result).replaceAll("<div class=\"comiis_quote\">$2</div>")
-        result = P_HIDE.matcher(result).replaceAll("<div class=\"comiis_quote\">$2</div>")
-        result = P_REPLY.matcher(result).replaceAll("<div class=\"comiis_quote\">$1</div>")
-        result = P_SPOILER.matcher(result).replaceAll("<div class=\"comiis_quote\">$1</div>")
+        result = P_QUOTE.matcher(result).replaceAll("<customquote>$2</customquote>")
+        result = P_HIDE.matcher(result).replaceAll("<customquote>$2</customquote>")
+        result = P_REPLY.matcher(result).replaceAll("<customquote>$1</customquote>")
+        result = P_SPOILER.matcher(result).replaceAll("<customquote>$1</customquote>")
         result = P_FREE.matcher(result).replaceAll("$1")
 
         result = P_HR.matcher(result).replaceAll("<hr>")
@@ -295,27 +298,38 @@ object BBCodeUtil {
         else 0xFFEBEEF2.toInt()
         val text = if (context != null) context.getColor(R.color.code_block_text)
         else 0xFF2D3339.toInt()
-        return CodeBlockTagHandler(bg, text)
+        val accent = 0xFF10B981.toInt() // 现代翠绿高亮条，与网页端及当前主题质感对齐
+        return CodeBlockTagHandler(bg, text, accent)
     }
 
     private class CodeBlockTagHandler(
         private val bgColor: Int,
-        private val textColor: Int
+        private val textColor: Int,
+        private val accentColor: Int
     ) : Html.TagHandler {
         private var preStart = -1
         private var inPre = false
+        private var quoteStart = -1
+        private var inQuote = false
 
         override fun handleTag(opening: Boolean, tag: String, output: Editable, xmlReader: XMLReader) {
-            if ("pre".equals(tag, ignoreCase = true)) {
+            val t = tag.lowercase(Locale.ROOT)
+            if (t == "pre" || t == "codeblock" || t == "code") {
                 if (opening) {
+                    if (output.isNotEmpty() && output.last() != '\n') {
+                        output.append("\n")
+                    }
                     inPre = true
                     preStart = output.length
                 } else if (inPre) {
+                    if (output.isNotEmpty() && output.last() != '\n') {
+                        output.append("\n")
+                    }
                     val start = Math.max(0, preStart)
                     val end = output.length
                     if (end > start) {
                         output.setSpan(
-                            CodeBlockSpan(start, end, bgColor), start, end,
+                            CodeBlockSpan(start, end, bgColor, accentColor), start, end,
                             Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
                         )
                         output.setSpan(
@@ -327,36 +341,71 @@ object BBCodeUtil {
                             Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
                         )
                         output.setSpan(
-                            RelativeSizeSpan(0.95f), start, end,
+                            RelativeSizeSpan(0.92f), start, end,
                             Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
                         )
+                        val margin = dp(16f).toInt()
                         output.setSpan(
-                            LeadingMarginSpan.Standard(dp(4f).toInt(), 0), start, end,
+                            LeadingMarginSpan.Standard(margin, margin), start, end,
                             Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
                         )
                     }
                     inPre = false
                     preStart = -1
                 }
+            } else if (t == "blockquote" || t == "customquote" || t == "quote") {
+                if (opening) {
+                    if (output.isNotEmpty() && output.last() != '\n') {
+                        output.append("\n")
+                    }
+                    inQuote = true
+                    quoteStart = output.length
+                } else if (inQuote) {
+                    if (output.isNotEmpty() && output.last() != '\n') {
+                        output.append("\n")
+                    }
+                    val start = Math.max(0, quoteStart)
+                    val end = output.length
+                    if (end > start) {
+                        output.setSpan(
+                            CodeBlockSpan(start, end, bgColor, 0xFF94A3B8.toInt(), 4f, 0f, 0f, 3f),
+                            start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+                        )
+                        output.setSpan(
+                            RelativeSizeSpan(0.95f), start, end,
+                            Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+                        )
+                        val margin = dp(14f).toInt()
+                        output.setSpan(
+                            LeadingMarginSpan.Standard(margin, margin), start, end,
+                            Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+                        )
+                    }
+                    inQuote = false
+                    quoteStart = -1
+                }
             }
         }
     }
 
     /**
-     * 代码块整块背景:LineBackgroundSpan 实现,支持圆角与整块连续绘制。
+     * 代码块整块背景:LineBackgroundSpan 实现,支持圆角、左侧强调条与整块连续绘制。
      * 需要记录区间 [start,end),只在自身范围内绘制。
      */
     class CodeBlockSpan @JvmOverloads constructor(
         private val start: Int,
         private val end: Int,
         private val bgColor: Int,
+        private val accentColor: Int = 0xFF10B981.toInt(),
         radiusDp: Float = 6f,
-        padLeftDp: Float = 8f,
-        padRightDp: Float = 8f
+        padLeftDp: Float = 0f,
+        padRightDp: Float = 0f,
+        accentWidthDp: Float = 3.5f
     ) : android.text.style.LineBackgroundSpan {
         private val radius: Float = dp(radiusDp)
         private val padLeft: Float = dp(padLeftDp)
         private val padRight: Float = dp(padRightDp)
+        private val accentWidth: Float = dp(accentWidthDp)
 
         override fun drawBackground(
             canvas: Canvas, paint: Paint, left: Int, right: Int, top: Int,
@@ -374,41 +423,48 @@ object BBCodeUtil {
             }
 
             val oldColor = paint.color
-            paint.color = bgColor
-            paint.style = Paint.Style.FILL
+            val oldStyle = paint.style
             val rectLeft = left + padLeft.toInt()
             val rectRight = right - padRight.toInt()
 
             val firstLine = lineStart <= start && lineEnd > start
             val lastLine = lineStart < end && lineEnd >= end
+
+            val p = Path()
+            val rectF = RectF(rectLeft.toFloat(), top.toFloat(), rectRight.toFloat(), bottom.toFloat())
+
             if (firstLine && lastLine) {
-                canvas.drawRoundRect(RectF(rectLeft.toFloat(), top.toFloat(), rectRight.toFloat(), bottom.toFloat()), radius, radius, paint)
+                p.addRoundRect(rectF, radius, radius, Path.Direction.CW)
             } else if (firstLine) {
-                // 首行:上圆角下直角
-                val p = Path()
-                p.moveTo(rectLeft.toFloat(), bottom.toFloat())
-                p.lineTo(rectLeft.toFloat(), top + radius)
-                p.quadTo(rectLeft.toFloat(), top.toFloat(), rectLeft + radius, top.toFloat())
-                p.lineTo(rectRight - radius, top.toFloat())
-                p.quadTo(rectRight.toFloat(), top.toFloat(), rectRight.toFloat(), top + radius)
-                p.lineTo(rectRight.toFloat(), bottom.toFloat())
-                p.close()
-                canvas.drawPath(p, paint)
+                val radii = floatArrayOf(radius, radius, radius, radius, 0f, 0f, 0f, 0f)
+                p.addRoundRect(rectF, radii, Path.Direction.CW)
             } else if (lastLine) {
-                // 末行:下圆角上直角
-                val p = Path()
-                p.moveTo(rectLeft.toFloat(), top.toFloat())
-                p.lineTo(rectLeft.toFloat(), bottom - radius)
-                p.quadTo(rectLeft.toFloat(), bottom.toFloat(), rectLeft + radius, bottom.toFloat())
-                p.lineTo(rectRight - radius, bottom.toFloat())
-                p.quadTo(rectRight.toFloat(), bottom.toFloat(), rectRight.toFloat(), bottom - radius)
-                p.lineTo(rectRight.toFloat(), top.toFloat())
-                p.close()
-                canvas.drawPath(p, paint)
+                val radii = floatArrayOf(0f, 0f, 0f, 0f, radius, radius, radius, radius)
+                p.addRoundRect(rectF, radii, Path.Direction.CW)
             } else {
-                canvas.drawRect(rectLeft.toFloat(), top.toFloat(), rectRight.toFloat(), bottom.toFloat(), paint)
+                p.addRect(rectF, Path.Direction.CW)
             }
+
+            // 1. 绘制主体背景底色
+            paint.color = bgColor
+            paint.style = Paint.Style.FILL
+            canvas.drawPath(p, paint)
+
+            // 2. 绘制左侧高亮竖条（Accent bar）
+            if (accentWidth > 0f) {
+                canvas.save()
+                canvas.clipPath(p)
+                paint.color = accentColor
+                val accentRect = RectF(
+                    rectLeft.toFloat(), top.toFloat(),
+                    rectLeft.toFloat() + accentWidth, bottom.toFloat()
+                )
+                canvas.drawRect(accentRect, paint)
+                canvas.restore()
+            }
+
             paint.color = oldColor
+            paint.style = oldStyle
         }
     }
 
