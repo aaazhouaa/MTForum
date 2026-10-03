@@ -90,11 +90,31 @@ class ReplyAdapter(rawReplies: List<ReplyItem>?) :
     }
 
     private fun isWaterReply(item: ReplyItem): Boolean {
-        val text = (item.contentText ?: item.contentHtml ?: "").trim()
-        val keywords = arrayOf("感谢", "看看", "隐藏", "分享")
+        val rawHtml = item.contentHtml ?: item.contentText ?: ""
+        // 1. 提取实际纯文本字符（剔除所有 HTML 标签、实体和空白符）
+        val textOnly = org.jsoup.Jsoup.parse(rawHtml).text().trim()
+        val cleanText = textOnly.replace(Regex("[\\s\\u00A0\\u3000]"), "")
+
+        // 2. 关键词匹配：原有关键词 + 用户指定扩展关键词
+        val keywords = arrayOf(
+            "感谢", "看看", "隐藏", "分享",
+            "学习学习", "学习一下", "论坛有你更精彩", "支持一下", "66666"
+        )
         for (kw in keywords) {
-            if (text.contains(kw)) return true
+            if (textOnly.contains(kw, ignoreCase = true)) return true
         }
+
+        // 3. 用户规则：纯文字字数 <= 2 个字的全部折叠
+        if (cleanText.length <= 2) {
+            return true
+        }
+
+        // 4. 用户规则：纯表情（仅表情图片或无实质汉字/字母/数字等有效文字内容）全部折叠
+        val effectiveWordText = cleanText.replace(Regex("[\\p{P}\\p{S}]"), "")
+        if (effectiveWordText.isEmpty()) {
+            return true
+        }
+
         return false
     }
 
@@ -408,11 +428,13 @@ class ReplyAdapter(rawReplies: List<ReplyItem>?) :
             val quotedText = item.quotedContentText
             if (!TextUtils.isEmpty(quotedText)) {
                 layoutReplyQuote.visibility = View.VISIBLE
-                tvReplyQuote.text = Html.fromHtml(
-                    quotedText, Html.FROM_HTML_MODE_COMPACT,
+                val cleanQuote = BBCodeUtil.stripHtmlColors(quotedText)
+                val spannedQuote = Html.fromHtml(
+                    cleanQuote, Html.FROM_HTML_MODE_COMPACT,
                     createInlineImageGetter(tvReplyQuote),
                     BBCodeUtil.createTagHandler(itemView.context)
                 )
+                tvReplyQuote.text = BBCodeUtil.stripForegroundColorSpans(spannedQuote)
                 attachCopyOnLongClick(tvReplyQuote)
             } else {
                 layoutReplyQuote.visibility = View.GONE
@@ -433,11 +455,14 @@ class ReplyAdapter(rawReplies: List<ReplyItem>?) :
 
             if (sourceHtml.isNotEmpty()) {
                 tvContent.visibility = View.VISIBLE
-                tvContent.text = Html.fromHtml(
-                    sourceHtml, Html.FROM_HTML_MODE_COMPACT,
+                // 用户要求：去除彩色字体，恢复正常文本颜色
+                val cleanSource = BBCodeUtil.stripHtmlColors(sourceHtml)
+                val spannedSource = Html.fromHtml(
+                    cleanSource, Html.FROM_HTML_MODE_COMPACT,
                     createInlineImageGetter(tvContent),
                     BBCodeUtil.createTagHandler(itemView.context)
                 )
+                tvContent.text = BBCodeUtil.stripForegroundColorSpans(spannedSource)
                 setupClickableLinks(tvContent)
                 attachCopyOnLongClick(tvContent)
             } else {

@@ -27,9 +27,11 @@ import android.text.style.ClickableSpan
 import android.text.style.ImageSpan
 import android.text.style.ReplacementSpan
 import android.text.style.URLSpan
+import android.util.TypedValue
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
+import android.view.ViewOutlineProvider
 import android.view.WindowManager
 import android.view.inputmethod.InputMethodManager
 import android.widget.ArrayAdapter
@@ -174,6 +176,9 @@ class ThreadDetailActivity : AppCompatActivity() {
     /** build70: 相册选图 launcher */
     private var imagePickerLauncher: ActivityResultLauncher<PickVisualMediaRequest>? = null
 
+    /** 原生回复贴底面板的系统返回键单次收起回调 */
+    private var replyBackPressedCallback: androidx.activity.OnBackPressedCallback? = null
+
     override fun onCreate(savedInstanceState: Bundle?) {
         com.solosu.mtforum.util.ThemeManager.applyTheme(this)
         super.onCreate(savedInstanceState)
@@ -188,6 +193,7 @@ class ThreadDetailActivity : AppCompatActivity() {
         binding.toolbar.setNavigationOnClickListener { finish() }
         binding.swipeRefresh.setOnRefreshListener { refreshPostDetail() }
         setupRecyclerView()
+        initReplyPanel()
         val onBottomReplyBarClick = View.OnClickListener { showReplyBottomSheet(currentReplyTarget) }
         binding.etReply.setOnClickListener(onBottomReplyBarClick)
         binding.tilReply.setOnClickListener(onBottomReplyBarClick)
@@ -881,75 +887,72 @@ class ThreadDetailActivity : AppCompatActivity() {
 
     // ==================== 回复 ====================
 
-    private fun ensureReplyBottomSheetDialog(): BottomSheetDialog {
-        var dialog = mBottomSheetDialog
-        if (dialog == null) {
-            val dialogView = layoutInflater.inflate(R.layout.dialog_reply_bottom_sheet, null)
-            val etReplyDialog = dialogView.findViewById<com.solosu.mtforum.ui.widget.RichTextInputEditText>(R.id.et_reply_dialog)
-            val btnSend = dialogView.findViewById<MaterialButton>(R.id.btn_send_reply)
-            val tvTarget = dialogView.findViewById<TextView>(R.id.tv_reply_target)
-            val btnPickImage = dialogView.findViewById<ImageButton>(R.id.btn_pick_image)
+    private fun initReplyPanel() {
+        val onBottomReplyBarClick = View.OnClickListener { showReplyBottomSheet(currentReplyTarget) }
+        binding.etReply.setOnClickListener(onBottomReplyBarClick)
+        binding.tilReply.setOnClickListener(onBottomReplyBarClick)
+        binding.layoutReply.setOnClickListener(onBottomReplyBarClick)
+        binding.etReply.isFocusable = false
+        binding.etReply.isCursorVisible = false
 
-            mEtReplyDialog = etReplyDialog
-            mTvReplyTarget = tvTarget
-            mBtnSendReply = btnSend
+        binding.vReplyMask.setOnClickListener { hideReplyPanel() }
 
-            etReplyDialog.onImageReceivedListener = { uri ->
-                addPendingImages(listOf(uri))
-                Toast.makeText(this@ThreadDetailActivity, "已添加图片", Toast.LENGTH_SHORT).show()
-                true
-            }
+        val panel = binding.containerReplyPanel
+        val etReplyDialog = panel.findViewById<com.solosu.mtforum.ui.widget.RichTextInputEditText>(R.id.et_reply_dialog)
+        val btnSend = panel.findViewById<MaterialButton>(R.id.btn_send_reply)
+        val tvTarget = panel.findViewById<TextView>(R.id.tv_reply_target)
+        val btnPickImage = panel.findViewById<ImageButton>(R.id.btn_pick_image)
 
-            btnSend.setOnClickListener {
-                val text = etReplyDialog.text?.toString()?.trim() ?: ""
-                if (TextUtils.isEmpty(text) && pendingImageUris.isEmpty()) {
-                    etReplyDialog.error = getString(R.string.reply_hint_empty)
-                } else {
-                    etReplyDialog.error = null
-                    val attachTags = buildAttachTags()
-                    attemptReply(attachTags + text, etReplyDialog)
-                }
-            }
+        mEtReplyDialog = etReplyDialog
+        mTvReplyTarget = tvTarget
+        mBtnSendReply = btnSend
 
-            btnPickImage?.setOnClickListener { pickImage() }
-
-            dialog = BottomSheetDialog(this, com.google.android.material.R.style.Theme_Design_BottomSheetDialog)
-            dialog.setContentView(dialogView)
-
-            dialog.window?.let { win ->
-                win.setBackgroundDrawable(ColorDrawable(android.graphics.Color.TRANSPARENT))
-                win.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
-            }
-
-            dialog.setOnDismissListener {
-                currentReplyPid = ""
-                currentReplyTarget = ""
-            }
-
-            dialog.setOnShowListener {
-                val sheet = dialog.findViewById<View>(com.google.android.material.R.id.design_bottom_sheet)
-                if (sheet != null) {
-                    sheet.setBackgroundColor(android.graphics.Color.TRANSPARENT)
-                    val behavior = BottomSheetBehavior.from(sheet)
-                    behavior.skipCollapsed = true
-                    behavior.state = BottomSheetBehavior.STATE_EXPANDED
-                }
-                etReplyDialog.post {
-                    etReplyDialog.isFocusable = true
-                    etReplyDialog.isFocusableInTouchMode = true
-                    etReplyDialog.requestFocus()
-                    val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
-                    imm?.showSoftInput(etReplyDialog, InputMethodManager.SHOW_IMPLICIT)
-                }
-            }
-            mBottomSheetDialog = dialog
+        etReplyDialog?.onImageReceivedListener = { uri ->
+            addPendingImages(listOf(uri))
+            Toast.makeText(this@ThreadDetailActivity, "已添加图片", Toast.LENGTH_SHORT).show()
+            true
         }
-        return dialog
+
+        btnSend?.setOnClickListener {
+            val text = etReplyDialog?.text?.toString()?.trim() ?: ""
+            if (TextUtils.isEmpty(text) && pendingImageUris.isEmpty()) {
+                etReplyDialog?.error = getString(R.string.reply_hint_empty)
+            } else {
+                etReplyDialog?.error = null
+                val attachTags = buildAttachTags()
+                attemptReply(attachTags + text, etReplyDialog)
+            }
+        }
+
+        btnPickImage?.setOnClickListener { pickImage() }
+
+        // 返回键单次直接收起回复输入框，不再需要按两次
+        val callback = object : androidx.activity.OnBackPressedCallback(false) {
+            override fun handleOnBackPressed() {
+                hideReplyPanel()
+            }
+        }
+        onBackPressedDispatcher.addCallback(this, callback)
+        replyBackPressedCallback = callback
+    }
+
+    private fun isReplyPanelShowing(): Boolean {
+        return binding.containerReplyPanel.visibility == View.VISIBLE
+    }
+
+    private fun hideReplyPanel() {
+        val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
+        mEtReplyDialog?.let { imm?.hideSoftInputFromWindow(it.windowToken, 0) }
+        binding.containerReplyPanel.visibility = View.GONE
+        binding.vReplyMask.visibility = View.GONE
+        replyBackPressedCallback?.isEnabled = false
+        // 用户需求：已输入的内容未发送时暂时保留（草稿暂存），离开当前帖子时才清除
+        currentReplyPid = ""
+        currentReplyTarget = ""
     }
 
     private fun showReplyBottomSheet(prefillText: String?) {
         if (isFinishing || isDestroyed) return
-        val dialog = ensureReplyBottomSheetDialog()
         val etReplyDialog = mEtReplyDialog
         val tvTarget = mTvReplyTarget
 
@@ -957,31 +960,36 @@ class ThreadDetailActivity : AppCompatActivity() {
             if (prefillText!!.startsWith("回复 ") || prefillText.contains("：")) {
                 tvTarget?.text = prefillText
                 tvTarget?.visibility = View.VISIBLE
-                etReplyDialog?.setText("")
             } else {
-                etReplyDialog?.setText(prefillText)
-                etReplyDialog?.setSelection(prefillText.length)
+                if (etReplyDialog?.text.isNullOrEmpty()) {
+                    etReplyDialog?.setText(prefillText)
+                }
                 tvTarget?.text = prefillText
                 tvTarget?.visibility = View.VISIBLE
             }
         } else {
             tvTarget?.visibility = View.GONE
-            etReplyDialog?.setText("")
         }
         etReplyDialog?.error = null
+
+        // 草稿保留：光标移至当前已有文字末尾，绝不主动清空
+        etReplyDialog?.setSelection(etReplyDialog.text?.length ?: 0)
 
         if (!pendingImageUris.isEmpty()) {
             updateDialogImagePreview()
         }
 
-        if (!dialog.isShowing) {
-            dialog.show()
-        } else {
-            etReplyDialog?.post {
-                etReplyDialog.requestFocus()
-                val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
-                imm?.showSoftInput(etReplyDialog, InputMethodManager.SHOW_IMPLICIT)
-            }
+        // 显示遮罩与输入面板，随输入法平滑升起贴合
+        binding.vReplyMask.visibility = View.VISIBLE
+        binding.containerReplyPanel.visibility = View.VISIBLE
+        replyBackPressedCallback?.isEnabled = true
+
+        etReplyDialog?.post {
+            etReplyDialog.isFocusable = true
+            etReplyDialog.isFocusableInTouchMode = true
+            etReplyDialog.requestFocus()
+            val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
+            imm?.showSoftInput(etReplyDialog, InputMethodManager.SHOW_IMPLICIT)
         }
     }
 
@@ -990,9 +998,7 @@ class ThreadDetailActivity : AppCompatActivity() {
         if (isFinishing || isDestroyed) {
             return
         }
-        if (mBottomSheetDialog != null && mBottomSheetDialog!!.isShowing) {
-            mBottomSheetDialog!!.dismiss()
-        }
+        hideReplyPanel()
         LoginBottomSheet.show(this, null)
     }
 
@@ -1114,11 +1120,10 @@ class ThreadDetailActivity : AppCompatActivity() {
                 imageUploadPendingQueue.clear()
             }
             binding.etReply.setText("")
+            mEtReplyDialog?.setText("")
             refreshAllImagePreviews()
             Toast.makeText(this, R.string.reply_success, Toast.LENGTH_SHORT).show()
-            if (mBottomSheetDialog != null && mBottomSheetDialog!!.isShowing) {
-                mBottomSheetDialog!!.dismiss()
-            }
+            hideReplyPanel()
             refreshPostDetail()
         }
     }
@@ -2526,10 +2531,10 @@ class ThreadDetailActivity : AppCompatActivity() {
         refreshAllImagePreviews()
     }
 
-    /** 刷新所有图片预览(底部回复栅 + 弹窗) */
+    /** 刷新所有图片预览(底部回复栅 + 回复面板) */
     private fun refreshAllImagePreviews() {
         updateInlineImagePreview()
-        if (mBottomSheetDialog != null && mBottomSheetDialog!!.isShowing) {
+        if (isReplyPanelShowing()) {
             updateDialogImagePreview()
         }
     }
@@ -2550,11 +2555,11 @@ class ThreadDetailActivity : AppCompatActivity() {
         }
     }
 
-    /** 更新底部弹窗的图片预览 */
+    /** 更新底部回复面板的图片预览 */
     private fun updateDialogImagePreview() {
-        if (mBottomSheetDialog == null) return
-        val hsv = mBottomSheetDialog!!.findViewById<android.widget.HorizontalScrollView>(R.id.hsv_image_preview)
-        val ll = mBottomSheetDialog!!.findViewById<LinearLayout>(R.id.ll_image_preview)
+        val panel = binding.containerReplyPanel
+        val hsv = panel.findViewById<android.widget.HorizontalScrollView>(R.id.hsv_image_preview)
+        val ll = panel.findViewById<LinearLayout>(R.id.ll_image_preview)
         if (hsv == null || ll == null) return
         if (pendingImageUris.isEmpty()) {
             hsv.visibility = View.GONE
@@ -3732,21 +3737,22 @@ class ThreadDetailActivity : AppCompatActivity() {
         }
     }
 
-    /** 安全解析 HTML,捕获 SpannableStringBuilder 的 PARAGRAPH 边界崩溃 */
+    /** 安全解析 HTML,捕获 SpannableStringBuilder 的 PARAGRAPH 边界崩溃，并移除彩色字体统一为系统文本色 */
     private fun safeFromHtml(html: String?, imageGetter: Html.ImageGetter, tagHandler: Html.TagHandler?): Spanned {
         if (TextUtils.isEmpty(html)) {
             return SpannedStringValueOf("")
         }
-        try {
-            return Html.fromHtml(html, Html.FROM_HTML_MODE_LEGACY, imageGetter, tagHandler)
+        val clean = BBCodeUtil.stripHtmlColors(html)
+        val rawSpanned: Spanned = try {
+            Html.fromHtml(clean, Html.FROM_HTML_MODE_LEGACY, imageGetter, tagHandler)
         } catch (e: Exception) {
             android.util.Log.w("ThreadDetail", "Html.fromHtml failed, retrying with COMPACT mode", e)
             try {
-                return Html.fromHtml(html, Html.FROM_HTML_MODE_COMPACT, imageGetter, tagHandler)
+                Html.fromHtml(clean, Html.FROM_HTML_MODE_COMPACT, imageGetter, tagHandler)
             } catch (e2: Exception) {
                 android.util.Log.w("ThreadDetail", "Html.fromHtml COMPACT also failed, stripping paragraph tags", e2)
                 // 移除可能导致段落边界问题的标签
-                var stripped = Regex("<div[^>]*>").replace(html!!, "")
+                var stripped = Regex("<div[^>]*>").replace(clean, "")
                 stripped = Regex("</div>").replace(stripped, "<br>")
                 stripped = Regex("<p[^>]*>").replace(stripped, "")
                 stripped = Regex("</p>").replace(stripped, "<br>")
@@ -3757,13 +3763,15 @@ class ThreadDetailActivity : AppCompatActivity() {
                 stripped = Regex("<ul[^>]*>").replace(stripped, "")
                 stripped = Regex("</ul>").replace(stripped, "")
                 try {
-                    return Html.fromHtml(stripped, Html.FROM_HTML_MODE_LEGACY, imageGetter, tagHandler)
+                    Html.fromHtml(stripped, Html.FROM_HTML_MODE_LEGACY, imageGetter, tagHandler)
                 } catch (e3: Exception) {
                     android.util.Log.e("ThreadDetail", "All Html.fromHtml attempts failed", e3)
-                    return SpannedStringValueOf(Html.fromHtml(TextUtils.htmlEncode(html)).toString())
+                    SpannedStringValueOf(Html.fromHtml(TextUtils.htmlEncode(clean)).toString())
                 }
             }
         }
+        val processed = BBCodeUtil.stripForegroundColorSpans(rawSpanned)
+        return (processed as? Spanned) ?: rawSpanned
     }
 
     private fun SpannedStringValueOf(s: String): Spanned {
@@ -4096,11 +4104,7 @@ class ThreadDetailActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
-        if (mBottomSheetDialog != null && mBottomSheetDialog!!.isShowing) {
-            try {
-                mBottomSheetDialog!!.dismiss()
-            } catch (_: Exception) {}
-        }
+        hideReplyPanel()
         super.onDestroy()
     }
 
@@ -4228,98 +4232,175 @@ class ThreadDetailActivity : AppCompatActivity() {
             cardLp.setMargins(0, dpToPx(10), 0, dpToPx(10))
             card.layoutParams = cardLp
             card.setBackgroundResource(R.drawable.bg_table_border)
-
-            val tableLayout = TableLayout(this)
-            tableLayout.layoutParams = FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-            )
-
-            val isTwoCols = maxCols == 2
-            if (isTwoCols) {
-                tableLayout.isStretchAllColumns = false
-                tableLayout.setColumnStretchable(1, true)
-                tableLayout.setColumnShrinkable(1, true)
-            } else {
-                tableLayout.isStretchAllColumns = true
-            }
+            card.outlineProvider = ViewOutlineProvider.BACKGROUND
+            card.clipToOutline = true
 
             val dividerColor = getColor(R.color.divider)
             val headerBgColor = getColor(R.color.code_block_bg)
             val textColor = getColor(R.color.text_primary)
+
+            val isTwoCols = maxCols == 2
+            if (isTwoCols) {
+                // 两列表格：采用垂直 LinearLayout + 每一行水平 LinearLayout 动态测量排版
+                // 彻底解决 Android 原生 TableLayout 在 shrink 时截断多行文本的系统缺陷
+                // 保证左侧表头严格垂直居中且背景平铺整行，右侧表单内容 100% 完整自适应展开不被截断
+                val rootLayout = LinearLayout(this).apply {
+                    orientation = LinearLayout.VERTICAL
+                    layoutParams = FrameLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.WRAP_CONTENT
+                    )
+                }
+
+                // 计算第0列（表头列）最大需要宽度
+                val testPaint = android.text.TextPaint().apply {
+                    textSize = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, 13.5f, resources.displayMetrics)
+                    typeface = Typeface.DEFAULT_BOLD
+                }
+                var maxKeyTextWidth = 0f
+                for (r in rows) {
+                    val firstCell = r.selectFirst("th, td")
+                    if (firstCell != null) {
+                        val lines = firstCell.text().split("\n", "/")
+                        for (line in lines) {
+                            val w = testPaint.measureText(line.trim())
+                            if (w > maxKeyTextWidth) maxKeyTextWidth = w
+                        }
+                    }
+                }
+                val minKeyWidth = dpToPx(72)
+                val maxKeyWidth = dpToPx(130)
+                val keyColWidth = (maxKeyTextWidth + dpToPx(24)).toInt().coerceIn(minKeyWidth, maxKeyWidth)
+
+                for ((rIdx, r) in rows.withIndex()) {
+                    val cells = r.select("th, td")
+                    if (cells.isEmpty()) continue
+
+                    val isHeaderRow = rIdx == 0 || cells.first()?.tagName()?.equals("th", ignoreCase = true) == true
+                    val rowLayout = LinearLayout(this).apply {
+                        orientation = LinearLayout.HORIZONTAL
+                        layoutParams = LinearLayout.LayoutParams(
+                            ViewGroup.LayoutParams.MATCH_PARENT,
+                            ViewGroup.LayoutParams.WRAP_CONTENT
+                        )
+                        if (isHeaderRow) {
+                            setBackgroundColor(headerBgColor)
+                        }
+                    }
+
+                    // 第0列（表头单元格，高度 MATCH_PARENT 保证垂直居中与背景完全铺满）
+                    val cell0 = cells.getOrNull(0)
+                    val tv0 = TextView(this).apply {
+                        layoutParams = LinearLayout.LayoutParams(keyColWidth, ViewGroup.LayoutParams.MATCH_PARENT)
+                        setPadding(dpToPx(10), dpToPx(8), dpToPx(10), dpToPx(8))
+                        gravity = if (isHeaderRow) Gravity.CENTER else (Gravity.CENTER_VERTICAL or Gravity.START)
+                        setTypeface(null, Typeface.BOLD)
+                        textSize = if (isHeaderRow) 14f else 13.5f
+                        setTextColor(textColor)
+                        if (!isHeaderRow) setBackgroundColor(headerBgColor)
+                        val rawText = cell0?.html()?.trim() ?: ""
+                        text = safeFromHtml(rawText, createInlineImageGetter(this), null)
+                    }
+                    rowLayout.addView(tv0)
+
+                    // 列间纵向细分割线
+                    val vDiv = View(this).apply {
+                        layoutParams = LinearLayout.LayoutParams(dpToPx(1), ViewGroup.LayoutParams.MATCH_PARENT)
+                        setBackgroundColor(dividerColor)
+                    }
+                    rowLayout.addView(vDiv)
+
+                    // 第1列（表单内容单元格，weight=1 且 height=WRAP_CONTENT，多行完整展示绝对不被裁切）
+                    val cell1 = cells.getOrNull(1)
+                    val tv1 = TextView(this).apply {
+                        layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f)
+                        setPadding(dpToPx(10), dpToPx(8), dpToPx(10), dpToPx(8))
+                        gravity = if (isHeaderRow) Gravity.CENTER else (Gravity.CENTER_VERTICAL or Gravity.START)
+                        textSize = if (isHeaderRow) 14f else 13.5f
+                        if (isHeaderRow) setTypeface(null, Typeface.BOLD)
+                        setTextColor(textColor)
+                        setLineSpacing(dpToPx(2).toFloat(), 1.0f)
+                        val rawText = cell1?.html()?.trim() ?: ""
+                        text = safeFromHtml(rawText, createInlineImageGetter(this), null)
+                    }
+                    rowLayout.addView(tv1)
+
+                    rootLayout.addView(rowLayout)
+
+                    if (rIdx < rows.size - 1) {
+                        val hDiv = View(this).apply {
+                            layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dpToPx(1))
+                            setBackgroundColor(dividerColor)
+                        }
+                        rootLayout.addView(hDiv)
+                    }
+                }
+
+                card.addView(rootLayout)
+                return card
+            }
+
+            // 多列表格（>2列）：支持横向平滑滚动
+            val tableLayout = TableLayout(this).apply {
+                layoutParams = FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+                )
+                isStretchAllColumns = false
+            }
 
             for ((rIdx, r) in rows.withIndex()) {
                 val cells = r.select("th, td")
                 if (cells.isEmpty()) continue
 
                 val isHeaderRow = rIdx == 0 || cells.first()?.tagName()?.equals("th", ignoreCase = true) == true
-                val tr = TableRow(this)
-                tr.layoutParams = TableLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.WRAP_CONTENT
-                )
-                if (isHeaderRow) {
-                    tr.setBackgroundColor(headerBgColor)
-                }
-
-                for ((cIdx, cell) in cells.withIndex()) {
-                    val cellTv = TextView(this)
-                    val lp = TableRow.LayoutParams(
+                val tr = TableRow(this).apply {
+                    layoutParams = TableLayout.LayoutParams(
                         ViewGroup.LayoutParams.WRAP_CONTENT,
                         ViewGroup.LayoutParams.WRAP_CONTENT
                     )
-                    cellTv.layoutParams = lp
-                    cellTv.setPadding(dpToPx(10), dpToPx(8), dpToPx(10), dpToPx(8))
-                    cellTv.gravity = Gravity.CENTER_VERTICAL or Gravity.START
-                    cellTv.setTextIsSelectable(true)
+                    if (isHeaderRow) setBackgroundColor(headerBgColor)
+                }
 
-                    if (isHeaderRow || (isTwoCols && cIdx == 0)) {
-                        cellTv.setTypeface(null, Typeface.BOLD)
-                        cellTv.textSize = 13.5f
-                        cellTv.setTextColor(textColor)
-                        if (!isHeaderRow && isTwoCols && cIdx == 0) {
-                            cellTv.setBackgroundColor(headerBgColor)
-                        }
-                    } else {
-                        cellTv.textSize = 13.5f
-                        cellTv.setTextColor(textColor)
-                        cellTv.setLineSpacing(dpToPx(2).toFloat(), 1.0f)
+                for (cell in cells) {
+                    val cellTv = TextView(this).apply {
+                        layoutParams = TableRow.LayoutParams(
+                            ViewGroup.LayoutParams.WRAP_CONTENT,
+                            ViewGroup.LayoutParams.WRAP_CONTENT
+                        )
+                        setPadding(dpToPx(10), dpToPx(8), dpToPx(10), dpToPx(8))
+                        gravity = Gravity.CENTER_VERTICAL or Gravity.START
+                        textSize = 13.5f
+                        if (isHeaderRow) setTypeface(null, Typeface.BOLD)
+                        setTextColor(textColor)
+                        setLineSpacing(dpToPx(2).toFloat(), 1.0f)
+                        text = safeFromHtml(cell.html().trim(), createInlineImageGetter(this), null)
                     }
-
-                    cellTv.text = Html.fromHtml(
-                        cell.html().trim(),
-                        Html.FROM_HTML_MODE_COMPACT,
-                        createInlineImageGetter(cellTv),
-                        null
-                    )
                     tr.addView(cellTv)
                 }
                 tableLayout.addView(tr)
 
                 if (rIdx < rows.size - 1) {
-                    val div = View(this)
-                    div.layoutParams = TableLayout.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT,
-                        dpToPx(1)
-                    )
-                    div.setBackgroundColor(dividerColor)
+                    val div = View(this).apply {
+                        layoutParams = TableLayout.LayoutParams(
+                            ViewGroup.LayoutParams.MATCH_PARENT,
+                            dpToPx(1)
+                        )
+                        setBackgroundColor(dividerColor)
+                    }
                     tableLayout.addView(div)
                 }
             }
 
-            if (maxCols > 2) {
-                val hsv = HorizontalScrollView(this)
-                hsv.layoutParams = FrameLayout.LayoutParams(
+            val hsv = HorizontalScrollView(this).apply {
+                layoutParams = FrameLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
                     ViewGroup.LayoutParams.WRAP_CONTENT
                 )
-                hsv.isFillViewport = true
-                hsv.addView(tableLayout)
-                card.addView(hsv)
-            } else {
-                card.addView(tableLayout)
+                isFillViewport = true
+                addView(tableLayout)
             }
-
+            card.addView(hsv)
             return card
         } catch (e: Exception) {
             return null

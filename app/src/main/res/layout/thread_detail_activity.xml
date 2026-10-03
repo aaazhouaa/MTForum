@@ -38,7 +38,7 @@
                 app:tint="@color/text_primary"
                 android:padding="12dp" />
 
-            <!-- 打赏图标 + 右上角人数角标 -->
+            <!-- 打赏图标 + 右下角人数角标（纯数字无背景边框） -->
             <FrameLayout
                 android:id="@+id/layout_reward"
                 android:layout_width="wrap_content"
@@ -50,28 +50,26 @@
                     android:layout_width="48dp"
                     android:layout_height="match_parent"
                     android:minWidth="0dp"
-                    android:src="@drawable/ic_reward_coin"
+                    android:src="@drawable/ic_reward_packet"
                     android:scaleType="fitCenter"
                     android:background="?attr/selectableItemBackgroundBorderless"
                     android:contentDescription="@string/reward_title"
                     app:tint="@color/text_primary"
                     android:padding="12dp" />
 
-                <!-- 打赏人数：灰色胶囊 + 深色字，低调不抢眼 -->
+                <!-- 打赏人数：右下角纯数字角标，无背景无边框，简约直观 -->
                 <TextView
                     android:id="@+id/tv_reward_badge"
                     android:layout_width="wrap_content"
-                    android:layout_height="16dp"
-                    android:layout_gravity="top|end"
-                    android:layout_marginTop="5dp"
-                    android:layout_marginEnd="3dp"
-                    android:minWidth="16dp"
-                    android:paddingHorizontal="4dp"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="bottom|end"
+                    android:layout_marginBottom="6dp"
+                    android:layout_marginEnd="6dp"
                     android:gravity="center"
                     android:singleLine="true"
-                    android:background="@drawable/bg_toolbar_badge"
-                    android:textColor="@color/text_primary"
-                    android:textSize="10sp"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="10.5sp"
+                    android:textStyle="bold"
                     android:visibility="gone" />
             </FrameLayout>
 
@@ -309,5 +307,28 @@
         </LinearLayout>
 
     </LinearLayout>
+
+    <!-- 回复半透明遮罩层：点击空白处收起回复输入框 -->
+    <View
+        android:id="@+id/v_reply_mask"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#55000000"
+        android:clickable="true"
+        android:focusable="true"
+        android:visibility="gone" />
+
+    <!-- 底部原生贴合回复面板（直接嵌入Activity视图树，随软键盘自然贴合升降动画，不再使用弹窗） -->
+    <FrameLayout
+        android:id="@+id/container_reply_panel"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
+        android:visibility="gone">
+
+        <include
+            android:id="@+id/panel_reply"
+            layout="@layout/dialog_reply_bottom_sheet" />
+    </FrameLayout>
 
 </androidx.coordinatorlayout.widget.CoordinatorLayout>

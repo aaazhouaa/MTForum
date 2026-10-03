@@ -187,7 +187,8 @@ object BBCodeUtil {
         result = P_U.matcher(result).replaceAll("<u>$1</u>")
         result = P_S.matcher(result).replaceAll("<s>$1</s>")
         result = P_DEL.matcher(result).replaceAll("<del>$1</del>")
-        result = P_COLOR.matcher(result).replaceAll("<span style=\"color:$1\">$2</span>")
+        // 用户要求：移除彩色字体，统一改为正常文本颜色
+        result = P_COLOR.matcher(result).replaceAll("$2")
         val sizeM = P_SIZE.matcher(result)
         val sbSize = StringBuffer()
         while (sizeM.find()) {
@@ -469,9 +470,54 @@ object BBCodeUtil {
 
     // ==================== 便捷方法 ====================
 
+    /**
+     * 剥离 HTML / BBCode 中定义的文字颜色属性，保证正文和评论区统一使用系统正常字体颜色
+     */
+    @JvmStatic
+    fun stripHtmlColors(html: String?): String {
+        if (html.isNullOrEmpty()) return ""
+        var clean = html
+        // 1. 移除 [color=xxx]...[/color]
+        clean = P_COLOR.matcher(clean).replaceAll("$2")
+        // 2. 移除 <font ... color="..."> 属性（支持单双引号或无引号，支持 hex、rgb、颜色单词）
+        clean = clean.replace(Regex("(?i)(<font\\b[^>]*?)\\s+color\\s*=\\s*(?:\"[^\"]*\"|'[^']*'|[^\\s>]+)"), "$1")
+        // 3. 移除 style 中的 color 属性（例如 color:#00ff00; 或 color:red; 或 color:rgb(...)）
+        clean = clean.replace(Regex("(?i)(style\\s*=\\s*['\"][^'\"]*?)\\bcolor\\s*:\\s*[^;'\"]+;?"), "$1")
+        clean = clean.replace(Regex("(?i)<font\\s*>"), "<font>")
+        return clean
+    }
+
+    /**
+     * 进一步从 Spanned 对象中移除 ForegroundColorSpan，彻底杜绝任何彩色字体渗入，
+     * 统一继承 TextView 的系统标准文本颜色（代码块除外）。
+     */
+    @JvmStatic
+    fun stripForegroundColorSpans(charSequence: CharSequence?): CharSequence {
+        if (charSequence == null || charSequence !is android.text.Spannable) {
+            return charSequence ?: ""
+        }
+        val spans = charSequence.getSpans(0, charSequence.length, android.text.style.ForegroundColorSpan::class.java)
+        val codeBlocks = charSequence.getSpans(0, charSequence.length, CodeBlockSpan::class.java)
+        for (span in spans) {
+            val spanStart = charSequence.getSpanStart(span)
+            val spanEnd = charSequence.getSpanEnd(span)
+            val inCodeBlock = codeBlocks.any { cb ->
+                val cbStart = charSequence.getSpanStart(cb)
+                val cbEnd = charSequence.getSpanEnd(cb)
+                spanStart >= cbStart && spanEnd <= cbEnd
+            }
+            if (!inCodeBlock) {
+                charSequence.removeSpan(span)
+            }
+        }
+        return charSequence
+    }
+
     @JvmStatic
     fun render(html: String?, context: Context?): CharSequence {
-        return Html.fromHtml(html, Html.FROM_HTML_MODE_COMPACT, null, createTagHandler(context))
+        val clean = stripHtmlColors(html)
+        val spanned = Html.fromHtml(clean, Html.FROM_HTML_MODE_COMPACT, null, createTagHandler(context))
+        return stripForegroundColorSpans(spanned)
     }
 
     private fun dp(value: Float): Float {
