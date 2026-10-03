@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 顶栏图标右上角的数量角标：浅灰底 + 深色字，低调不抢眼 -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="@color/background_secondary" />
+    <corners android:radius="8dp" />
+    <stroke android:width="0.5dp" android:color="@color/divider" />
+</shape>

@@ -20,6 +20,7 @@ import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
+import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import com.bumptech.glide.load.resource.bitmap.CircleCrop
@@ -40,23 +41,39 @@ import java.util.regex.Pattern
  * 支持 Glide 加载头像、楼层标签、楼主标识、等级、时间、地点等完整信息
  */
 class ReplyAdapter(rawReplies: List<ReplyItem>?) :
-    RecyclerView.Adapter<ReplyAdapter.ViewHolder>() {
+    RecyclerView.Adapter<RecyclerView.ViewHolder>() {
+
+    /** 页首「帖子正文头」item：让整页只由一个 RecyclerView 滚动（恢复回收复用）。 */
+    interface HeaderProvider {
+        fun onCreateHeaderView(parent: ViewGroup): View
+        fun onBindHeaderView(view: View)
+    }
+
+    private var headerProvider: HeaderProvider? = null
 
     data class DisplayRow(
         val item: ReplyItem,
         val foldedCount: Int = 0,
         val isExpanded: Boolean = false,
-        val groupKey: String = ""
+        val groupKey: String = "",
+        /** 分组入口行显示的“名物”文案（配合展开/折叠状态拼句子）。 */
+        val groupLabel: String? = null,
+        /** 行身份，用于展开/折叠后把视口锚回同一行（否则点击后列表会跳位）。 */
+        val identity: String = "r:" + (item.pid ?: System.identityHashCode(item).toString())
     )
 
     private var rawReplyList: List<ReplyItem> = rawReplies ?: ArrayList()
+
+    /** 已展开的分组。默认全部折叠，只有用户点过「展开」的才在此集合里。 */
     private val expandedKeys: MutableSet<String> = HashSet()
+
+    /** 承载本适配器的 RecyclerView，用于展开/折叠后把视口锚回原行。 */
+    private var attachedRecycler: RecyclerView? = null
     private var displayList: MutableList<DisplayRow> = ArrayList()
 
     private var replyClickListener: OnReplyClickListener? = null
     private var userClickListener: OnUserClickListener? = null
     private var replyLongClickListener: OnReplyLongClickListener? = null // build73: 长按出操作菜单
-    var onPreloadListener: (() -> Unit)? = null
 
     init {
         rebuildDisplayList()
@@ -64,53 +81,187 @@ class ReplyAdapter(rawReplies: List<ReplyItem>?) :
 
     private fun rebuildDisplayList() {
         displayList.clear()
-        if (rawReplyList.isEmpty()) return
+        val n = rawReplyList.size
+        if (n == 0) return
 
-        val grouped = LinkedHashMap<String, MutableList<ReplyItem>>()
-        for (item in rawReplyList) {
-            val rawText = item.contentText
-            val text = if (!rawText.isNullOrEmpty()) {
-                rawText.trim()
-            } else {
-                val html = item.contentHtml ?: ""
-                if (html.length < 300) html.replace(Regex("<[^>]*>"), "").trim() else ""
+        // 分组键只算一次：groupKeyOf 内部有正则与字符串归一化，逐条重复调用在长帖里很贵。
+        val keys = ArrayList<String>(n)
+        for (item in rawReplyList) keys.add(groupKeyOf(item))
+
+        val groups = LinkedHashMap<String, MutableList<Int>>()
+        for (i in 0 until n) groups.getOrPut(keys[i]) { ArrayList() }.add(i)
+
+        // 只有成员 > 1 的组才有折叠概念；列表刷新后自动丢弃已消失的分组状态。
+        val multiKeys = groups.filterValues { it.size > 1 }.keys
+        expandedKeys.retainAll(HashSet(multiKeys))
+
+        val firstIndex = HashMap<String, Int>()
+        for ((k, idxs) in groups) firstIndex[k] = idxs.first()
+
+        // 输出严格按原始楼层顺序。折叠时只保留该组首条，展开时按原位置列出全部成员。
+        // 不再单独插一行“折叠条”：折叠提示直接挂在首条的回复卡片内（见 bind），
+        // 也就是“就在第一个要折叠的那条下面”。
+        for (i in 0 until n) {
+            val key = keys[i]
+            val idxs = groups[key] ?: continue
+            if (idxs.size == 1) {
+                displayList.add(DisplayRow(item = rawReplyList[i]))
+                continue
             }
-            val hasImages = item.contentHtml?.contains("<img", ignoreCase = true) == true
-            // 纯文本相同（且无复杂图片、长度小于 100 字）的简短灌水回复进行折叠归并
-            val key = if (!hasImages && text.isNotEmpty() && text.length <= 100) text else "unique_${item.pid ?: System.identityHashCode(item)}"
-            grouped.getOrPut(key) { ArrayList() }.add(item)
+            val expanded = expandedKeys.contains(key)
+            val isFirst = firstIndex[key] == i
+            // 折叠态只展示首条（其余成员隐藏）；展开态成员各回原位
+            if (!isFirst && !expanded) continue
+            displayList.add(
+                DisplayRow(
+                    item = rawReplyList[i],
+                    foldedCount = if (isFirst) idxs.size - 1 else 0,
+                    isExpanded = expanded,
+                    groupKey = if (isFirst) key else "",
+                    groupLabel = if (isFirst) groupLabelOf(key) else null
+                )
+            )
+        }
+    }
+
+    override fun onAttachedToRecyclerView(recyclerView: RecyclerView) {
+        super.onAttachedToRecyclerView(recyclerView)
+        attachedRecycler = recyclerView
+    }
+
+    override fun onDetachedFromRecyclerView(recyclerView: RecyclerView) {
+        super.onDetachedFromRecyclerView(recyclerView)
+        if (attachedRecycler === recyclerView) attachedRecycler = null
+    }
+
+    /** 展开/折叠一组，并把视口锚回点击前所在的那一行，避免列表跳位。 */
+    fun toggleGroup(groupKey: String) {
+        if (groupKey.isEmpty()) return
+        val rv = attachedRecycler
+        val lm = rv?.layoutManager as? LinearLayoutManager
+        val firstPos = lm?.findFirstVisibleItemPosition() ?: RecyclerView.NO_POSITION
+        var anchorIdentity: String? = null
+        var anchorOffset = 0
+        if (firstPos != RecyclerView.NO_POSITION) {
+            anchorIdentity = identityAtAdapterPosition(firstPos)
+            val v = lm?.findViewByPosition(firstPos)
+            if (v != null) anchorOffset = v.top - (rv?.paddingTop ?: 0)
         }
 
-        for ((key, items) in grouped) {
-            if (items.size == 1) {
-                displayList.add(DisplayRow(items[0]))
-            } else {
-                val isExpanded = expandedKeys.contains(key)
-                val foldedCount = items.size - 1
-                if (isExpanded) {
-                    for (i in items.indices) {
-                        displayList.add(
-                            DisplayRow(
-                                item = items[i],
-                                foldedCount = if (i == 0) foldedCount else 0,
-                                isExpanded = true,
-                                groupKey = key
-                            )
-                        )
-                    }
-                } else {
-                    // 折叠态：仅展示首条，标注折叠数
-                    displayList.add(
-                        DisplayRow(
-                            item = items[0],
-                            foldedCount = foldedCount,
-                            isExpanded = false,
-                            groupKey = key
-                        )
-                    )
-                }
-            }
+        if (expandedKeys.contains(groupKey)) expandedKeys.remove(groupKey)
+        else expandedKeys.add(groupKey)
+        rebuildDisplayList()
+        notifyDataSetChanged()
+
+        var target = anchorIdentity?.let { adapterPositionOfIdentity(it) } ?: -1
+        if (target < 0) {
+            // 极罕：锚点行本次被收起了。退而锚定该组首条（它始终存在）。
+            target = firstRowPositionOfGroup(groupKey)
+            anchorOffset = 0
         }
+        if (target >= 0) lm?.scrollToPositionWithOffset(target, anchorOffset)
+    }
+
+    /** 某分组首条在适配器中的位置（折叠条已取消，折叠提示挂在首条上）。 */
+    private fun firstRowPositionOfGroup(groupKey: String): Int {
+        val offset = if (hasHeader()) 1 else 0
+        for (i in displayList.indices) {
+            if (displayList[i].groupKey == groupKey) return i + offset
+        }
+        return -1
+    }
+
+    private fun identityAtAdapterPosition(pos: Int): String? {
+        if (pos < 0) return null
+        if (hasHeader()) {
+            if (pos == 0) return IDENTITY_HEADER
+            val idx = pos - 1
+            return if (idx in displayList.indices) displayList[idx].identity else null
+        }
+        return if (pos in displayList.indices) displayList[pos].identity else null
+    }
+
+    private fun adapterPositionOfIdentity(identity: String): Int {
+        val offset = if (hasHeader()) 1 else 0
+        if (identity == IDENTITY_HEADER) return if (hasHeader()) 0 else -1
+        for (i in displayList.indices) {
+            if (displayList[i].identity == identity) return i + offset
+        }
+        return -1
+    }
+
+    /**
+     * 计算一条回复的分组键；相同键才会被折叠归并。
+     *
+     * 旧实现把「带任何 <img>」的回复一律排除在折叠外，而 Discuz 的内联表情本身就是
+     * <img src=".../static/image/smiley/...">，于是“支持😄 / 顶一个👍”这类最典型的
+     * 灌水回复永远不参与折叠——折叠几乎无效的主因就在这。
+     * 现改为：排除表情后仍无真实图文才允许折叠，并对文本做标点/空白/大小写/全角半角
+     * 归一化，使“看着一样”的回复归为一组。
+     */
+    private fun groupKeyOf(item: ReplyItem): String {
+        if (!isFoldable(item)) return uniqueKeyOf(item)
+        val norm = normalizedTextOf(item)
+        if (norm.isEmpty()) {
+            // 纯表情回复（只有表情、无文字）同属无信息量，归入同一批；
+            // 其余空文本（解析异常、真空白页）不折叠，以免把异常当成内容藏掉。
+            return if (hasExpressionImage(item.contentHtml ?: "")) BATCH_PREFIX + BATCH_EMOJI_SUFFIX
+            else uniqueKeyOf(item)
+        }
+        // 极短回复（“顶”“好”“支持”等）整批折叠
+        if (norm.length <= BATCH_MAX_LEN) return BATCH_PREFIX + norm.length
+        return norm
+    }
+
+    /** 是否含有内联表情（只判定表情，不看是否还有真图）。 */
+    private fun hasExpressionImage(html: String): Boolean {
+        if (!html.contains("<img", ignoreCase = true)) return false
+        var rest = html
+        if (rest.length > MAX_HTML_SCAN) rest = rest.substring(0, MAX_HTML_SCAN)
+        for (tag in IMG_TAG_RE.findAll(rest)) {
+            val src = IMG_SRC_RE.find(tag.value)?.groupValues?.get(1)?.lowercase() ?: continue
+            if (EXPRESSION_HINTS.any { src.contains(it) }) return true
+        }
+        return false
+    }
+
+    /** 是否允许参与折叠：无引用、非代码块、且排除表情后无真实图片。 */
+    private fun isFoldable(item: ReplyItem): Boolean {
+        if (!TextUtils.isEmpty(item.quotedContentHtml) || !TextUtils.isEmpty(item.quotedContentText)) {
+            return false
+        }
+        val html = item.contentHtml ?: ""
+        if (html.contains("comiis_blockcode") || html.contains("<pre")) return false
+        return !hasRealImage(html)
+    }
+
+    /** 排除内联表情后，是否还有真实图片。 */
+    private fun hasRealImage(html: String): Boolean {
+        if (!html.contains("<img", ignoreCase = true)) return false
+        var rest = html
+        if (rest.length > MAX_HTML_SCAN) rest = rest.substring(0, MAX_HTML_SCAN)
+        for (tag in IMG_TAG_RE.findAll(rest)) {
+            val src = IMG_SRC_RE.find(tag.value)?.groupValues?.get(1)?.lowercase() ?: continue
+            if (EXPRESSION_HINTS.any { src.contains(it) }) continue
+            return true
+        }
+        return false
+    }
+
+    /** 归一化文本：优先用 contentText，缺失时从 HTML 剥标签。 */
+    private fun normalizedTextOf(item: ReplyItem): String {
+        val raw = if (!TextUtils.isEmpty(item.contentText)) {
+            item.contentText ?: ""
+        } else {
+            val html = item.contentHtml ?: return ""
+            if (html.length > MAX_HTML_SCAN) return ""
+            html.replace(Regex("<[^>]*>"), " ")
+        }
+        return normalizeText(raw)
+    }
+
+    private fun uniqueKeyOf(item: ReplyItem): String {
+        return "unique_" + (item.pid ?: System.identityHashCode(item))
     }
 
     interface OnReplyClickListener {
@@ -138,31 +289,120 @@ class ReplyAdapter(rawReplies: List<ReplyItem>?) :
         this.userClickListener = listener
     }
 
+    private fun hasHeader(): Boolean = headerProvider != null
+
+    /** 底部状态行：自动加载中 / 失败重试 / 到底了。 */
+    enum class FooterState { LOADING, RETRY, END }
+
+    interface FooterActionListener {
+        fun onRetry()
+    }
+
+    var footerState: FooterState? = null
+        private set
+    private var footerActionListener: FooterActionListener? = null
+
+    fun setFooterActionListener(listener: FooterActionListener?) {
+        footerActionListener = listener
+    }
+
+    /** 设置底部状态行；传 null 则移除该行。 */
+    fun setFooterState(state: FooterState?) {
+        if (footerState == state) return
+        val had = footerState != null
+        val has = state != null
+        footerState = state
+        val tail = displayList.size + (if (hasHeader()) 1 else 0)
+        when {
+            !had && has -> notifyItemInserted(tail)
+            had && !has -> notifyItemRemoved(tail)
+            else -> notifyItemChanged(tail)
+        }
+    }
+
+    fun setHeaderProvider(provider: HeaderProvider?) {
+        headerProvider = provider
+        if (provider != null) notifyItemInserted(0) else if (itemCount > 0) notifyItemRemoved(0)
+    }
+
     fun updateData(newList: List<ReplyItem>?) {
         this.rawReplyList = newList ?: ArrayList()
         rebuildDisplayList()
         notifyDataSetChanged()
     }
 
-    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
+    override fun getItemViewType(position: Int): Int {
+        if (hasHeader() && position == 0) return TYPE_HEADER
+        if (footerState != null && position == itemCount - 1) return TYPE_FOOTER
+        return TYPE_REPLY
+    }
+
+    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder {
+        if (viewType == TYPE_HEADER) {
+            val v = headerProvider!!.onCreateHeaderView(parent)
+            return HeaderViewHolder(v)
+        }
+        if (viewType == TYPE_FOOTER) {
+            val v = LayoutInflater.from(parent.context)
+                .inflate(R.layout.item_reply_footer, parent, false)
+            return FooterViewHolder(v)
+        }
         val view = LayoutInflater.from(parent.context)
             .inflate(R.layout.item_reply, parent, false)
         return ViewHolder(view)
     }
 
-    override fun onBindViewHolder(holder: ViewHolder, position: Int) {
-        val row = displayList[position]
-        holder.bind(row)
-        val totalCount = displayList.size
-        // 浏览到接近列表末尾（剩余 4 条或总数较少时最后 1~2 条）触发预加载后续页面
-        val threshold = if (totalCount <= 15) maxOf(0, totalCount - 2) else totalCount - 5
-        if (position >= threshold) {
-            onPreloadListener?.invoke()
+    override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
+        if (holder is HeaderViewHolder) {
+            headerProvider?.onBindHeaderView(holder.itemView)
+            return
         }
+        if (holder is FooterViewHolder) {
+            holder.bind(footerState ?: FooterState.END)
+            return
+        }
+        // 预加载由外层 RecyclerView 的滚动监听驱动，绝不在 bind 里触发：
+        // 否则「bind末尾→拉下一页→全量刷新→又bind末尾」会自激，进帖即把整帖拉完。
+        (holder as ViewHolder).bind(displayList[replyIndex(position)])
+    }
+
+    /** 列表位置 -> 回复行下标（去掉 header 占位）。 */
+    private fun replyIndex(position: Int): Int {
+        return if (hasHeader()) position - 1 else position
     }
 
     override fun getItemCount(): Int {
-        return displayList.size
+        return displayList.size + (if (hasHeader()) 1 else 0) + (if (footerState != null) 1 else 0)
+    }
+
+    inner class HeaderViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView)
+
+    inner class FooterViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
+        private val progress: View = itemView.findViewById(R.id.footer_progress)
+        private val text: TextView = itemView.findViewById(R.id.footer_text)
+
+        fun bind(state: FooterState) {
+            when (state) {
+                FooterState.LOADING -> {
+                    progress.visibility = View.VISIBLE
+                    text.text = "加载中…"
+                    itemView.isClickable = false
+                    itemView.setOnClickListener(null)
+                }
+                FooterState.RETRY -> {
+                    progress.visibility = View.GONE
+                    text.text = "加载失败，点击重试"
+                    itemView.isClickable = true
+                    itemView.setOnClickListener { footerActionListener?.onRetry() }
+                }
+                FooterState.END -> {
+                    progress.visibility = View.GONE
+                    text.text = "已经到底了"
+                    itemView.isClickable = false
+                    itemView.setOnClickListener(null)
+                }
+            }
+        }
     }
 
     inner class ViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
@@ -184,6 +424,10 @@ class ReplyAdapter(rawReplies: List<ReplyItem>?) :
         private val tvCollapsedText: TextView? = itemView.findViewById(R.id.tv_collapsed_text)
 
         fun bind(row: DisplayRow) {
+            // 普通回复行：先收起折叠提示，避免复用残留
+            layoutCollapsedHint?.visibility = View.GONE
+            itemView.setOnClickListener(null)
+            ivAvatar.visibility = View.VISIBLE
             val item = row.item
             // 头像 - Glide 加载圆图
             val avatarUrl = item.avatarUrl
@@ -371,25 +615,19 @@ class ReplyAdapter(rawReplies: List<ReplyItem>?) :
                 llReplyImages.visibility = View.GONE
             }
 
-            // 相同内容折叠条展示与交互
+            // 折叠提示：直接挂在被折叠组的首条回复卡片内，
+            // 即“就在第一个要折叠的那条下面”，不再单独占一整行。
             if (row.foldedCount > 0 && layoutCollapsedHint != null && tvCollapsedText != null) {
                 layoutCollapsedHint.visibility = View.VISIBLE
+                val label = row.groupLabel ?: "相同回复"
                 if (row.isExpanded) {
-                    tvCollapsedText.text = "已展开 ${row.foldedCount} 条相同回复 · 点击折叠"
+                    tvCollapsedText.text = "已展开 ${row.foldedCount} 条$label · 点击折叠"
                     ivCollapsedIcon?.rotation = 270f
                 } else {
-                    tvCollapsedText.text = "相同内容已折叠 ${row.foldedCount} 条 · 点击展开"
+                    tvCollapsedText.text = "已折叠 ${row.foldedCount} 条$label · 点击展开"
                     ivCollapsedIcon?.rotation = 90f
                 }
-                layoutCollapsedHint.setOnClickListener {
-                    if (row.isExpanded) {
-                        expandedKeys.remove(row.groupKey)
-                    } else {
-                        expandedKeys.add(row.groupKey)
-                    }
-                    rebuildDisplayList()
-                    notifyDataSetChanged()
-                }
+                layoutCollapsedHint.setOnClickListener { toggleGroup(row.groupKey) }
             } else {
                 layoutCollapsedHint?.visibility = View.GONE
             }
@@ -397,6 +635,70 @@ class ReplyAdapter(rawReplies: List<ReplyItem>?) :
     }
 
     companion object {
+
+        /** item 类型：页首正文头 / 普通回复 / 底部状态行 */
+        private const val TYPE_HEADER = 0
+        private const val TYPE_REPLY = 1
+        private const val TYPE_FOOTER = 2
+
+        /** 正文头在适配器里的身份标识（视口锚点用）。 */
+        private const val IDENTITY_HEADER = "header"
+
+        /** 正文头占据的 item 数（有 header 时为 1）。 */
+        const val HEADER_ITEM_COUNT = 1
+
+        /** 归一化后长度不超过此值的回复视为“无信息量短回复”，整批折叠。 */
+        private const val BATCH_MAX_LEN = 6
+
+        /** 短回复批量组的分组键前缀。 */
+        private const val BATCH_PREFIX = "batch_"
+
+        /** 纯表情批量组的后缀。 */
+        private const val BATCH_EMOJI_SUFFIX = "emoji"
+
+        /** HTML 扫描上限，避免超长内容做无谓的正则扫描。 */
+        private const val MAX_HTML_SCAN = 4000
+
+        /** 超过此长度的文本不作为分组入口展示（避免胶囊条文案过长）。 */
+        private const val MAX_LABEL_TEXT_LEN = 60
+
+        /** Discuz 内联表情的特征词。 */
+        private val EXPRESSION_HINTS = listOf(
+            "smiley", "emoticon", "/static/image/", "face", "stamp", "magic"
+        )
+
+        private val IMG_TAG_RE = Regex("<img\\b[^>]*>", RegexOption.IGNORE_CASE)
+        private val IMG_SRC_RE = Regex("src\\s*=\\s*[\"']([^\"']+)[\"']", RegexOption.IGNORE_CASE)
+
+        /**
+         * 归一化文本，用于“看着一样即归为一组”。
+         * 先把全角字符折成半角（ＡＢＣ１２３、全角标点、全角空格），
+         * 再保留字母/数字、其余一律丢弃，并统一小写。
+         */
+        private fun normalizeText(s: String): String {
+            val sb = StringBuilder(s.length)
+            for (raw in s) {
+                val ch = when {
+                    // 全角 ！~～（U+FF01..U+FF5E）整体平移到 ASCII
+                    raw.code in 0xFF01..0xFF5E -> (raw.code - 0xFEE0).toChar()
+                    // 全角空格
+                    raw.code == 0x3000 -> ' '
+                    else -> raw
+                }
+                if (ch.isLetterOrDigit()) sb.append(ch.lowercaseChar())
+            }
+            return sb.toString()
+        }
+
+        private fun isBatchGroupKey(key: String): Boolean = key.startsWith(BATCH_PREFIX)
+
+        private fun groupLabelOf(key: String): String {
+            return when {
+                key == BATCH_PREFIX + BATCH_EMOJI_SUFFIX -> "纯表情回复"
+                isBatchGroupKey(key) -> "短回复"
+                else -> "相同回复"
+            }
+        }
 
         /**
          * 为 TextView 设置可点击链接（蓝色高亮 + 可点击跳转）
@@ -709,12 +1011,8 @@ class ReplyAdapter(rawReplies: List<ReplyItem>?) :
                             var h = resource.intrinsicHeight
                             val emotSize = dpToPx(tv.context, 24)
                             val maxSize = if (maxW > 0) maxW else dpToPx(tv.context, 320)
-                            if (w <= 0) {
-                                w = emotSize
-                            }
-                            if (h <= 0) {
-                                h = emotSize
-                            }
+                            if (w <= 0) w = emotSize
+                            if (h <= 0) h = emotSize
                             // 表情类小图（≤32dp）保持原尺寸；大图限宽
                             if (w <= dpToPx(tv.context, 32)) {
                                 if (w > emotSize || h > emotSize) {
@@ -727,7 +1025,8 @@ class ReplyAdapter(rawReplies: List<ReplyItem>?) :
                                 w = maxSize
                             }
                             resource.setBounds(0, 0, w, h)
-                            placeholder.setReal(resource, tv)
+                            // item 内联图：只回填，不 setText 重排（避免回收复用时乱跳）
+                            placeholder.setRealNoRelayout(resource)
                         }
 
                         override fun onLoadCleared(placeholderD: Drawable?) {

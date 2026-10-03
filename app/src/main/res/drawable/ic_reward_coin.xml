@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 打赏：实心硬币 + 币面五角星（比双圆环更饱满、辨识度更高） -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp" android:height="24dp"
+    android:viewportWidth="24" android:viewportHeight="24"
+    android:tint="?attr/colorControlNormal">
+    <!-- 币身 -->
+    <path android:fillColor="@android:color/white"
+        android:fillType="evenOdd"
+        android:pathData="M12,2.4a9.6,9.6 0 1,0 0,19.2a9.6,9.6 0 1,0 0,-19.2zM12,3.9a8.1,8.1 0 1,0 0,16.2a8.1,8.1 0 1,0 0,-16.2z" />
+    <!-- 币面五角星 -->
+    <path android:fillColor="@android:color/white"
+        android:pathData="M12,7.1l1.5,3.04l3.35,0.49l-2.43,2.36l0.58,3.34L12,14.75l-3.0,1.58l0.58,-3.34L7.15,10.63l3.35,-0.49z" />
+</vector>

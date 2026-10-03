@@ -45,6 +45,20 @@ class UrlDrawable(targetView: View, sizePx: Int) : ColorDrawable(0x00000000) {
         }
     }
 
+    /**
+     * 仅回填真实图并重绘，**不**重新 setText。
+     *
+     * 供 RecyclerView item 使用：那里 item 会被回收复用，setText 式的重排延迟到
+     * 下一帧、而此时 ViewHolder 可能已绑到别的条目，既造成跳动又白白多一次全量排版。
+     * 代价是行高按占位尺寸（表情 24dp）计算——评论内联图绝大多数是表情，够用。
+     */
+    fun setRealNoRelayout(drawable: Drawable?) {
+        this.real = drawable
+        val drawableLocal = drawable ?: return
+        drawableLocal.setBounds(getBounds())
+        target?.postInvalidate()
+    }
+
     override fun draw(canvas: Canvas) {
         val realLocal = real
         if (realLocal != null) {

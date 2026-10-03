@@ -50,7 +50,6 @@ import androidx.annotation.NonNull
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.SwitchCompat
-import androidx.core.widget.NestedScrollView
 import androidx.fragment.app.FragmentActivity
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.ItemTouchHelper
@@ -75,6 +74,7 @@ import com.solosu.mtforum.R
 import com.solosu.mtforum.ai.AiConfigManager
 import com.solosu.mtforum.ai.AiLog
 import com.solosu.mtforum.ai.AutoReplyEngine
+import com.solosu.mtforum.databinding.ItemThreadDetailHeaderBinding
 import com.solosu.mtforum.databinding.ThreadDetailActivityBinding
 import com.solosu.mtforum.model.PostDetail
 import com.solosu.mtforum.model.ReplyItem
@@ -122,13 +122,21 @@ class ThreadDetailActivity : AppCompatActivity() {
     private var mBtnSendReply: MaterialButton? = null
     private var postDetail: PostDetail? = null
     private var replyAdapter: ReplyAdapter? = null
+
+    /**
+     * 「帖子正文头」item 的 ViewBinding。
+     *
+     * 正文头已从 activity 布局移到 item_thread_detail_header.xml，作为评论区 RecyclerView
+     * 的第 0 项（整页只由一个 RecyclerView 滚动，恢复回收复用）。头视图会被回收重建，
+     * 所以每次绑定都要重新赋值。未绑定时为 null。
+     */
+    private var headerBinding: ItemThreadDetailHeaderBinding? = null
     private var tid: String? = null
     private var onlyOpReplies = false
-    private var repliesDescending = true
+    private var repliesDescending = false // 默认时间正序（楼层从小到大）
     private var displayedReplies: MutableList<ReplyItem> = ArrayList()
     private var isLiked = false
     private var likeCount = 0
-    private var likeUsersAdapter: LikeUsersAdapter? = null
     private var isFavorited = false
     private var favoriteCount = 0   // 真实收藏数(来自 ForumParser #comiis_favorite_a)
     private var currentReplyTarget = ""
@@ -181,10 +189,8 @@ class ThreadDetailActivity : AppCompatActivity() {
         binding.etReply.isFocusable = false
         binding.etReply.isCursorVisible = false
         val commentsClick = View.OnClickListener {
-            binding.recyclerReplies.visibility = View.VISIBLE
-            binding.nestedScroll.post {
-                binding.nestedScroll.smoothScrollTo(0, binding.recyclerReplies.top)
-            }
+            // 评论区现在是同一个 RecyclerView 里的 item，直接滚到「评论标题栏」位置
+            scrollToReplySection()
         }
         binding.btnComments.setOnClickListener(commentsClick)
         binding.layoutComments.setOnClickListener(commentsClick)
@@ -195,48 +201,196 @@ class ThreadDetailActivity : AppCompatActivity() {
 
         binding.btnLike.setOnClickListener { toggleLike() }
         binding.layoutLike.setOnClickListener { toggleLike() }
+        // 长按点赞图标 → 弹出「赞过此帖的人」列表（原正文底部「赞过」行已移除）
+        val showLikers = View.OnLongClickListener {
+            showLikeUsersSheet()
+            true
+        }
+        binding.layoutLike.setOnLongClickListener(showLikers)
+        binding.btnLike.setOnLongClickListener(showLikers)
 
         // 顶栏双击快速回到顶部
-        com.solosu.mtforum.util.ScrollToTopHelper.attachNestedScrollView(binding.toolbar, binding.nestedScroll)
+        com.solosu.mtforum.util.ScrollToTopHelper.attachRecyclerView(binding.toolbar, binding.recyclerReplies)
 
         binding.btnFavorite.setOnClickListener { toggleFavorite() }
         binding.layoutFavorite.setOnClickListener { toggleFavorite() }
         binding.btnShare.setOnClickListener { shareThread() }
-        binding.btnViewHidden.setOnClickListener { viewHiddenContent() }
-        binding.btnLoadMore.setOnClickListener { loadMoreReplies() }
-        binding.nestedScroll.setOnScrollChangeListener { v, _, scrollY, _, oldScrollY ->
-            val scrollView = v as NestedScrollView
-            if (scrollY > oldScrollY) {
-                checkReplyPreload(scrollView, scrollY)
-            }
-        }
-        binding.btnOnlyOp.setOnClickListener {
+        // 顶栏图标：打赏 / 踢帖（原来在正文下方一整条按钮，现上移到分享左侧）
+        binding.btnReward.setOnClickListener { showRewardDialog() }
+        binding.btnKick.setOnClickListener { showKickDialog() }
+        loadPostDetail()
+    }
+
+    /**
+     * 取正文头视图（单例）。
+     *
+     * 头视图一旦被 RecyclerView 回收，其内容（尤其是 tvContent 里那大块 HTML）
+     * 就得重新构建。这里全程复用同一个实例，因此 bindData 渲染过的内容不会因
+     * 滚动离开屏幕而丢失；只有监听需要在每次绑定时重挂（在 bindThreadHeader 里）。
+     *
+     * 不做 removeView：暂存的视图本就不在父容器里（ensureHeaderBound 阶段已在树外，
+     * 或已被 RecyclerView 移除）；若仍在 RecyclerView 上说明回收/解绑顺序异常，
+     * 此时 return 原 view 由 RecyclerView 自行处理，避免从父子树上把活视图抽走。
+     */
+    private var headerView: View? = null
+
+    private fun obtainHeaderView(): View {
+        headerView?.let { return it }
+        // 必须传 parent 才能拿到正确的 LayoutParams：
+        // 传 null 时根布局的 layout_width="match_parent" 不生成 LayoutParams，
+        // RecyclerView 只能用默认 WRAP_CONTENT，头视图宽度会退化成“由子控件撑出来”
+        // ——正文会被压成一小条、右侧大片空白（曾真实踩到）。
+        val v = layoutInflater.inflate(R.layout.item_thread_detail_header,
+                binding.recyclerReplies, false)
+        // 双保险：显式声明宽度匹配父容器，不依赖 inflate 的推导结果
+        v.layoutParams = RecyclerView.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT)
+        headerView = v
+        return v
+    }
+
+    /** 确保正文头已创建并绑定，供 bindData 在 RecyclerView 首次布局前使用。 */
+    private fun ensureHeaderBound() {
+        if (headerBinding != null) return
+        bindThreadHeader(obtainHeaderView())
+    }
+
+    /**
+     * 绑定正文头 item（它现在是 RecyclerView 的第 0 项，会被回收重建）。
+     *
+     * 头的控件监听原来在 onCreate 里一次性挂到 activity 视图上；视图改成 item 后
+     * 每次重建监听都会丢，所以改为每次绑定重挂；数据回填走 applyHeaderFromDetail()。
+     */
+    private fun bindThreadHeader(view: View) {
+        val hb = ItemThreadDetailHeaderBinding.bind(view)
+        headerBinding = hb
+
+        hb.btnViewHidden.setOnClickListener { viewHiddenContent() }
+        // 打赏/踢帖已移到顶栏图标（见 onCreate 的 binding.btnReward / binding.btnKick）
+        hb.btnCollapseImages.setOnClickListener { toggleImageGallery() }
+        hb.btnOnlyOp.setOnClickListener {
             onlyOpReplies = !onlyOpReplies
-            lastPreloadTriggerCount = 0
             updateReplyFilterAndOrder()
         }
-        binding.btnReplyOrder.setOnClickListener {
+        hb.btnReplyOrder.setOnClickListener {
             repliesDescending = !repliesDescending
             refreshPostDetail()
         }
-        binding.btnReward.setOnClickListener { showRewardDialog() }
-        binding.btnKick.setOnClickListener { showKickDialog() }
-        // build64: AI 总结(详情页入口,与列表卡片行为一致)
-        binding.btnAiSummary.setOnClickListener {
-            val it = Intent(this, com.solosu.mtforum.ai.AiSummarizeActivity::class.java)
-            it.putExtra("tid", tid)
-            it.putExtra(
-                "title",
-                if (binding.tvThreadTitle.text != null) binding.tvThreadTitle.text.toString() else ""
-            )
-            startActivity(it)
+
+        // 正文由 bindData 负责渲染（含巨额 HTML），这里只保证绑定后的视觉状态正确
+        applyHeaderStaticState()
+    }
+
+    /**
+     * header 被回收重建后，把依赖 postDetail 的静态状态重新套上。
+     * 不动 tvContent：它的 HTML 由 bindData 渲染并缓存在 postDetail.contentHtml，
+     * 重新 fromHtml 一次代价很高，滚动中就重建 header 会明显掉帧。
+     */
+    private fun applyHeaderStaticState() {
+        val hb = headerBinding ?: return
+        val detail = postDetail ?: return
+        hb.tvThreadTitle.text = if (!TextUtils.isEmpty(detail.title)) detail.title else ""
+        hb.tvThreadTitle.isLongClickable = true
+        hb.tvThreadTitle.setOnLongClickListener {
+            reportPost(null)
+            true
         }
-        loadPostDetail()
+        if (!TextUtils.isEmpty(detail.forumName)) {
+            hb.tvForumName.visibility = View.VISIBLE
+            hb.tvForumName.text = detail.forumName
+        } else {
+            hb.tvForumName.visibility = View.GONE
+        }
+        val avatarUrl = detail.avatarUrl
+        if (!TextUtils.isEmpty(avatarUrl)) {
+            Glide.with(this as FragmentActivity).load(avatarUrl).transform(CircleCrop())
+                .placeholder(R.drawable.ic_account).error(R.drawable.ic_account)
+                .into(hb.ivAuthorAvatar)
+        } else {
+            hb.ivAuthorAvatar.setImageResource(R.drawable.ic_account)
+        }
+        hb.tvAuthorName.text = if (!TextUtils.isEmpty(detail.author)) detail.author else "匿名"
+        val authorUid = detail.authorUid
+        if (!TextUtils.isEmpty(authorUid)) {
+            hb.ivAuthorAvatar.setOnClickListener { openUserProfile(authorUid, detail.author) }
+            hb.tvAuthorName.setOnClickListener { openUserProfile(authorUid, detail.author) }
+        }
+        if (!TextUtils.isEmpty(detail.authorLevel)) {
+            hb.tvAuthorLevel.visibility = View.VISIBLE
+            hb.tvAuthorLevel.text = detail.authorLevel
+        } else {
+            hb.tvAuthorLevel.visibility = View.GONE
+        }
+        hb.tvPublishTime.text = if (!TextUtils.isEmpty(detail.publishTime)) detail.publishTime else ""
+        hb.tvLocation.visibility = View.GONE
+
+        // 图集重建：bindData 只在首次渲染时填过图集，header 视图重建后必须补上，
+        // 否则正文图会整块消失（只有图片列表，不需要重新 fromHtml）。
+        // 兜底：若正文抽取为空，则用解析器从消息区抽到的 imageUrls。
+        val galleryList = if (currentImageList.isNotEmpty()) currentImageList else detail.imageUrls
+        rebuildImageGallery(galleryList)
+        // 打赏/好评统计块与「赞过」行已移除：打赏人数改为顶栏图标角标，
+        // 赞过列表改为长按底部点赞图标弹出
+        bindRewardBadge(detail)
+    }
+
+    /**
+     * 重建正文图集。
+     *
+     * 拆成独立方法是因为它需要在两个时机执行：bindData 首次渲染，以及 header
+     * 视图被回收重建后的重新绑定。之前只做了前者，导致 header 一重建图集就空掉。
+     */
+    private fun rebuildImageGallery(imageList: List<String>?) {
+        val hb = headerBinding ?: return
+        if (imageList == null || imageList.isEmpty()) {
+            hb.cardImageGallery.visibility = View.GONE
+            hb.llImageGallery.removeAllViews()
+            return
+        }
+        hb.cardImageGallery.visibility = View.VISIBLE
+        hb.hsvImageGallery.visibility = View.VISIBLE
+        hb.llImageGallery.removeAllViews()
+        FrostedGlassHelper.applyToCardViews(hb.cardImageGallery, this)
+        val height = dpToPx(ItemTouchHelper.Callback.DEFAULT_DRAG_ANIMATION_DURATION)
+        val margin = dpToPx(4)
+        for (url in imageList) {
+            val imageView = ImageView(this)
+            imageView.layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT, height
+            )
+            imageView.adjustViewBounds = true
+            imageView.scaleType = ImageView.ScaleType.FIT_CENTER
+            (imageView.layoutParams as LinearLayout.LayoutParams).setMargins(margin, 0, margin, 0)
+            imageView.setOnClickListener { openImagePreview(url) }
+            Glide.with(this as FragmentActivity).load(url)
+                .placeholder(ColorDrawable(getColor(R.color.background_secondary)))
+                .error(ColorDrawable(getColor(R.color.divider)))
+                .into(imageView)
+            hb.llImageGallery.addView(imageView)
+        }
+        hb.btnCollapseImages.setOnClickListener { toggleImageGallery() }
+    }
+
+    /**
+     * 打赏人数角标：挂在顶栏打赏图标右上角。
+     *
+     * 原来正文底部有一整块「X 人打赏 / Y 人好评」+ 头像条，占位大且与顶栏图标重复；
+     * 现改为只在图标角标显示打赏人数。为 0 时角标隐藏（图标本体仍可点）。
+     */
+    private fun bindRewardBadge(detail: PostDetail) {
+        val badge = binding.tvRewardBadge
+        val count = detail.rewardCount
+        if (count > 0) {
+            badge.text = if (count > 99) "99+" else count.toString()
+            badge.visibility = View.VISIBLE
+        } else {
+            badge.visibility = View.GONE
+        }
     }
 
     private fun setupRecyclerView() {
         replyAdapter = ReplyAdapter(ArrayList())
-        replyAdapter!!.onPreloadListener = { checkAndPreloadReplies() }
         // build73: 评论长按 -> 回复 / 举报 / (本人)删除
         replyAdapter!!.setOnReplyLongClickListener(object : ReplyAdapter.OnReplyLongClickListener {
             override fun onReplyLongClick(item: ReplyItem?, position: Int) {
@@ -270,6 +424,25 @@ class ThreadDetailActivity : AppCompatActivity() {
         })
         binding.recyclerReplies.layoutManager = LinearLayoutManager(this)
         binding.recyclerReplies.adapter = replyAdapter
+
+        // 正文头作为第 0 个 item，整页由这个 RecyclerView 自己滚动，
+        // 不再依赖会一次性布局全部子项的 NestedScrollView，从而恢复回收复用。
+        replyAdapter!!.setHeaderProvider(object : ReplyAdapter.HeaderProvider {
+            override fun onCreateHeaderView(parent: ViewGroup): View {
+                return obtainHeaderView()
+            }
+
+            override fun onBindHeaderView(view: View) {
+                bindThreadHeader(view)
+            }
+        })
+
+        binding.recyclerReplies.addOnScrollListener(object : RecyclerView.OnScrollListener() {
+            override fun onScrolled(rv: RecyclerView, dx: Int, dy: Int) {
+                // 向下滚时检查是否该自动加载下一页（见 maybeAutoLoadMore）
+                if (dy > 0) maybeAutoLoadMore()
+            }
+        })
     }
 
     private fun loadPostDetail() {
@@ -289,7 +462,6 @@ class ThreadDetailActivity : AppCompatActivity() {
                 }
                 val detail = ForumParser.parseThreadDetail(html)
                 fetchRepliesUpTo(detail, 20)
-                enrichGoodReviewAvatars(detail)
                 refreshServerActionState(detail)
                 // build61: 进帖触发解锁——只记录页面,渲染后在后台线程执行(不阻塞首屏)
                 pendingUnlockHtml = html
@@ -357,7 +529,6 @@ class ThreadDetailActivity : AppCompatActivity() {
                 }
                 val detail = ForumParser.parseThreadDetail(html)
                 fetchRepliesUpTo(detail, 20)
-                enrichGoodReviewAvatars(detail)
                 refreshServerActionState(detail)
                 // build61: 下拉刷新链同样只记录页面,渲染后异步解锁(同加载链)
                 pendingUnlockHtml = html
@@ -400,18 +571,21 @@ class ThreadDetailActivity : AppCompatActivity() {
         }
         val postDetail = postDetailArg
         this.postDetail = postDetail
+        // 正文头是 RecyclerView 的 item，bindData 会直接写入它的控件；
+        // RecyclerView 首次布局前 header 可能尚未创建/绑定，这里先确保就绪。
+        ensureHeaderBound()
         binding.progressBar.visibility = View.GONE
         binding.swipeRefresh.isEnabled = true
         if (!TextUtils.isEmpty(postDetail.forumName)) {
-            binding.tvForumName.visibility = View.VISIBLE
-            binding.tvForumName.text = postDetail.forumName
+            headerBinding!!.tvForumName.visibility = View.VISIBLE
+            headerBinding!!.tvForumName.text = postDetail.forumName
         } else {
-            binding.tvForumName.visibility = View.GONE
+            headerBinding!!.tvForumName.visibility = View.GONE
         }
-        binding.tvThreadTitle.text = if (!TextUtils.isEmpty(postDetail.title)) postDetail.title else ""
+        headerBinding!!.tvThreadTitle.text = if (!TextUtils.isEmpty(postDetail.title)) postDetail.title else ""
         // build75: 长按标题 -> 举报帖子
-        binding.tvThreadTitle.isLongClickable = true
-        binding.tvThreadTitle.setOnLongClickListener {
+        headerBinding!!.tvThreadTitle.isLongClickable = true
+        headerBinding!!.tvThreadTitle.setOnLongClickListener {
             reportPost(null)
             true
         }
@@ -419,48 +593,48 @@ class ThreadDetailActivity : AppCompatActivity() {
         if (!TextUtils.isEmpty(avatarUrl)) {
             Glide.with(this as FragmentActivity).load(avatarUrl).transform(CircleCrop())
                 .placeholder(R.drawable.ic_account).error(R.drawable.ic_account)
-                .into(binding.ivAuthorAvatar)
+                .into(headerBinding!!.ivAuthorAvatar)
         } else {
-            binding.ivAuthorAvatar.setImageResource(R.drawable.ic_account)
+            headerBinding!!.ivAuthorAvatar.setImageResource(R.drawable.ic_account)
         }
-        binding.tvAuthorName.text = if (!TextUtils.isEmpty(postDetail.author)) postDetail.author else "匿名"
+        headerBinding!!.tvAuthorName.text = if (!TextUtils.isEmpty(postDetail.author)) postDetail.author else "匿名"
         val authorUid = postDetail.authorUid
         if (!TextUtils.isEmpty(authorUid)) {
-            binding.ivAuthorAvatar.setOnClickListener { openUserProfile(authorUid, postDetail.author) }
-            binding.tvAuthorName.setOnClickListener { openUserProfile(authorUid, postDetail.author) }
+            headerBinding!!.ivAuthorAvatar.setOnClickListener { openUserProfile(authorUid, postDetail.author) }
+            headerBinding!!.tvAuthorName.setOnClickListener { openUserProfile(authorUid, postDetail.author) }
         }
         if (!TextUtils.isEmpty(postDetail.authorLevel)) {
-            binding.tvAuthorLevel.visibility = View.VISIBLE
-            binding.tvAuthorLevel.text = postDetail.authorLevel
+            headerBinding!!.tvAuthorLevel.visibility = View.VISIBLE
+            headerBinding!!.tvAuthorLevel.text = postDetail.authorLevel
         } else {
-            binding.tvAuthorLevel.visibility = View.GONE
+            headerBinding!!.tvAuthorLevel.visibility = View.GONE
         }
-        binding.tvPublishTime.text = if (!TextUtils.isEmpty(postDetail.publishTime)) postDetail.publishTime else ""
-        binding.tvLocation.visibility = View.GONE
+        headerBinding!!.tvPublishTime.text = if (!TextUtils.isEmpty(postDetail.publishTime)) postDetail.publishTime else ""
+        headerBinding!!.tvLocation.visibility = View.GONE
         // 收藏数回填缓存:详情页拿到数字后存进 FavoritesCache,列表卡片第四格就能显示
         if (postDetail.favoriteCount > 0) {
             FavoritesCache.put(this, postDetail.tid, postDetail.favoriteCount)
         }
         if (httpClient.isLoggedIn() && !TextUtils.isEmpty(postDetail.author)) {
-            binding.btnFollow.visibility = View.VISIBLE
+            headerBinding!!.btnFollow.visibility = View.VISIBLE
             if (isOwnThread(postDetail)) {
                 // build73: 自己的帖子 -> 右上角是「编辑」(不是关注)
-                binding.btnFollow.text = "编辑"
-                binding.btnFollow.setOnClickListener { openEditThread() }
+                headerBinding!!.btnFollow.text = "编辑"
+                headerBinding!!.btnFollow.setOnClickListener { openEditThread() }
             } else {
-                binding.btnFollow.setText(
+                headerBinding!!.btnFollow.setText(
                     if (postDetail.isFollowed) R.string.action_followed else R.string.action_follow
                 )
-                binding.btnFollow.setOnClickListener { toggleFollow() }
+                headerBinding!!.btnFollow.setOnClickListener { toggleFollow() }
             }
         } else {
-            binding.btnFollow.visibility = View.GONE
+            headerBinding!!.btnFollow.visibility = View.GONE
         }
         val contentHtml = postDetail.contentHtml
         var hiddenNotice = ""
         if (!TextUtils.isEmpty(contentHtml)) {
             val converted = BBCodeUtil.convertBBCodeToHtml(contentHtml)
-            binding.tvContent.visibility = View.VISIBLE
+            headerBinding!!.tvContent.visibility = View.VISIBLE
             val imageList = ArrayList<String>()
             val footerSplit = splitEditFooter(converted)
             val cleaned = extractAndSeparateImages(footerSplit[0], imageList)
@@ -473,19 +647,10 @@ class ThreadDetailActivity : AppCompatActivity() {
                 }
             }
             if (!TextUtils.isEmpty(footerSplit[1])) {
-                binding.layoutEditFooter.visibility = View.VISIBLE
-                binding.tvEditFooter.text = footerSplit[1]
-                binding.viewContentTopDivider.visibility = View.GONE
-                adjustEditFooterDividerWidth()
-                val lp = binding.frameContent.layoutParams as LinearLayout.LayoutParams
-                lp.topMargin = 0
-                binding.frameContent.layoutParams = lp
+                headerBinding!!.layoutEditFooter.visibility = View.VISIBLE
+                headerBinding!!.tvEditFooter.text = footerSplit[1]
             } else {
-                binding.layoutEditFooter.visibility = View.GONE
-                binding.viewContentTopDivider.visibility = View.VISIBLE
-                val lp2 = binding.frameContent.layoutParams as LinearLayout.LayoutParams
-                lp2.topMargin = dpToPx(12)
-                binding.frameContent.layoutParams = lp2
+                headerBinding!!.layoutEditFooter.visibility = View.GONE
             }
             // 收集当前帖全部图片供全屏翻页
             currentImageList = ArrayList(imageList)
@@ -494,46 +659,21 @@ class ThreadDetailActivity : AppCompatActivity() {
                     && !TextUtils.isEmpty(postDetail.hiddenContentHtml)
                     && !AutoReplyEngine.isLockedHidden(postDetail.hiddenContentHtml)
             hiddenNotice = if (unlocked) "隐藏内容(已解锁)" else placeholders[1]
-            binding.tvContent.text = safeFromHtml(
+            headerBinding!!.tvContent.text = safeFromHtml(
                 placeholders[0],
-                createInlineImageGetter(binding.tvContent),
+                createInlineImageGetter(headerBinding!!.tvContent),
                 BBCodeUtil.createTagHandler(this)
             )
-            applyHiddenNoticeHighlight(binding.tvContent.text, hiddenNotice)
-            setupClickableLinks(binding.tvContent)
-            if (!imageList.isEmpty()) {
-                binding.cardImageGallery.visibility = View.VISIBLE
-                binding.hsvImageGallery.visibility = View.VISIBLE
-                binding.llImageGallery.removeAllViews()
-                FrostedGlassHelper.applyToCardViews(binding.cardImageGallery, this)
-                val height = dpToPx(ItemTouchHelper.Callback.DEFAULT_DRAG_ANIMATION_DURATION)
-                val margin = dpToPx(4)
-                for (str2 in imageList) {
-                    val imageView = ImageView(this)
-                    imageView.layoutParams = LinearLayout.LayoutParams(
-                        LinearLayout.LayoutParams.WRAP_CONTENT, height
-                    )
-                    imageView.adjustViewBounds = true
-                    imageView.scaleType = ImageView.ScaleType.FIT_CENTER
-                    (imageView.layoutParams as LinearLayout.LayoutParams).setMargins(margin, 0, margin, 0)
-                    imageView.setOnClickListener { openImagePreview(str2) }
-                    Glide.with(this as FragmentActivity).load(str2)
-                        .placeholder(ColorDrawable(getColor(R.color.background_secondary)))
-                        .error(ColorDrawable(getColor(R.color.divider)))
-                        .into(imageView)
-                    binding.llImageGallery.addView(imageView)
-                }
-                binding.btnCollapseImages.setOnClickListener { toggleImageGallery() }
-            } else {
-                binding.cardImageGallery.visibility = View.GONE
-            }
+            applyHiddenNoticeHighlight(headerBinding!!.tvContent.text, hiddenNotice)
+            setupClickableLinks(headerBinding!!.tvContent)
+            rebuildImageGallery(imageList)
         } else {
-            binding.tvContent.visibility = View.VISIBLE
-            binding.cardImageGallery.visibility = View.GONE
-            binding.tvContent.text = "[内容加载中，请刷新重试]"
-            binding.tvContent.setTextColor(getColor(R.color.text_hint))
-            binding.tvContent.textSize = 14.0f
-            binding.tvContent.gravity = Gravity.CENTER
+            headerBinding!!.tvContent.visibility = View.VISIBLE
+            headerBinding!!.cardImageGallery.visibility = View.GONE
+            headerBinding!!.tvContent.text = "[内容加载中，请刷新重试]"
+            headerBinding!!.tvContent.setTextColor(getColor(R.color.text_hint))
+            headerBinding!!.tvContent.textSize = 14.0f
+            headerBinding!!.tvContent.gravity = Gravity.CENTER
         }
         val hasHidden = postDetail.hasHiddenContent
         val hiddenUnlocked = hasHidden && httpClient.isLoggedIn()
@@ -541,20 +681,20 @@ class ThreadDetailActivity : AppCompatActivity() {
                 && !AutoReplyEngine.isLockedHidden(postDetail.hiddenContentHtml)
         if (hiddenUnlocked) {
             // 已登录且可获取隐藏内容:正文中的胶囊只显示短提示,下方直接展示完整内容
-            binding.layoutHiddenContent.visibility = View.VISIBLE
-            binding.tvHiddenContentHint.visibility = View.GONE
-            binding.btnViewHidden.visibility = View.GONE
+            headerBinding!!.layoutHiddenContent.visibility = View.VISIBLE
+            headerBinding!!.tvHiddenContentHint.visibility = View.GONE
+            headerBinding!!.btnViewHidden.visibility = View.GONE
             renderHiddenContent(postDetail.hiddenContentHtml)
         } else if (hasHidden) {
             // 未登录或暂无内容:显示按钮引导查看(点击会提示登录或重新加载)
-            binding.layoutHiddenContent.visibility = View.VISIBLE
-            binding.tvHiddenContentHint.visibility = View.VISIBLE
-            binding.btnViewHidden.visibility = View.VISIBLE
-            binding.tvHiddenContent.visibility = View.GONE
+            headerBinding!!.layoutHiddenContent.visibility = View.VISIBLE
+            headerBinding!!.tvHiddenContentHint.visibility = View.VISIBLE
+            headerBinding!!.btnViewHidden.visibility = View.VISIBLE
+            headerBinding!!.tvHiddenContent.visibility = View.GONE
             // 自动解锁：进入帖子发现是「回复可见」时，后台直接回复解锁
             maybeAutoUnlock()
         } else {
-            binding.layoutHiddenContent.visibility = View.GONE
+            headerBinding!!.layoutHiddenContent.visibility = View.GONE
         }
         if (postDetail.likedStateKnown) {
             isLiked = postDetail.isLiked
@@ -566,8 +706,6 @@ class ThreadDetailActivity : AppCompatActivity() {
         updateLikeIcon()
         updateCountBadge(binding.tvCommentsBadge, postDetail.replyCount)
         updateCountBadge(binding.tvLikeBadge, likeCount)
-        // === 点赞人头像行 ===
-        bindLikeUsers(postDetail)
         if (postDetail.favoritedStateKnown) {
             isFavorited = postDetail.isFavorited
             saveFavoritedState(isFavorited)
@@ -591,43 +729,25 @@ class ThreadDetailActivity : AppCompatActivity() {
             }
         }
         displayedReplies = ArrayList(replies)
-        lastPreloadTriggerCount = 0
+        replyAdapter!!.setFooterActionListener(object : ReplyAdapter.FooterActionListener {
+            override fun onRetry() {
+                replyAdapter?.setFooterState(null)
+                loadMoreReplies()
+            }
+        })
         updateReplyFilterAndOrder()
-        binding.btnLoadMore.visibility = if (postDetail.currentPage < postDetail.totalPages) View.VISIBLE else View.GONE
         val replyCount = postDetail.replyCount
         if (replyCount > 0) {
-            binding.tvReplyCount.visibility = View.VISIBLE
-            binding.tvReplyCount.text = "($replyCount)"
+            headerBinding!!.tvReplyCount.visibility = View.VISIBLE
+            headerBinding!!.tvReplyCount.text = "($replyCount)"
         } else {
-            binding.tvReplyCount.visibility = View.GONE
+            headerBinding!!.tvReplyCount.visibility = View.GONE
         }
-        binding.btnLoadMore.visibility = View.GONE
         binding.layoutReply.visibility = if (httpClient.isLoggedIn()) View.VISIBLE else View.GONE
-        binding.layoutThreadActions.visibility = if (httpClient.isLoggedIn()) View.VISIBLE else View.GONE
-        val rewardCount = postDetail.rewardCount
-        val goodReviewCount = postDetail.goodReviewCount
-        val rewardCoins = postDetail.rewardCoins
-        val rewardUserAvatars = postDetail.rewardUserAvatars
-        val goodReviewUserAvatars = postDetail.goodReviewUserAvatars
-        var hasRewardStats = true
-        if (rewardCount <= 0 && goodReviewCount <= 0 &&
-            (rewardUserAvatars == null || rewardUserAvatars.isEmpty()) &&
-            (goodReviewUserAvatars == null || goodReviewUserAvatars.isEmpty())
-        ) {
-            hasRewardStats = false
-        }
-        if (httpClient.isLoggedIn() && hasRewardStats) {
-            binding.layoutRewardReviewStats.visibility = View.VISIBLE
-            binding.tvRewardCount.text = rewardCount.toString()
-            binding.tvRewardCoins.text = "共计 $rewardCoins 金币"
-            binding.tvGoodReviewCount.text = goodReviewCount.toString()
-            bindAvatarStrip(binding.llRewardAvatars, rewardUserAvatars)
-            bindAvatarStrip(binding.llGoodReviewAvatars, goodReviewUserAvatars)
-        } else {
-            binding.layoutRewardReviewStats.visibility = View.GONE
-        }
-        if (scrollToTop && binding.nestedScroll.scrollY != 0) {
-            binding.nestedScroll.scrollTo(0, 0)
+        // 打赏/踢帖改为顶栏图标，不再按登录态显隐正文里的按钮条
+        bindRewardBadge(postDetail)
+        if (scrollToTop && binding.recyclerReplies.computeVerticalScrollOffset() != 0) {
+            binding.recyclerReplies.scrollToPosition(0)
         }
     }
 
@@ -639,18 +759,18 @@ class ThreadDetailActivity : AppCompatActivity() {
     }
 
     private fun toggleImageGallery() {
-        val isCollapsed = binding.hsvImageGallery.visibility == View.GONE
+        val isCollapsed = headerBinding!!.hsvImageGallery.visibility == View.GONE
         if (isCollapsed) {
-            binding.hsvImageGallery.visibility = View.VISIBLE
-            binding.hsvImageGallery.alpha = 0.0f
-            binding.hsvImageGallery.animate().alpha(1.0f).setDuration(300L).start()
-            binding.btnCollapseImages.animate().rotation(90.0f).setDuration(200L).start()
+            headerBinding!!.hsvImageGallery.visibility = View.VISIBLE
+            headerBinding!!.hsvImageGallery.alpha = 0.0f
+            headerBinding!!.hsvImageGallery.animate().alpha(1.0f).setDuration(300L).start()
+            headerBinding!!.btnCollapseImages.animate().rotation(90.0f).setDuration(200L).start()
             return
         }
-        binding.hsvImageGallery.animate().alpha(0.0f).setDuration(200L)
-            .withEndAction { binding.hsvImageGallery.visibility = View.GONE }
+        headerBinding!!.hsvImageGallery.animate().alpha(0.0f).setDuration(200L)
+            .withEndAction { headerBinding!!.hsvImageGallery.visibility = View.GONE }
             .start()
-        binding.btnCollapseImages.animate().rotation(-90.0f).setDuration(200L).start()
+        headerBinding!!.btnCollapseImages.animate().rotation(-90.0f).setDuration(200L).start()
     }
 
     private fun getReplyOrder(): String {
@@ -681,83 +801,36 @@ class ThreadDetailActivity : AppCompatActivity() {
             }
         }
         replyAdapter!!.updateData(result)
+        // 过滤/排序后数据整体变了，底部状态行重置：还有下一页就让滚动监听重新触发
+        if (postDetail != null && postDetail!!.currentPage < postDetail!!.totalPages) {
+            replyAdapter!!.setFooterState(null)
+            // 首屏可能不够清屏内容、用户根本滑不动；布局完成后补一次检查
+            binding.recyclerReplies.post { maybeAutoLoadMore() }
+        } else {
+            replyAdapter!!.setFooterState(ReplyAdapter.FooterState.END)
+        }
         val themeColor = com.solosu.mtforum.util.ThemeManager.getThemeColor(this)
-        binding.btnOnlyOp.setText(if (onlyOpReplies) R.string.reply_all_users else R.string.reply_only_op)
-        binding.btnOnlyOp.setTextColor(if (onlyOpReplies) themeColor else getColor(R.color.text_secondary))
-        binding.btnReplyOrder.setText(if (repliesDescending) R.string.reply_order_desc else R.string.reply_order_asc)
-        binding.btnReplyOrder.setTextColor(if (repliesDescending) themeColor else getColor(R.color.text_secondary))
+        headerBinding?.let {
+            it.btnOnlyOp.setText(if (onlyOpReplies) R.string.reply_all_users else R.string.reply_only_op)
+            it.btnOnlyOp.setTextColor(if (onlyOpReplies) themeColor else getColor(R.color.text_secondary))
+            it.btnReplyOrder.setText(if (repliesDescending) R.string.reply_order_desc else R.string.reply_order_asc)
+            it.btnReplyOrder.setTextColor(if (repliesDescending) themeColor else getColor(R.color.text_secondary))
+        }
         if (result.isEmpty()) {
-            binding.recyclerReplies.visibility = View.GONE
-            binding.tvEmptyReplies.visibility = View.VISIBLE
+            // 评论为空时 RecyclerView 仍要显示：正文头是它的第 0 项。
+            binding.recyclerReplies.visibility = View.VISIBLE
+            binding.recyclerReplies.scrollToPosition(0)
+            headerBinding?.tvEmptyReplies?.visibility = View.VISIBLE
         } else {
             binding.recyclerReplies.visibility = View.VISIBLE
-            binding.tvEmptyReplies.visibility = View.GONE
+            headerBinding?.tvEmptyReplies?.visibility = View.GONE
         }
     }
 
-    private fun enrichGoodReviewAvatars(detail: PostDetail?) {
-        if (detail == null) {
-            return
-        }
-        try {
-            if (detail.goodReviewCount > 0) {
-                val desktopHtml = httpClient.getDesktop(ForumParser.getThreadDesktopDetailUrl(tid))
-                val avatars = ForumParser.parseGoodReviewAvatarUrls(desktopHtml)
-                if (avatars != null && !avatars.isEmpty()) {
-                    detail.goodReviewUserAvatars = avatars
-                }
-            }
-            val rewardDetailUrl = detail.rewardDetailUrl
-            if (!TextUtils.isEmpty(rewardDetailUrl)) {
-                val rewardHtml = httpClient.get(rewardDetailUrl!!)
-                detail.rewardCoins = ForumParser.parseRewardCoins(rewardHtml)
-            }
-        } catch (ignored: Exception) {
-        }
-    }
-
-    private fun bindAvatarStrip(linearLayout: LinearLayout?, avatarUrls: MutableList<String>?) {
-        if (linearLayout == null) {
-            return
-        }
-        linearLayout.removeAllViews()
-        if (avatarUrls == null || avatarUrls.isEmpty()) {
-            return
-        }
-        val maxVisible = minOf(6, avatarUrls.size)
-        val size = dpToPx(32)
-        val overlap = dpToPx(8)
-        for (i in 0 until maxVisible) {
-            val avatar = ImageView(this)
-            val params = LinearLayout.LayoutParams(size, size)
-            if (i > 0) {
-                params.leftMargin = -overlap
-            }
-            avatar.layoutParams = params
-            avatar.scaleType = ImageView.ScaleType.CENTER_CROP
-            avatar.setPadding(dpToPx(1), dpToPx(1), dpToPx(1), dpToPx(1))
-            avatar.setBackgroundResource(R.drawable.circle_avatar_bg)
-            val url = avatarUrls[i]
-            Glide.with(this as FragmentActivity).load(url).transform(CircleCrop())
-                .placeholder(R.drawable.ic_account).error(R.drawable.ic_account)
-                .into(avatar)
-            linearLayout.addView(avatar)
-        }
-        if (avatarUrls.size > 6) {
-            val more = TextView(this)
-            val params2 = LinearLayout.LayoutParams(dpToPx(32), dpToPx(32))
-            params2.leftMargin = -overlap
-            more.layoutParams = params2
-            more.gravity = Gravity.CENTER
-            more.text = "+" + (avatarUrls.size - 6)
-            more.textSize = 10.0f
-            more.setTextColor(-1)
-            val bg = GradientDrawable()
-            bg.shape = GradientDrawable.OVAL
-            bg.setColor(-1728053248)
-            bg.setStroke(dpToPx(1), -1)
-            more.background = bg
-            linearLayout.addView(more)
+    /** 滚到评论区（正文头之后的第一屏评论）。 */
+    private fun scrollToReplySection() {
+        binding.recyclerReplies.post {
+            binding.recyclerReplies.smoothScrollToPosition(ReplyAdapter.HEADER_ITEM_COUNT)
         }
     }
 
@@ -1194,17 +1267,17 @@ class ThreadDetailActivity : AppCompatActivity() {
             return
         }
         val targetState = !detail.isFollowed
-        binding.btnFollow.isEnabled = false
+        headerBinding!!.btnFollow.isEnabled = false
         java.lang.Thread {
             val success = FollowStateManager.syncFollow(this, detail.authorUid, targetState)
             runOnUiThread {
-                binding.btnFollow.isEnabled = true
+                headerBinding!!.btnFollow.isEnabled = true
                 if (!success) {
                     Toast.makeText(this, "关注操作失败，请稍后重试", Toast.LENGTH_SHORT).show()
                     return@runOnUiThread
                 }
                 detail.isFollowed = targetState
-                binding.btnFollow.setText(
+                headerBinding!!.btnFollow.setText(
                     if (targetState) R.string.action_followed else R.string.action_follow
                 )
                 val res = if (targetState) R.string.action_follow_success else R.string.action_unfollow_success
@@ -1789,34 +1862,6 @@ class ThreadDetailActivity : AppCompatActivity() {
         }
     }
 
-    private fun adjustEditFooterDividerWidth() {
-        binding.tvEditFooter.post {
-            if (binding.tvEditFooter.visibility != View.VISIBLE) {
-                return@post
-            }
-            val text = binding.tvEditFooter.text.toString().trim()
-            if (TextUtils.isEmpty(text)) {
-                return@post
-            }
-            val textW = binding.tvEditFooter.paint.measureText(text)
-            val divider = binding.viewEditDivider
-            val lp = divider.layoutParams as LinearLayout.LayoutParams
-            val parentW = divider.measuredWidth
-            if (parentW <= 0) {
-                return@post
-            }
-            val w = minOf(dpToPx(2) + textW.toInt(), parentW)
-            lp.width = w
-            lp.gravity = Gravity.CENTER
-            divider.layoutParams = lp
-            val dividerTop = binding.viewEditDividerTop
-            val lpTop = dividerTop.layoutParams as LinearLayout.LayoutParams
-            lpTop.width = w
-            lpTop.gravity = Gravity.CENTER
-            dividerTop.layoutParams = lpTop
-        }
-    }
-
     private fun splitEditFooter(html: String?): Array<String> {
         if (html == null) {
             return arrayOf("", "")
@@ -1876,16 +1921,16 @@ class ThreadDetailActivity : AppCompatActivity() {
         if (TextUtils.isEmpty(hiddenHtml)) {
             return
         }
-        binding.tvHiddenContent.visibility = View.VISIBLE
+        headerBinding!!.tvHiddenContent.visibility = View.VISIBLE
         val bbcodeConverted = BBCodeUtil.convertBBCodeToHtml(hiddenHtml!!)
         val hiddenImageUrls = ArrayList<String>()
         val cleanHiddenHtml = extractAndSeparateImages(bbcodeConverted, hiddenImageUrls)
-        binding.tvHiddenContent.text = Html.fromHtml(
+        headerBinding!!.tvHiddenContent.text = Html.fromHtml(
             cleanHiddenHtml, Html.FROM_HTML_MODE_COMPACT,
-            createInlineImageGetter(binding.tvHiddenContent),
+            createInlineImageGetter(headerBinding!!.tvHiddenContent),
             BBCodeUtil.createTagHandler(this)
         )
-        setupClickableLinks(binding.tvHiddenContent)
+        setupClickableLinks(headerBinding!!.tvHiddenContent)
         for (imgUrl in hiddenImageUrls) {
             val imageView = ImageView(this)
             imageView.layoutParams = LinearLayout.LayoutParams(
@@ -1900,10 +1945,10 @@ class ThreadDetailActivity : AppCompatActivity() {
                 .placeholder(ColorDrawable(getColor(R.color.background_secondary)))
                 .error(ColorDrawable(getColor(R.color.divider)))
                 .into(imageView)
-            binding.llImageGallery.addView(imageView)
+            headerBinding!!.llImageGallery.addView(imageView)
         }
-        binding.cardImageGallery.visibility = View.VISIBLE
-        FrostedGlassHelper.applyToCardViews(binding.cardImageGallery, this)
+        headerBinding!!.cardImageGallery.visibility = View.VISIBLE
+        FrostedGlassHelper.applyToCardViews(headerBinding!!.cardImageGallery, this)
     }
 
     private fun viewHiddenContent() {
@@ -1915,8 +1960,8 @@ class ThreadDetailActivity : AppCompatActivity() {
             promptLogin()
             return
         }
-        binding.tvHiddenContentHint.visibility = View.GONE
-        binding.btnViewHidden.visibility = View.GONE
+        headerBinding!!.tvHiddenContentHint.visibility = View.GONE
+        headerBinding!!.btnViewHidden.visibility = View.GONE
         if (!TextUtils.isEmpty(detail.hiddenContentHtml)) {
             renderHiddenContent(detail.hiddenContentHtml)
         } else {
@@ -1986,15 +2031,21 @@ class ThreadDetailActivity : AppCompatActivity() {
         }, "auto-unlock").start()
     }
 
-    private var lastPreloadTriggerCount = 0
-
     /**
-     * 顺序拉取后续页面，直到回复总数达到 targetCount 或无更多页
+     * 顺序拉取后续页面，直到回复总数达到 targetCount 或无更多页。
+     *
+     * 注意：必须有“本页未产出新回复就立即停止”的出口。旧版只有
+     * `replies.size < targetCount` 一个条件，一旦某页解析出的回复少于预期
+     * （模板差异/楼层被过滤），size 不增长，循环就会一路翻到 totalPages ——
+     * 变成几十上百次串行请求，这就是“有些帖子进帖特别慢”的原因。
      */
     private fun fetchRepliesUpTo(detail: PostDetail, targetCount: Int) {
         var curTotalPages = detail.totalPages
         var nextPage = detail.currentPage + 1
+        var guard = 0
         while ((detail.replies?.size ?: 0) < targetCount && nextPage <= curTotalPages) {
+            if (++guard > MAX_PREFETCH_PAGES) break
+            var added = 0
             try {
                 val nextUrl = ForumParser.getThreadDetailUrl(tid, nextPage, getReplyOrder())
                 val nextHtml = httpClient.get(nextUrl)
@@ -2005,6 +2056,7 @@ class ThreadDetailActivity : AppCompatActivity() {
                         val currentReplies = detail.replies ?: ArrayList()
                         currentReplies.addAll(nextReplies)
                         detail.replies = currentReplies
+                        added = nextReplies.size
                     }
                     detail.currentPage = maxOf(detail.currentPage, nextPageDetail.currentPage, nextPage)
                     if (nextPageDetail.totalPages > curTotalPages) {
@@ -2017,57 +2069,34 @@ class ThreadDetailActivity : AppCompatActivity() {
             } catch (_: Exception) {
                 break
             }
+            // 该页没有产出新回复：说明模板/解析与预期不符，继续翻页只会浪费时间
+            if (added == 0) break
             nextPage++
         }
     }
 
-    private fun checkAndPreloadReplies() {
-        if (postDetail == null || isLoadingMore) return
+    private fun maybeAutoLoadMore() {
+        if (isFinishing || isDestroyed) return
+        if (isLoadingMore) return
         val detail = postDetail ?: return
-        if (detail.currentPage >= detail.totalPages) return
-        val totalCount = replyAdapter?.itemCount ?: 0
-        if (totalCount != lastPreloadTriggerCount) {
-            lastPreloadTriggerCount = totalCount
+        val adapter = replyAdapter ?: return
+        // 加载失败时不再自动重试，否则会陷入无休止的请求循环；等用户点「重试」
+        if (adapter.footerState == ReplyAdapter.FooterState.RETRY) return
+        if (detail.currentPage >= detail.totalPages) {
+            adapter.setFooterState(ReplyAdapter.FooterState.END)
+            return
+        }
+
+        val lm = binding.recyclerReplies.layoutManager as? LinearLayoutManager ?: return
+        val lastVisible = lm.findLastVisibleItemPosition()
+        if (lastVisible == RecyclerView.NO_POSITION) return
+        val total = adapter.itemCount
+        if (total <= 0) return
+        if (lastVisible >= total - AUTO_LOAD_THRESHOLD) {
             loadMoreReplies()
-        }
-    }
-
-    private fun checkReplyPreload(scrollView: NestedScrollView, scrollY: Int) {
-        if (postDetail == null || isLoadingMore) return
-        val detail = postDetail ?: return
-        if (detail.currentPage >= detail.totalPages) return
-
-        val totalCount = replyAdapter?.itemCount ?: 0
-        if (totalCount == lastPreloadTriggerCount) return
-
-        val lm = binding.recyclerReplies.layoutManager as? LinearLayoutManager
-        val triggerIndex = if (totalCount <= 15) {
-            maxOf(0, totalCount - 2)
         } else {
-            maxOf(0, totalCount - 6)
-        }
-        val triggerView = lm?.findViewByPosition(triggerIndex)
-        val viewportBottom = scrollY + scrollView.height
-        var shouldTrigger = false
-
-        if (triggerView != null) {
-            val triggerTopInScroll = triggerView.top + binding.recyclerReplies.top
-            if (viewportBottom >= triggerTopInScroll) {
-                shouldTrigger = true
-            }
-        } else {
-            val scrollContent = scrollView.getChildAt(0)
-            if (scrollContent != null) {
-                val contentHeight = scrollContent.height - scrollView.height
-                if (scrollY >= contentHeight - 1000) {
-                    shouldTrigger = true
-                }
-            }
-        }
-
-        if (shouldTrigger) {
-            lastPreloadTriggerCount = totalCount
-            loadMoreReplies()
+            // 还没滑到接近底部：把底部状态行收起来，避免列表中间凭空多一行“加载中”
+            adapter.setFooterState(null)
         }
     }
 
@@ -2076,19 +2105,27 @@ class ThreadDetailActivity : AppCompatActivity() {
             return
         }
         val curDetail = postDetail!!
+        val adapter = replyAdapter
         if (curDetail.currentPage >= curDetail.totalPages) {
+            adapter?.setFooterState(ReplyAdapter.FooterState.END)
             return
         }
         isLoadingMore = true
-        binding.btnLoadMore.isEnabled = false
-        binding.btnLoadMore.setText(R.string.loading)
-        binding.loadingMore.visibility = View.VISIBLE
+        adapter?.setFooterState(ReplyAdapter.FooterState.LOADING)
         java.lang.Thread {
+            var failedMessage: String? = null
+            val allNewReplies = ArrayList<ReplyItem>()
+            var pagesFetched = 0
             try {
                 var totalPages = curDetail.totalPages
-                val allNewReplies = ArrayList<ReplyItem>()
                 var page = curDetail.currentPage + 1
-                while (allNewReplies.size < 20 && page <= totalPages) {
+                // 尽量凑足一屏，但最多只连拉 LOAD_PAGE_BATCH 页：
+                // 论坛每页条数不由我们决定，某些页可能只解析出几条甚至 0 条，
+                // 只拉一页就会呈现“点一次没几条”的观感。
+                while (page <= totalPages && pagesFetched < LOAD_PAGE_BATCH &&
+                    allNewReplies.size < REPLIES_PER_PAGE
+                ) {
+                    pagesFetched++
                     val pageUrl = ForumParser.getThreadDetailUrl(tid, page, getReplyOrder())
                     val html = httpClient.get(pageUrl)
                     if (!TextUtils.isEmpty(html)) {
@@ -2107,39 +2144,42 @@ class ThreadDetailActivity : AppCompatActivity() {
                     }
                     page++
                 }
-                runOnUiThread {
-                    if (isFinishing || isDestroyed) return@runOnUiThread
-                    isLoadingMore = false
-                    binding.btnLoadMore.isEnabled = true
-                    binding.btnLoadMore.setText(R.string.load_more_replies)
-                    binding.loadingMore.visibility = View.GONE
-                    if (!allNewReplies.isEmpty()) {
-                        val bl = BlacklistManager.uidSet(this)
-                        if (!bl.isEmpty()) {
-                            val itr = allNewReplies.iterator()
-                            while (itr.hasNext()) {
-                                val r = itr.next()
-                                if (r != null && r.authorUid != null && bl.contains(r.authorUid)) itr.remove()
-                            }
-                        }
-                        val merged = ArrayList<ReplyItem>(curDetail.replies ?: ArrayList())
-                        merged.addAll(allNewReplies)
-                        curDetail.replies = merged
-                        displayedReplies = ArrayList(merged)
-                        updateReplyFilterAndOrder()
-                    } else {
-                        Toast.makeText(this, R.string.no_more_replies, Toast.LENGTH_SHORT).show()
-                    }
-                binding.btnLoadMore.visibility = if (curDetail.currentPage < curDetail.totalPages) View.VISIBLE else View.GONE
-                }
             } catch (e: Exception) {
-                runOnUiThread {
-                    if (isFinishing || isDestroyed) return@runOnUiThread
-                    isLoadingMore = false
-                    binding.btnLoadMore.isEnabled = true
-                    binding.btnLoadMore.setText(R.string.load_more_replies)
-                    binding.loadingMore.visibility = View.GONE
-                    Toast.makeText(this, "加载失败: " + e.message, Toast.LENGTH_SHORT).show()
+                failedMessage = e.message ?: "网络异常"
+            }
+            val err = failedMessage
+            val fetched = allNewReplies
+            runOnUiThread {
+                if (isFinishing || isDestroyed) return@runOnUiThread
+                isLoadingMore = false
+                if (err != null) {
+                    adapter?.setFooterState(ReplyAdapter.FooterState.RETRY)
+                    Toast.makeText(this, "加载失败: $err", Toast.LENGTH_SHORT).show()
+                    return@runOnUiThread
+                }
+                if (fetched.isNotEmpty()) {
+                    val bl = BlacklistManager.uidSet(this)
+                    if (!bl.isEmpty()) {
+                        val itr = fetched.iterator()
+                        while (itr.hasNext()) {
+                            val r = itr.next()
+                            if (r != null && r.authorUid != null && bl.contains(r.authorUid)) itr.remove()
+                        }
+                    }
+                    val merged = ArrayList<ReplyItem>(curDetail.replies ?: ArrayList())
+                    merged.addAll(fetched)
+                    curDetail.replies = merged
+                    displayedReplies = ArrayList(merged)
+                    updateReplyFilterAndOrder()
+                }
+                // 拉完一屏后：没页了显示“到底了”；还有页就继续贴近底部自动加载
+                if (curDetail.currentPage >= curDetail.totalPages) {
+                    adapter?.setFooterState(ReplyAdapter.FooterState.END)
+                } else if (fetched.isEmpty()) {
+                    // 页码在推进但一条回复都没解析出来：别再自动续拉，避免空转
+                    adapter?.setFooterState(ReplyAdapter.FooterState.RETRY)
+                } else {
+                    binding.recyclerReplies.post { maybeAutoLoadMore() }
                 }
             }
         }.start()
@@ -2197,6 +2237,10 @@ class ThreadDetailActivity : AppCompatActivity() {
         if (detail == null || TextUtils.isEmpty(tid) || !httpClient.isLoggedIn()) {
             return
         }
+        // 详情页已经能确定收藏状态时，不必再拉整个收藏列表（那是首页渲染前的串行请求）。
+        if (detail.favoritedStateKnown) {
+            return
+        }
         try {
             val html = httpClient.get(
                 "https://bbs.binmt.cc/home.php?mod=space&do=favorite&mobile=2&_refresh=" +
@@ -2230,81 +2274,76 @@ class ThreadDetailActivity : AppCompatActivity() {
         applyServerActionState(detail)
     }
 
-    // ==================== 点赞人列表 ====================
+    // ==================== 赞过此帖的人 ====================
 
-    /** 绑定点赞人头像行(登录态才有数据;未登录/无数据时隐藏) */
-    private fun bindLikeUsers(detail: PostDetail) {
-        if (likeUsersAdapter == null) {
-            likeUsersAdapter = LikeUsersAdapter(object : LikeUsersAdapter.OnUserClickListener {
-                override fun onUserClick(uid: String?, name: String?) {
-                    val intent = Intent(this@ThreadDetailActivity, UserProfileActivity::class.java)
-                    intent.putExtra(ChatActivity.EXTRA_UID, uid)
-                    intent.putExtra("username", if (name != null) name else "")
-                    startActivity(intent)
-                }
-            })
-            binding.rvLikeUsers.layoutManager = LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
-            binding.rvLikeUsers.adapter = likeUsersAdapter
-            binding.tvLikeMore.setOnClickListener { showLikeUsersSheet(detail) }
-            binding.layoutLikeUsers.setOnClickListener { showLikeUsersSheet(detail) }
-        }
-        val uids = detail.likeUserUids
-        val avatars = detail.likeUserAvatars
-        val names = detail.likeUserNames
-        if (uids != null && !uids.isEmpty()) {
-            likeUsersAdapter!!.setData(uids, avatars, names)
-            binding.layoutLikeUsers.visibility = View.VISIBLE
-        } else {
-            binding.layoutLikeUsers.visibility = View.GONE
-        }
-    }
-
-    /** 底部弹层:全部点赞人(头像+用户名,可滚动) */
-    private fun showLikeUsersSheet(detail: PostDetail) {
-        var uids = detail.likeUserUids
-        var avatars = detail.likeUserAvatars
-        var names = detail.likeUserNames
-        if (uids == null || uids.isEmpty()) {
+    /**
+     * 弹出「赞过此帖的人」列表（长按底部点赞图标触发）。
+     *
+     * 数据优先用详情页已解析的 likeUserUids/Avatars/Names 即时渲染，
+     * 再在后台线程用 LikeUserFetcher 拉一次独立接口补真实昵称与头像。
+     *
+     * 关闭动效：setDismissWithAnimation(true) 后，点空白处与返回键都走
+     * BottomSheetBehavior 的下滑动画，两者一致。
+     */
+    private fun showLikeUsersSheet() {
+        val detail = postDetail
+        if (detail == null) {
             Toast.makeText(this, "暂无点赞数据", Toast.LENGTH_SHORT).show()
             return
         }
-        // 防空兜底: PostDetail 三字段默认 null(ForumParser 只在非空时才 set),
-        // 不兜底时 names.size()/avatars.size() 会 NPE, 表现为"查看全部"闪退回主页。
-        if (names == null) names = ArrayList()
-        if (avatars == null) avatars = ArrayList()
-        val sheet = BottomSheetDialog(this)
+        val uidList = detail.likeUserUids
+        if (uidList == null || uidList.isEmpty()) {
+            Toast.makeText(this, "暂无点赞数据", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val avatars = detail.likeUserAvatars ?: ArrayList<String>()
+        val names = detail.likeUserNames ?: ArrayList<String>()
+
+        // 内容圆角卡片：与 App 其它底部弹层一致（顶部圆角 16dp，底部贴边）
+        val card = MaterialCardView(this)
+        card.setCardBackgroundColor(getColor(R.color.surface))
+        card.strokeColor = getColor(R.color.divider)
+        card.strokeWidth = dpToPx(1)
+        card.cardElevation = 2f * dpToPx(1)
+        card.shapeAppearanceModel = ShapeAppearanceModel.builder()
+            .setTopLeftCorner(CornerFamily.ROUNDED, dpToPx(16).toFloat())
+            .setTopRightCorner(CornerFamily.ROUNDED, dpToPx(16).toFloat())
+            .setBottomLeftCorner(CornerFamily.ROUNDED, 0f)
+            .setBottomRightCorner(CornerFamily.ROUNDED, 0f)
+            .build()
+
         val root = LinearLayout(this)
         root.orientation = LinearLayout.VERTICAL
         val pad = dpToPx(16)
         root.setPadding(pad, pad, pad, pad)
-        // 标题
+
         val title = TextView(this)
-        title.text = "赞过此帖的人 (${uids.size})"
+        title.text = "赞过此帖的人 (${uidList.size})"
         title.textSize = 16f
         title.typeface = Typeface.DEFAULT_BOLD
         title.setTextColor(getColor(R.color.text_primary))
         title.setPadding(0, 0, 0, dpToPx(12))
         root.addView(title)
-        // 滚动容器
-        val scroll = ScrollView(this)
+
         val list = LinearLayout(this)
         list.orientation = LinearLayout.VERTICAL
+        val scroll = ScrollView(this)
         scroll.addView(list)
-        scroll.layoutParams = android.widget.FrameLayout.LayoutParams(
-            android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
-            android.widget.FrameLayout.LayoutParams.MATCH_PARENT
-        )
         root.addView(scroll, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f))
-        // build67: 收集每行引用, 供接口回填真实昵称/头像
+        card.addView(root, android.view.ViewGroup.LayoutParams(
+            android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+            android.view.ViewGroup.LayoutParams.WRAP_CONTENT))
+
+        val sheet = BottomSheetDialog(this)
+
         val nameViews = ArrayList<TextView>()
         val imgViews = ArrayList<ShapeableImageView>()
         val rowViews = ArrayList<LinearLayout>()
-        for (i in uids.indices) {
-            val uid = uids[i]
+        for (i in uidList.indices) {
+            val uid = uidList[i]
             val name = if (i < names.size && names[i] != null && !names[i]!!.isEmpty())
                 names[i]!! else "用户$uid"
             val avatar = if (i < avatars.size) avatars[i] else null
-            // build65: 每行 = 头像 + 名字(原来只有 TextView,头像数据白拿)
             val row = LinearLayout(this)
             row.orientation = LinearLayout.HORIZONTAL
             row.gravity = Gravity.CENTER_VERTICAL
@@ -2331,20 +2370,35 @@ class ThreadDetailActivity : AppCompatActivity() {
             row.addView(tv)
             row.setOnClickListener {
                 sheet.dismiss()
-                val intent = Intent(this, UserProfileActivity::class.java)
-                intent.putExtra(ChatActivity.EXTRA_UID, uid)
-                intent.putExtra("username", name)
-                startActivity(intent)
+                openUserProfile(uid, name)
             }
             list.addView(row)
             rowViews.add(row)
             imgViews.add(iv)
             nameViews.add(tv)
         }
-        sheet.setContentView(root)
+
+        sheet.setContentView(card)
+        // 去掉弹层外层白底，让卡片圆角真正可见
+        sheet.setOnShowListener {
+            val bottomSheet = sheet.findViewById<View>(
+                com.google.android.material.R.id.design_bottom_sheet)
+            if (bottomSheet != null) {
+                bottomSheet.setBackgroundColor(android.graphics.Color.TRANSPARENT)
+                val behavior = BottomSheetBehavior.from(bottomSheet)
+                behavior.skipCollapsed = true
+                behavior.state = BottomSheetBehavior.STATE_EXPANDED
+            }
+        }
+        // 返回键 → 与点空白处走同一条取消路径（同样的下滑退出动画）
+        // 实现方式：setDismissWithAnimation(true) 让 cancel() 也走 BottomSheetBehavior
+        // 滑出（原来 cancel() 走的是窗口动画：位移 20% + 淡出，与返回键的下滑不一致）。
+        // 不能再靠 setOnKeyListener 抢返回键：API 33+ 的返回由 OnBackInvokedDispatcher
+        // 分发，根本不经过 KEYCODE_BACK，监听器不会触发。
+        sheet.setDismissWithAnimation(true)
         sheet.show()
-        // build67: 弹窗先用详情页数据即时渲染, 后台拉独立接口补"真实昵称+头像"
-        // (接口免登录、一次性返回全部点赞人, 只在用户点"查看全部"时发 1 发)
+
+        // 后台拉独立接口补“真实昵称+头像”（免登录、一次性返回全部点赞人）
         val tidForLikers = tid
         java.lang.Thread({
             val items = LikeUserFetcher.fetch(tidForLikers)
@@ -3829,6 +3883,20 @@ class ThreadDetailActivity : AppCompatActivity() {
         }
     }
 
+    /**
+     * 按给定属性名顺序取第一个非空值（与 ForumParser.firstNonEmptyAttr 同语义）。
+     * 用于统一图片真实地址的取值优先级，避免列表/详情两套口径不一致。
+     */
+    private fun firstNonEmptyAttr(element: Element, vararg names: String): String? {
+        for (name in names) {
+            if (element.hasAttr(name)) {
+                val value = element.attr(name)
+                if (!TextUtils.isEmpty(value)) return value.trim()
+            }
+        }
+        return null
+    }
+
     private fun extractAndSeparateImages(html: String?, imageUrls: MutableList<String>): String {
         if (TextUtils.isEmpty(html)) {
             return ""
@@ -3841,21 +3909,15 @@ class ThreadDetailActivity : AppCompatActivity() {
             doc.select("*:matchesOwn(^border\\s*=\\s*[\"']?\\d)").remove()
             val imgs = doc.select("img")
             for (img in imgs) {
-                var realUrl: String? = null
-                if (img.hasAttr("file") && !TextUtils.isEmpty(img.attr("file"))) {
-                    realUrl = img.attr("file")
-                } else if (img.hasAttr("comiis_loadimages") && !TextUtils.isEmpty(img.attr("comiis_loadimages"))) {
-                    realUrl = img.attr("comiis_loadimages")
-                } else if (img.hasAttr("data-original") && !TextUtils.isEmpty(img.attr("data-original"))) {
-                    realUrl = img.attr("data-original")
-                } else if (img.hasAttr("data-src") && !TextUtils.isEmpty(img.attr("data-src"))) {
-                    realUrl = img.attr("data-src")
-                } else if (img.hasAttr("data-file") && !TextUtils.isEmpty(img.attr("data-file"))) {
-                    realUrl = img.attr("data-file")
-                } else if (img.hasAttr("src") && !TextUtils.isEmpty(img.attr("src"))) {
-                    realUrl = img.attr("src")
-                }
-                if (realUrl != null && realUrl.isNotEmpty()) {
+                // 属性优先级与列表页（ForumParser.firstNonEmptyAttr）保持一致：
+                // comiis_loadimages 才是 Comiis 模板下懒加载的**真实图**地址，
+                // 其余属性/ src 可能只是占位或尺寸不符的缩略图。
+                val realUrl: String? = firstNonEmptyAttr(
+                    img,
+                    "comiis_loadimages", "file", "data-original", "data-src",
+                    "data-file", "data-lazy-src", "src"
+                )
+                if (!TextUtils.isEmpty(realUrl)) {
                     val fullUrl = normalizeImageUrl(realUrl)
                     if (fullUrl != null && !fullUrl.contains("smiley") && !fullUrl.contains("emoticon")
                         && !fullUrl.contains("face") && !fullUrl.contains("/static/image/smiley")
@@ -3944,5 +4006,17 @@ class ThreadDetailActivity : AppCompatActivity() {
         private const val PREF_LIKE_FAV = "thread_like_fav_state"
         private const val REQUEST_IMAGE_PICK = 1002
         private const val REQUEST_EDIT_THREAD = 1003 // build73: 编辑帖子
+
+        /** 进帖预取回复的最大页数，防止解析异常时无界翻页（串行请求会拖死首屏）。 */
+        private const val MAX_PREFETCH_PAGES = 3
+
+        /** 自动加载时，距列表底部还剩多少行就提前开始拉下一页。 */
+        private const val AUTO_LOAD_THRESHOLD = 5
+
+        /** 自动加载单次最多连拉的页数，避免尾页异常时一次请求过多。 */
+        private const val LOAD_PAGE_BATCH = 3
+
+        /** 目标每页回复数；论坛实际每页条数不止由我们决定，故连拉多页凑一屏。 */
+        private const val REPLIES_PER_PAGE = 20
     }
 }

@@ -1,5 +1,6 @@
 package com.solosu.mtforum.ui.detail
 
+import android.animation.ValueAnimator
 import android.content.Context
 import android.graphics.Matrix
 import android.graphics.PointF
@@ -8,8 +9,10 @@ import android.util.AttributeSet
 import android.view.GestureDetector
 import android.view.MotionEvent
 import android.view.ScaleGestureDetector
+import android.view.ViewParent
 import android.view.ViewTreeObserver
 import android.widget.ImageView
+import android.view.animation.DecelerateInterpolator
 
 import androidx.annotation.NonNull
 import androidx.annotation.Nullable
@@ -18,18 +21,21 @@ import androidx.appcompat.widget.AppCompatImageView
 /**
  * 支持双指缩放、单指拖动、双击放大/还原的 ImageView
  *
- * 历史缺陷（本次重写修复）：
- * 1. 旧实现 setScaleType(MATRIX) 后 matrix 永远是 identity（单位矩阵），
- *    大图只露左上角、小图死贴左上角，从不做适配屏幕的初始化。
- * 2. 旧 MIN_SCALE=1.0 按绝对比例限制，没有基于 fitScale 的动态上下限，
- *    图片永远缩不到适配屏幕状态。
- *
  * 重写要点：
  * - onGlobalLayout 首次布局后计算 fitScale（图完整显示进视图的最小比例），
  *   并 postTranslate 居中，作为基准矩阵 baseMatrix。
  * - 双指缩放限制在 [fitScale*0.5, fitScale*4]。
- * - 双击在 fitScale 与 fitScale*2.5 之间切换。
- * - 抬指后若缩放低于 fitScale 回弹至 fitScale。
+ * - 双击在 fitScale 与 fitScale*2.5 之间平滑过渡（ValueAnimator，不再瞬间跳变）。
+ *
+ * 本次修复“放大后拖动不流畅、不易操作”的三个根因：
+ * 1. 平移无边界约束：放大后能把图整个拖出屏幕，之后图就消失、拉不回来。
+ *    现在拖动/缩放后都会把可视区域夹回视图内（小于视图时强制居中）。
+ * 2. 未申请父级不拦截触摸：预览页外层是 ViewPager2，放大后横向平移会与翻页
+ *    手势互相抢夺，表现为拖动一顿一顿、或突然翻到下一张。现在在“已放大”或
+ *    “多指”时调用 requestDisallowInterceptTouchEvent(true)，回到适应屏幕
+ *    状态再放开，让未放大时的左右滑动仍可正常翻页。
+ * 3. 捏合过程中抬起一指就结束手势：剩下那根手指必须重新按下才能拖动。
+ *    现在 ACTION_POINTER_UP 后若仍有手指，立即以当前位置重建拖动基准。
  */
 class ZoomableImageView @JvmOverloads constructor(
         @NonNull context: Context,
@@ -50,6 +56,9 @@ class ZoomableImageView @JvmOverloads constructor(
     private var mode = NONE
 
     private val lastFinger = PointF()
+
+    /** 正在执行的矩阵动画（双击/回弹），新手势开始时需取消，否则会互相覆盖。 */
+    private var matrixAnimator: ValueAnimator? = null
 
     init {
         super.setScaleType(ImageView.ScaleType.MATRIX)
@@ -98,11 +107,6 @@ class ZoomableImageView @JvmOverloads constructor(
         applyMatrix()
     }
 
-    /** 图片变化时重建基准（Glide 加载完成会触发 onGlobalLayout，但 baseReady 已置位，这里主动刷新） */
-    override fun onAttachedToWindow() {
-        super.onAttachedToWindow()
-    }
-
     override fun setImageDrawable(@Nullable drawable: Drawable?) {
         super.setImageDrawable(drawable)
         baseReady = false // 新图，重建基准
@@ -124,39 +128,193 @@ class ZoomableImageView @JvmOverloads constructor(
         return v[Matrix.MSCALE_X]
     }
 
+    /** 是否已放大到需要“接管”手势（此时平移优先于翻页）。 */
+    private fun isZoomedIn(): Boolean = currentScale() > fitScale * 1.01f
+
+    /**
+     * 把 supp 矩阵的平移量夹回可视范围：
+     * - 缩放后小于视图的轴 → 强制居中（否则会歪在一边）
+     * - 大于视图的轴 → 保证图始终铺满视图，边缘不外露
+     */
+    private fun clampTranslation(supp: Matrix) {
+        val d: Drawable = drawable ?: return
+        val dw0 = d.intrinsicWidth.toFloat()
+        val dh0 = d.intrinsicHeight.toFloat()
+        if (dw0 <= 0 || dh0 <= 0) return
+
+        val m = Matrix()
+        m.set(baseMatrix)
+        m.postConcat(supp)
+        val v = FloatArray(9)
+        m.getValues(v)
+        val scale = v[Matrix.MSCALE_X]
+        if (scale <= 0f) return
+
+        val vw = (width - paddingLeft - paddingRight).toFloat()
+        val vh = (height - paddingTop - paddingBottom).toFloat()
+        if (vw <= 0f || vh <= 0f) return
+
+        val dw = dw0 * scale
+        val dh = dh0 * scale
+        val left = v[Matrix.MTRANS_X]
+        val top = v[Matrix.MTRANS_Y]
+
+        val corrX = if (dw <= vw) {
+            (paddingLeft + (vw - dw) / 2f) - left
+        } else {
+            val minL = paddingLeft + vw - dw // 右边缘贴齐
+            val maxL = paddingLeft.toFloat() // 左边缘贴齐
+            when {
+                left > maxL -> maxL - left
+                left < minL -> minL - left
+                else -> 0f
+            }
+        }
+        val corrY = if (dh <= vh) {
+            (paddingTop + (vh - dh) / 2f) - top
+        } else {
+            val minT = paddingTop + vh - dh
+            val maxT = paddingTop.toFloat()
+            when {
+                top > maxT -> maxT - top
+                top < minT -> minT - top
+                else -> 0f
+            }
+        }
+        if (corrX != 0f || corrY != 0f) {
+            supp.postTranslate(corrX, corrY)
+        }
+    }
+
+    /** 让父容器（ViewPager2）是否让出触摸决策权。 */
+    private fun disallowParentIntercept(disallow: Boolean) {
+        var p: ViewParent? = parent
+        while (p != null) {
+            p.requestDisallowInterceptTouchEvent(disallow)
+            p = p.parent
+        }
+    }
+
+    private fun cancelMatrixAnimator() {
+        matrixAnimator?.let {
+            it.cancel()
+            matrixAnimator = null
+        }
+    }
+
+    /** 在两个 supp 矩阵之间做平滑过渡，避免双击/回弹瞬间跳变。 */
+    private fun animateSuppMatrix(from: Matrix, to: Matrix, duration: Long) {
+        cancelMatrixAnimator()
+        val a = FloatArray(9)
+        val b = FloatArray(9)
+        from.getValues(a)
+        to.getValues(b)
+        val anim = ValueAnimator.ofFloat(0f, 1f)
+        anim.duration = duration
+        anim.interpolator = DecelerateInterpolator()
+        anim.addUpdateListener { va ->
+            val t = va.animatedValue as Float
+            val c = FloatArray(9)
+            for (i in 0 until 9) {
+                c[i] = a[i] + (b[i] - a[i]) * t
+            }
+            val mm = Matrix()
+            mm.setValues(c)
+            suppMatrix.set(mm)
+            applyMatrix()
+        }
+        anim.addListener(object : android.animation.AnimatorListenerAdapter() {
+            override fun onAnimationEnd(animation: android.animation.Animator) {
+                if (matrixAnimator === anim) matrixAnimator = null
+                // 动画结束后再夹一次，消除插值残差
+                clampTranslation(suppMatrix)
+                applyMatrix()
+                disallowParentIntercept(isZoomedIn())
+            }
+        })
+        matrixAnimator = anim
+        anim.start()
+    }
+
     override fun onTouchEvent(event: MotionEvent): Boolean {
+        if (event.actionMasked == MotionEvent.ACTION_DOWN) {
+            cancelMatrixAnimator()
+        }
         scaleDetector.onTouchEvent(event)
         tapDetector.onTouchEvent(event)
+
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
                 savedMatrix.set(suppMatrix)
                 lastFinger.set(event.x, event.y)
                 mode = DRAG
+                // 不放大时允许父容器（翻页）接管；放大了才独占
+                disallowParentIntercept(isZoomedIn())
             }
 
             MotionEvent.ACTION_POINTER_DOWN -> {
                 savedMatrix.set(suppMatrix)
                 mode = ZOOM
+                // 多指一定是缩放意图，禁止翻页抢手势
+                disallowParentIntercept(true)
             }
 
             MotionEvent.ACTION_MOVE -> {
-                if (mode == DRAG && event.pointerCount == 1 && currentScale() > fitScale * 1.01f) {
+                if (mode == DRAG && event.pointerCount == 1 && isZoomedIn()) {
+                    disallowParentIntercept(true)
                     val dx = event.x - lastFinger.x
                     val dy = event.y - lastFinger.y
                     suppMatrix.set(savedMatrix)
                     suppMatrix.postTranslate(dx, dy)
+                    clampTranslation(suppMatrix)
                     applyMatrix()
                 }
             }
 
-            MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP -> {
-                mode = NONE
-                // 低于 fitScale 回弹
-                if (currentScale() < fitScale) {
-                    suppMatrix.reset()
-                    applyMatrix()
+            MotionEvent.ACTION_POINTER_UP -> {
+                // 抬起其中一指：若仍有手指，以当前接触点重建拖动基准，
+                // 否则剩余手指会因 lastFinger 过期而“跳”一下或干脆拖不动。
+                val remainIndex = if (event.actionIndex == 0) 1 else 0
+                if (event.pointerCount - 1 >= 1 && remainIndex < event.pointerCount) {
+                    savedMatrix.set(suppMatrix)
+                    lastFinger.set(event.getX(remainIndex), event.getY(remainIndex))
+                    mode = DRAG
+                } else {
+                    mode = NONE
                 }
             }
+
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                mode = NONE
+                val cur = Matrix()
+                cur.set(suppMatrix)
+                val target = Matrix()
+                target.set(suppMatrix)
+                // 缩放低于 fitScale：动画回弹到适应屏幕并居中
+                val scale = currentScale()
+                if (scale < fitScale * 0.999f) {
+                    target.reset()
+                }
+                clampTranslation(target)
+                if (!matricesClose(cur, target)) {
+                    animateSuppMatrix(cur, target, 180L)
+                } else {
+                    suppMatrix.set(target)
+                    applyMatrix()
+                    disallowParentIntercept(isZoomedIn())
+                }
+            }
+        }
+        return true
+    }
+
+    private fun matricesClose(a: Matrix, b: Matrix): Boolean {
+        val va = FloatArray(9)
+        val vb = FloatArray(9)
+        a.getValues(va)
+        b.getValues(vb)
+        for (i in 0 until 9) {
+            if (Math.abs(va[i] - vb[i]) > 0.5f) return false
         }
         return true
     }
@@ -173,8 +331,20 @@ class ZoomableImageView @JvmOverloads constructor(
                 factor = min / currentScale()
             }
             suppMatrix.postScale(factor, factor, detector.focusX, detector.focusY)
+            clampTranslation(suppMatrix)
             applyMatrix()
             return true
+        }
+
+        override fun onScaleBegin(detector: ScaleGestureDetector): Boolean {
+            // 双指按下即锁定手势，避免父容器在缩放起始帧抢走
+            disallowParentIntercept(true)
+            return true
+        }
+
+        override fun onScaleEnd(detector: ScaleGestureDetector) {
+            clampTranslation(suppMatrix)
+            applyMatrix()
         }
     }
 
@@ -191,14 +361,16 @@ class ZoomableImageView @JvmOverloads constructor(
 
     private inner class TapListener : GestureDetector.SimpleOnGestureListener() {
         override fun onDoubleTap(e: MotionEvent): Boolean {
-            val cur = currentScale()
-            if (cur > fitScale * 1.01f) {
-                suppMatrix.reset()
+            val cur = Matrix()
+            cur.set(suppMatrix)
+            val target = Matrix()
+            if (currentScale() > fitScale * 1.01f) {
+                target.reset() // 已放大 → 回到适应屏幕
             } else {
-                suppMatrix.reset()
-                suppMatrix.postScale(DOUBLE_TAP_FACTOR, DOUBLE_TAP_FACTOR, e.x, e.y)
+                target.postScale(DOUBLE_TAP_FACTOR, DOUBLE_TAP_FACTOR, e.x, e.y)
+                clampTranslation(target)
             }
-            applyMatrix()
+            animateSuppMatrix(cur, target, 220L)
             return true
         }
 
@@ -208,6 +380,11 @@ class ZoomableImageView @JvmOverloads constructor(
             }
             return true
         }
+    }
+
+    override fun onDetachedFromWindow() {
+        cancelMatrixAnimator()
+        super.onDetachedFromWindow()
     }
 
     companion object {
