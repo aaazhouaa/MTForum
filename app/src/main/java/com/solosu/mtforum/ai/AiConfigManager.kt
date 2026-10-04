@@ -189,10 +189,10 @@ object AiConfigManager {
         sp(c).edit().putBoolean(KEY_AUTO_REPLY_ENABLED, v).apply()
     }
 
-    /** 静默模式：不弹通知、不在界面提示，后台悄悄回复 */
+    /** 静默模式：不弹通知、不在界面提示，后台悄悄回复（默认关闭） */
     @JvmStatic
     fun isSilentMode(c: Context): Boolean {
-        return sp(c).getBoolean(KEY_AUTO_REPLY_SILENT, true)
+        return sp(c).getBoolean(KEY_AUTO_REPLY_SILENT, false)
     }
 
     @JvmStatic
@@ -256,10 +256,10 @@ object AiConfigManager {
 
     private const val KEY_AUTO_HIDE_NAV = "auto_hide_nav"
 
-    /** build72: 底部导航栏滚动自动隐藏(默认开启,与历史行为一致) */
+    /** build72: 底部导航栏滚动自动隐藏(默认关闭) */
     @JvmStatic
     fun isAutoHideNav(c: Context): Boolean {
-        return sp(c).getBoolean(KEY_AUTO_HIDE_NAV, true)
+        return sp(c).getBoolean(KEY_AUTO_HIDE_NAV, false)
     }
 
     @JvmStatic
@@ -267,24 +267,27 @@ object AiConfigManager {
         sp(c).edit().putBoolean(KEY_AUTO_HIDE_NAV, v).apply()
     }
 
-    private const val KEY_MIGRATE_DRY_RUN_OFF = "migrate_dry_run_off_v12"
+    private const val KEY_MIGRATE_DRAWER_ALL_OFF = "migrate_drawer_all_off_v2"
 
     /**
-     * 一次性迁移：v1.2 起「演练模式」默认关闭。
-     * 旧版本里如果曾被打开过，自动回复会一直"只生成不发送"，
-     * 表现为「开关开着却什么都没发生」。这里强制关一次，之后用户可自由开关。
+     * 侧边栏功能默认全关闭迁移处理：
+     * 隐藏运行、自动签到、自动解锁隐藏内容、演练模式、底部栏滚动自动隐藏全部默认置为关闭。
      */
     @JvmStatic
     fun migrateDefaults(c: Context) {
         try {
             val p = sp(c)
-            if (p.getBoolean(KEY_MIGRATE_DRY_RUN_OFF, false)) return
-            val was = p.getBoolean(KEY_AUTO_REPLY_DRY_RUN, false)
-            p.edit().putBoolean(KEY_AUTO_REPLY_DRY_RUN, false)
-                    .putBoolean(KEY_MIGRATE_DRY_RUN_OFF, true).apply()
-            if (was) {
-                AiLog.i("config", "迁移：已关闭旧的「演练模式」，自动回复恢复真实发送")
-            }
+            if (p.getBoolean(KEY_MIGRATE_DRAWER_ALL_OFF, false)) return
+            p.edit()
+                .putBoolean(KEY_AUTO_REPLY_SILENT, false)
+                .putBoolean(KEY_AUTO_UNLOCK_HIDDEN, false)
+                .putBoolean(KEY_UNLOCK_ON_VIEW, false)
+                .putBoolean(KEY_AUTO_REPLY_DRY_RUN, false)
+                .putBoolean(KEY_AUTO_HIDE_NAV, false)
+                .putBoolean(KEY_MIGRATE_DRAWER_ALL_OFF, true)
+                .apply()
+            com.solosu.mtforum.session.AutoSignInManager.setEnabled(c, false)
+            AiLog.i("config", "已将侧边栏所有功能默认初始化为关闭")
         } catch (ignore: Throwable) {
         }
     }
@@ -302,11 +305,11 @@ object AiConfigManager {
 
     /**
      * 自动回复模式：true = 解锁隐藏内容（对含「回复可见」的帖子自动回复）；
-     * false = 老的模式（回复自己帖子下的新评论）。
+     * false = 老的模式（回复自己帖子下的新评论）。默认关闭。
      */
     @JvmStatic
     fun isUnlockMode(c: Context): Boolean {
-        return sp(c).getBoolean(KEY_AUTO_UNLOCK_HIDDEN, true)
+        return sp(c).getBoolean(KEY_AUTO_UNLOCK_HIDDEN, false)
     }
 
     @JvmStatic
@@ -314,10 +317,10 @@ object AiConfigManager {
         sp(c).edit().putBoolean(KEY_AUTO_UNLOCK_HIDDEN, v).apply()
     }
 
-    /** 进入帖子详情页时自动回复解锁隐藏内容 */
+    /** 进入帖子详情页时自动回复解锁隐藏内容，默认关闭 */
     @JvmStatic
     fun isUnlockOnView(c: Context): Boolean {
-        return sp(c).getBoolean(KEY_UNLOCK_ON_VIEW, true)
+        return sp(c).getBoolean(KEY_UNLOCK_ON_VIEW, false)
     }
 
     @JvmStatic

@@ -285,15 +285,6 @@ class ThreadDetailActivity : AppCompatActivity() {
         headerBinding = hb
 
         hb.btnViewHidden.setOnClickListener { viewHiddenContent() }
-        hb.btnAiSummary.setOnClickListener {
-            val it = Intent(this, com.solosu.mtforum.ai.AiSummarizeActivity::class.java)
-            it.putExtra("tid", tid)
-            it.putExtra(
-                "title",
-                if (!TextUtils.isEmpty(postDetail?.title)) postDetail?.title else ""
-            )
-            startActivity(it)
-        }
         // 打赏/踢帖已移到顶栏图标（见 onCreate 的 binding.btnReward / binding.btnKick）
         hb.btnCollapseImages.setOnClickListener { toggleImageGallery() }
         hb.btnOnlyOp.setOnClickListener {

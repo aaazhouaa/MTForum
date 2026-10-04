@@ -203,16 +203,6 @@ class ThreadAdapter(private val context: Context) : RecyclerView.Adapter<ThreadA
              }
          }
          holder.btnFollow!!.setText(if (thread.followed) "已关注" else "关注")
-        // AI 一键总结:拉帖+评论区,有隐藏先固定模板回复解锁再总结
-        holder.btnAiSummarize!!.setOnClickListener { v ->
-            val it = Intent(context, com.solosu.mtforum.ai.AiSummarizeActivity::class.java)
-            it.putExtra("tid", thread.tid)
-            it.putExtra("title", thread.title)
-            if (context !is android.app.Activity) {
-                it.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            }
-            context.startActivity(it)
-        }
         holder.btnFollow!!.setOnClickListener { v ->
             if (!FollowStateManager.isLoggedIn(context)) {
                 if (context is android.app.Activity) {
@@ -376,7 +366,6 @@ class ThreadAdapter(private val context: Context) : RecyclerView.Adapter<ThreadA
         var tvReplies: TextView?
         var tvLikes: TextView?
         var tvSticky: TextView?
-        var btnAiSummarize: TextView?
 
         init {
             cardView = itemView.findViewById<View>(R.id.thread_card)
@@ -394,7 +383,6 @@ class ThreadAdapter(private val context: Context) : RecyclerView.Adapter<ThreadA
             tvReplies = itemView.findViewById<TextView>(R.id.tv_replies)
             tvLikes = itemView.findViewById<TextView>(R.id.tv_likes)
             tvSticky = itemView.findViewById<TextView>(R.id.tv_sticky)
-            btnAiSummarize = itemView.findViewById<TextView>(R.id.btn_ai_summary)
         }
     }
 

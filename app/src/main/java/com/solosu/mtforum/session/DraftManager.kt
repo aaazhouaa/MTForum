@@ -54,7 +54,8 @@ object DraftManager {
                 e.forumName = o.optString("forum", "")
                 e.anonymous = o.optBoolean("anon", false)
                 e.time = o.optLong("time", 0)
-                if (e.id > 0) out.add(e)
+                // 仅标题或正文有非空内容才视为有效草稿（单独选版块不计为有效草稿）
+                if (e.id > 0 && (!e.title.isNullOrBlank() || !e.content.isNullOrBlank())) out.add(e)
             }
         } catch (ignored: Exception) {
         }
@@ -86,6 +87,13 @@ object DraftManager {
     @JvmStatic
     fun saveDraft(c: Context, id: Long, title: String?, content: String?,
                   fid: String?, forumName: String?, anonymous: Boolean): Long {
+        val cleanTitle = title?.trim() ?: ""
+        val cleanContent = content?.trim() ?: ""
+        // 无有效内容时不保存
+        if (cleanTitle.isEmpty() && cleanContent.isEmpty()) {
+            if (id > 0) delete(c, id)
+            return 0L
+        }
         val l = parse(prefs(c).getString(KEY, "[]"))
         var e: Entry? = null
         if (id > 0) {

@@ -1164,6 +1164,10 @@ class PostActivity : AppCompatActivity() {
         val empty = (etTitle.text == null || etTitle.text.toString().trim().isEmpty())
                 && (etContent.text == null || etContent.text.toString().trim().isEmpty())
         if (!empty) return // 已有内容不覆盖
+        if (e.title.isNullOrBlank() && e.content.isNullOrBlank()) {
+            DraftManager.delete(this, e.id)
+            return
+        }
         draftId = e.id
         if (e.title != null) etTitle.setText(e.title)
         if (e.content != null) etContent.setText(e.content)
@@ -1177,10 +1181,11 @@ class PostActivity : AppCompatActivity() {
     }
 
     private fun saveDraftNow() {
-        if (postedDone) return
+        if (postedDone || isEditMode()) return
         val title = if (etTitle.text != null) etTitle.text.toString().trim() else ""
         val content = if (etContent.text != null) etContent.text.toString().trim() else ""
-        if (title.isEmpty() && content.isEmpty() && selectedFid == null) {
+        // 无有效内容（选择版块不算有效内容）时不保存为草稿
+        if (title.isEmpty() && content.isEmpty()) {
             if (draftId > 0) {
                 DraftManager.delete(this, draftId)
                 draftId = 0
