@@ -1,6 +1,6 @@
 # MTForum — MT 论坛第三方客户端（二改版）
 
-[bbs.binmt.cc](https://bbs.binmt.cc/) 的第三方 Android 客户端。Kotlin + Material Design，
+Kotlin + Material Design，
 覆盖版块浏览、帖子阅读、回复/发帖、个人中心、多账号、人机验证兜底等功能。
 
 > 本仓库基于 MTForum v2.2 (build83) 源码做二次修正，**非官方**，与论坛站点及原作者无关。
