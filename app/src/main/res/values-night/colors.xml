@@ -39,6 +39,8 @@
     <color name="surface">#383C42</color>
     <color name="card_frosted">#383C42</color>
     <color name="divider">#484D55</color>
+    <!-- 暗色顶栏：略高于灰底的高层面板色 -->
+    <color name="top_bar">#383C42</color>
 
     <!-- 代码块背景(暗色) -->
     <color name="code_block_bg">#242629</color>

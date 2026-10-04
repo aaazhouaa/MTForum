@@ -194,7 +194,7 @@ class HomeFragment : Fragment() {
                     headerContainer.orientation = LinearLayout.VERTICAL
                     val lp = LinearLayout.LayoutParams(
                             ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
-                    lp.setMargins((12*density).toInt(), (8*density).toInt(), (12*density).toInt(), (10*density).toInt())
+                    lp.setMargins((6*density).toInt(), 0, (6*density).toInt(), (5*density).toInt())
                     headerContainer.layoutParams = lp
                     headerContainer.setPadding((6*density).toInt(), (10*density).toInt(), (10*density).toInt(), (10*density).toInt())
                     headerContainer.background =

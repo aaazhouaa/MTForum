@@ -68,9 +68,8 @@ object ThemeManager {
     /** 统一将状态栏与导航栏底色设为背景色，并自动调适图标深浅色 */
     @JvmStatic
     fun setupWindow(activity: Activity) {
-        val bg = ContextCompat.getColor(activity, R.color.background)
-        activity.window.statusBarColor = bg
-        activity.window.navigationBarColor = bg
+        activity.window.statusBarColor = ContextCompat.getColor(activity, R.color.top_bar)
+        activity.window.navigationBarColor = ContextCompat.getColor(activity, R.color.background)
         androidx.core.view.WindowInsetsControllerCompat(activity.window, activity.window.decorView).apply {
             val isDark = isDarkMode(activity)
             isAppearanceLightStatusBars = !isDark

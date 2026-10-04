@@ -80,7 +80,7 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
-        binding.mainDrawer.setStatusBarBackgroundColor(ContextCompat.getColor(this, R.color.background))
+        binding.mainDrawer.setStatusBarBackgroundColor(ContextCompat.getColor(this, R.color.top_bar))
         com.solosu.mtforum.util.ThemeManager.setupWindow(this)
 
         // 底部导航栏：QWEA0 液态玻璃 TabLayout（initNavigationBar 里初始化）
@@ -90,13 +90,14 @@ class MainActivity : AppCompatActivity() {
         pagerAdapter = MainPagerAdapter(this)
         mainPager!!.adapter = pagerAdapter
         mainPager!!.offscreenPageLimit = MainPagerAdapter.PAGE_COUNT - 1 // 全页保活，切换不重建
-        // 降低 ViewPager2 左右滑动灵敏度，保证列表上下滑动极其丝滑不被截胡
-        reduceViewPager2Sensitivity(mainPager!!, 3.2f)
+        mainPager!!.isUserInputEnabled = false // 禁用左右滑动切页，仅通过底部导航栏切换
         mainPager!!.registerOnPageChangeCallback(object : ViewPager2.OnPageChangeCallback() {
             override fun onPageSelected(position: Int) {
                 // pager 页 → 液态玻璃 tab（0首页/1版块/3消息/4我的，跳过中间的 + 发帖 tab）
                 val tabIdx = pagerToTabIndex(position)
                 currentSelectedNavTab.intValue = tabIdx
+                updateHamburgerVisibility(position)
+                updateStatusBarColor(position)
                 // build71: 切页时底部栏立即恢复显示(用户刚切换,需要看到导航)
                 setBottomNavVisible(true)
             }
@@ -126,6 +127,10 @@ class MainActivity : AppCompatActivity() {
 
         // 初始化侧边栏
         initDrawer()
+
+        // 初始页为首页，汉堡入口保持显示
+        updateHamburgerVisibility(mainPager?.currentItem ?: 0)
+        updateStatusBarColor(mainPager?.currentItem ?: 0)
     }
 
     // ==================== 侧边栏 ====================
@@ -641,10 +646,10 @@ class MainActivity : AppCompatActivity() {
                 onTabSelected = { pos ->
                     currentSelectedNavTab.intValue = pos
                     when (pos) {
-                        0 -> mainPager?.setCurrentItem(MainPagerAdapter.PAGE_HOME, true)
-                        1 -> mainPager?.setCurrentItem(MainPagerAdapter.PAGE_COMMUNITY, true)
-                        3 -> mainPager?.setCurrentItem(MainPagerAdapter.PAGE_MESSAGE, true)
-                        4 -> mainPager?.setCurrentItem(MainPagerAdapter.PAGE_PROFILE, true)
+                        0 -> mainPager?.setCurrentItem(MainPagerAdapter.PAGE_HOME, false)
+                        1 -> mainPager?.setCurrentItem(MainPagerAdapter.PAGE_COMMUNITY, false)
+                        3 -> mainPager?.setCurrentItem(MainPagerAdapter.PAGE_MESSAGE, false)
+                        4 -> mainPager?.setCurrentItem(MainPagerAdapter.PAGE_PROFILE, false)
                     }
                     setBottomNavVisible(true)
                 },
@@ -671,19 +676,18 @@ class MainActivity : AppCompatActivity() {
         else -> 0
     }
 
-    /**
-     * 降低 ViewPager2 左右滑动的灵敏度，避免手指轻微倾斜误触发横向切页导致上下滑动卡顿
-     */
-    private fun reduceViewPager2Sensitivity(viewPager: ViewPager2, multiplier: Float) {
-        try {
-            val recyclerView = viewPager.getChildAt(0) as? androidx.recyclerview.widget.RecyclerView ?: return
-            val touchSlopField = androidx.recyclerview.widget.RecyclerView::class.java.getDeclaredField("mTouchSlop")
-            touchSlopField.isAccessible = true
-            val currentTouchSlop = touchSlopField.getInt(recyclerView)
-            touchSlopField.setInt(recyclerView, (currentTouchSlop * multiplier).toInt())
-        } catch (e: Throwable) {
-            android.util.Log.w("MainActivity", "Failed to reduce ViewPager2 sensitivity: ${e.message}")
-        }
+    /** "我的"页移除左上角侧边栏入口，其余页保留 */
+    private fun updateHamburgerVisibility(pagerPos: Int) {
+        val btn = findViewById<View>(R.id.btn_open_drawer) ?: return
+        btn.visibility = if (pagerPos == MainPagerAdapter.PAGE_PROFILE) View.GONE else View.VISIBLE
+    }
+
+    /** "我的"页无顶栏，状态栏跟随页面背景；其余页跟随白色顶栏 */
+    private fun updateStatusBarColor(pagerPos: Int) {
+        val colorRes = if (pagerPos == MainPagerAdapter.PAGE_PROFILE) R.color.background else R.color.top_bar
+        val color = ContextCompat.getColor(this, colorRes)
+        window.statusBarColor = color
+        binding.mainDrawer.setStatusBarBackgroundColor(color)
     }
 
     // ==================== build71: 底部导航栏滚动自动隐藏 ====================

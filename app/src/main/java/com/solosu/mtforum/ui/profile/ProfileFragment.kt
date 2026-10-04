@@ -133,8 +133,8 @@ class ProfileFragment : Fragment() {
             startActivity(intent)
         }
 
-        // 退出登录/登录按钮
-        binding!!.btnLogout.setOnClickListener {
+        // 登录/退出图标（靠右，随登录状态切换）
+        binding!!.btnAccount.setOnClickListener {
             if (!isActuallyLoggedIn()) {
                 startLogin()
                 return@setOnClickListener
@@ -189,11 +189,13 @@ class ProfileFragment : Fragment() {
             binding!!.ivAvatar.setOnClickListener { startLogin() }
             binding!!.tvUsername.setOnClickListener { startLogin() }
             binding!!.tvUid.setOnClickListener { startLogin() }
-            binding!!.btnLogout.text = "登录账号"
+            binding!!.btnAccount.setImageResource(R.drawable.ic_login)
+            binding!!.btnAccount.contentDescription = "登录"
             return
         }
         binding!!.root.visibility = View.VISIBLE
-        binding!!.btnLogout.text = getString(R.string.action_logout)
+        binding!!.btnAccount.setImageResource(R.drawable.ic_logout)
+        binding!!.btnAccount.contentDescription = "退出登录"
         loadProfile()
     }
 

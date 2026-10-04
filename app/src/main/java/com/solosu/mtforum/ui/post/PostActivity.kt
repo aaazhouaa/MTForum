@@ -109,6 +109,7 @@ class PostActivity : AppCompatActivity() {
         com.solosu.mtforum.util.ThemeManager.applyTheme(this)
         super.onCreate(savedInstanceState)
         setContentView(R.layout.post_activity)
+        window.statusBarColor = androidx.core.content.ContextCompat.getColor(this, R.color.background)
 
         initViews()
         setupTitleCounter()

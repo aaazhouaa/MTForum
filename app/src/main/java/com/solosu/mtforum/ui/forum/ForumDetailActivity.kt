@@ -3,7 +3,6 @@ package com.solosu.mtforum.ui.forum
 import android.content.Intent
 import android.os.Bundle
 import android.text.TextUtils
-import android.view.MenuItem
 import android.view.View
 import androidx.annotation.NonNull
 import androidx.annotation.Nullable
@@ -73,16 +72,6 @@ class ForumDetailActivity : AppCompatActivity() {
         totalPosts = intent.getIntExtra("totalPosts", 0)
         totalThreads = intent.getIntExtra("totalThreads", 0)
 
-        // Toolbar
-        setSupportActionBar(binding.toolbar)
-        if (supportActionBar != null) {
-            supportActionBar!!.setDisplayHomeAsUpEnabled(true)
-            supportActionBar!!.setDisplayShowTitleEnabled(true)
-            if (forumName != null && !forumName!!.isEmpty()) {
-                supportActionBar!!.title = forumName
-            }
-        }
-
         // 版块头部信息
         binding.tvForumName.text = forumName ?: ""
         binding.tvForumDesc.text = if (description != null && !description!!.isEmpty()) description else "暂无描述"
@@ -108,8 +97,10 @@ class ForumDetailActivity : AppCompatActivity() {
             }
         }
 
-        // 顶栏双击快速回到顶部
-        com.solosu.mtforum.util.ScrollToTopHelper.attachRecyclerView(binding.toolbar, binding.recyclerView)
+        // 双击版块头部快速回到顶部
+        com.solosu.mtforum.util.ScrollToTopHelper.attachRecyclerView(binding.headerForum, binding.recyclerView)
+        // 左边缘右滑返回（顶栏与返回图标已移除）
+        binding.root.onBack = { finish() }
 
         // 设置帖子列表
         val layoutManager = LinearLayoutManager(this)
@@ -288,13 +279,5 @@ class ForumDetailActivity : AppCompatActivity() {
                 }
             }
         }.start()
-    }
-
-    override fun onOptionsItemSelected(item: MenuItem): Boolean {
-        if (item.itemId == android.R.id.home) {
-            finish()
-            return true
-        }
-        return super.onOptionsItemSelected(item)
     }
 }

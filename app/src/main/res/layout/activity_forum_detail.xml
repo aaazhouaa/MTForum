@@ -1,21 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<com.solosu.mtforum.ui.widget.EdgeSwipeBackLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/background"
     android:orientation="vertical"
     android:fitsSystemWindows="true">
-
-    <!-- 顶部固定:工具栏 -->
-    <com.google.android.material.appbar.MaterialToolbar
-        android:id="@+id/toolbar"
-        android:layout_width="match_parent"
-        android:layout_height="?attr/actionBarSize"
-        android:background="@color/background"
-        app:titleTextColor="@color/text_primary"
-        app:navigationIconTint="@color/text_primary"
-        app:title="@string/title_forum_detail" />
 
     <!-- 顶部固定:版块头部信息 -->
     <LinearLayout
@@ -144,4 +134,4 @@
             android:text="@string/forum_empty" />
     </FrameLayout>
 
-</LinearLayout>
+</com.solosu.mtforum.ui.widget.EdgeSwipeBackLayout>

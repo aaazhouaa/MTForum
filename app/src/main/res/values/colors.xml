@@ -33,8 +33,10 @@
     <color name="theme_rose_light">#F43F5E</color>
 
     <!-- 背景色 - 现代冷灰与纯白层级 (Slate 系列) -->
-    <color name="background">#F8FAFC</color>
-    <color name="background_primary">#F8FAFC</color>
+    <color name="background">#F2F2F6</color>
+    <color name="background_primary">#F2F2F6</color>
+    <!-- 顶栏专用白色（与灰底页面区分） -->
+    <color name="top_bar">#FFFFFF</color>
     <color name="background_secondary">#F1F5F9</color>
     <color name="surface">#FFFFFF</color>
     <!-- 卡片表面：纯净高质感白 -->

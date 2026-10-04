@@ -11,7 +11,7 @@
         android:id="@+id/layout_title_bar"
         android:layout_width="match_parent"
         android:layout_height="48dp"
-        android:background="@color/background">
+        android:background="@color/top_bar">
 
         <TextView
             android:id="@+id/tv_title_discover"
@@ -68,16 +68,16 @@
             android:layout_height="wrap_content"
             android:orientation="vertical"
             android:paddingBottom="92dp"
-            android:paddingEnd="9dp"
-            android:paddingStart="9dp"
-            android:paddingTop="4dp">
+            android:paddingEnd="3dp"
+            android:paddingStart="3dp"
+            android:paddingTop="6dp">
 
         <!-- 统计卡片 -->
         <!-- 数据统计:4 个独立玻璃卡片 -->
         <FrameLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="2dp">
+            android:layout_marginTop="0dp">
 
             <GridLayout
                 android:layout_width="match_parent"
@@ -91,7 +91,7 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_columnWeight="1"
-                    android:layout_margin="3dp"
+                    android:layout_margin="1.5dp"
                     android:gravity="center"
                     android:orientation="vertical"
                     android:padding="6dp">
@@ -121,7 +121,7 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_columnWeight="1"
-                    android:layout_margin="3dp"
+                    android:layout_margin="1.5dp"
                     android:gravity="center"
                     android:orientation="vertical"
                     android:padding="6dp">
@@ -151,7 +151,7 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_columnWeight="1"
-                    android:layout_margin="3dp"
+                    android:layout_margin="1.5dp"
                     android:gravity="center"
                     android:orientation="vertical"
                     android:padding="6dp">
@@ -181,7 +181,7 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_columnWeight="1"
-                    android:layout_margin="3dp"
+                    android:layout_margin="1.5dp"
                     android:gravity="center"
                     android:orientation="vertical"
                     android:padding="6dp">
@@ -212,19 +212,9 @@
         <View
             android:layout_width="match_parent"
             android:layout_height="0.5dp"
-            android:layout_marginTop="16dp"
-            android:layout_marginBottom="8dp"
+            android:layout_marginTop="6dp"
+            android:layout_marginBottom="4dp"
             android:background="@color/scrim" />
-
-        <!-- 版块网格标题 -->
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="8dp"
-            android:text="@string/tab_discover"
-            android:textSize="18sp"
-            android:textStyle="bold"
-            android:textColor="@color/text_primary" />
 
         <!-- 版块网格 -->
         <androidx.recyclerview.widget.RecyclerView

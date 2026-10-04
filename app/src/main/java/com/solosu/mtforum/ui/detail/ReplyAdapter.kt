@@ -373,7 +373,6 @@ class ReplyAdapter(rawReplies: List<ReplyItem>?) :
         private val tvReplyQuote: TextView = itemView.findViewById(R.id.tv_reply_quote)
         private val llReplyImages: LinearLayout = itemView.findViewById(R.id.ll_reply_images)
         private val btnReplyTo: View = itemView.findViewById(R.id.btn_reply_to)
-        private val ivReplyMore: ImageView? = itemView.findViewById(R.id.iv_reply_more)
         private val layoutCollapsedHint: View? = itemView.findViewById(R.id.layout_collapsed_hint)
         private val ivCollapsedIcon: ImageView? = itemView.findViewById(R.id.iv_collapsed_icon)
         private val tvCollapsedText: TextView? = itemView.findViewById(R.id.tv_collapsed_text)
@@ -460,7 +459,7 @@ class ReplyAdapter(rawReplies: List<ReplyItem>?) :
 
             // 评论区按参考样式仅显示时间，不显示回复项地点，避免与回复按钮并列出现重复灰色定位文字。
 
-            // 回复按钮 + 更多(⋮)
+            // 回复按钮
             val author = item.author
             if (!TextUtils.isEmpty(author)) {
                 btnReplyTo.visibility = View.VISIBLE
@@ -469,17 +468,8 @@ class ReplyAdapter(rawReplies: List<ReplyItem>?) :
                         replyClickListener!!.onReplyClick(item, bindingAdapterPosition)
                     }
                 }
-                if (ivReplyMore != null) {
-                    ivReplyMore.visibility = View.VISIBLE
-                    ivReplyMore.setOnClickListener {
-                        if (replyLongClickListener != null) {
-                            replyLongClickListener!!.onReplyLongClick(item, bindingAdapterPosition)
-                        }
-                    }
-                }
             } else {
                 btnReplyTo.visibility = View.GONE
-                if (ivReplyMore != null) ivReplyMore.visibility = View.GONE
             }
 
             // 内容 - 优先显示纯文本

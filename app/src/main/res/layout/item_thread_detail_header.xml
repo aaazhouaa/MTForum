@@ -229,15 +229,6 @@
         </FrameLayout>
     </androidx.cardview.widget.CardView>
     <!-- 正文内容的结束线：只划住图片，不含其后的打赏/好评/赞过行 -->
-    <View
-        android:id="@+id/view_content_bottom_divider"
-        android:layout_width="match_parent"
-        android:layout_height="1dp"
-        android:layout_marginStart="16dp"
-        android:layout_marginEnd="16dp"
-        android:layout_marginTop="12dp"
-        android:layout_marginBottom="4dp"
-        android:background="@color/divider" />
     <!-- ========== 隐藏内容区域 ========== -->
     <LinearLayout
         android:id="@+id/layout_hidden_content"

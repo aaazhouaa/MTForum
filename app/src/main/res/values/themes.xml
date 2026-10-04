@@ -12,7 +12,7 @@
         <item name="colorOnSecondary">@color/text_white</item>
 
         <!-- 沉浸式状态栏与导航栏：无缝融入背景 -->
-        <item name="android:statusBarColor" tools:targetApi="21">@color/background</item>
+        <item name="android:statusBarColor" tools:targetApi="21">@color/top_bar</item>
         <item name="android:windowLightStatusBar" tools:targetApi="23">true</item>
         <item name="android:navigationBarColor" tools:targetApi="21">@color/background</item>
         <item name="android:windowLightNavigationBar" tools:targetApi="27">true</item>

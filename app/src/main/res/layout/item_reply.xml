@@ -4,15 +4,10 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
-    android:paddingStart="12dp"
-    android:paddingTop="8dp"
-    android:paddingEnd="12dp"
-    android:paddingBottom="8dp"
-    android:layout_marginStart="8dp"
-    android:layout_marginTop="5dp"
-    android:layout_marginEnd="8dp"
-    android:layout_marginBottom="5dp"
-    android:background="@drawable/reply_nested_bg">
+    android:paddingStart="16dp"
+    android:paddingTop="18dp"
+    android:paddingEnd="16dp"
+    android:paddingBottom="18dp">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -112,22 +107,12 @@
                     android:layout_width="30dp"
                     android:layout_height="27dp"
                     android:padding="3.5dp"
-                    android:src="@drawable/ic_reply_arrow"
+                    android:src="@drawable/forum_comment"
+                    app:tint="@color/icon_secondary"
                     android:scaleType="fitCenter"
                     android:background="?attr/selectableItemBackgroundBorderless"
                     android:contentDescription="回复"
                     android:visibility="gone" />
-
-                <ImageView
-                    android:id="@+id/iv_reply_more"
-                    android:layout_width="30dp"
-                    android:layout_height="27dp"
-                    android:layout_marginStart="4dp"
-                    android:padding="3dp"
-                    android:src="@drawable/ic_more_vert"
-                    android:scaleType="fitCenter"
-                    android:background="?attr/selectableItemBackgroundBorderless"
-                    android:contentDescription="更多操作" />
             </LinearLayout>
         </LinearLayout>
     </LinearLayout>
