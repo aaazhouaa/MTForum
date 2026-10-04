@@ -58,7 +58,7 @@
         android:orientation="horizontal"
         android:layout_marginStart="16dp"
         android:layout_marginEnd="16dp"
-        android:layout_marginTop="12dp"
+        android:layout_marginTop="14dp"
         android:gravity="center_vertical">
         <com.google.android.material.imageview.ShapeableImageView
             android:id="@+id/iv_author_avatar"
@@ -148,8 +148,8 @@
             android:layout_height="wrap_content"
             android:layout_marginStart="16dp"
             android:layout_marginEnd="16dp"
-            android:layout_marginTop="6dp"
-            android:layout_marginBottom="0dp"
+            android:layout_marginTop="8dp"
+            android:layout_marginBottom="4dp"
             android:gravity="start"
             android:textSize="11sp"
             android:textColor="@color/text_secondary"
@@ -162,14 +162,15 @@
         android:orientation="vertical"
         android:layout_marginStart="16dp"
         android:layout_marginEnd="16dp"
-        android:layout_marginTop="8dp">
+        android:layout_marginTop="14dp">
         <TextView
             android:id="@+id/tv_content"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:textSize="15sp"
             android:textColor="@color/text_primary"
-            android:lineSpacingExtra="6dp" />
+            android:lineSpacingExtra="6dp"
+            android:letterSpacing="0.015" />
     </LinearLayout>
     <!-- 帖子正文中的图片容器(玻璃卡片 + 横向滑动 + 折叠) -->
     <androidx.cardview.widget.CardView
@@ -304,6 +305,16 @@
             android:lineSpacingExtra="5dp"
             android:visibility="gone" />
     </LinearLayout>
+    <!-- 正文与评论区优雅过渡底线与呼吸间距 -->
+    <View
+        android:id="@+id/view_content_bottom_divider"
+        android:layout_width="match_parent"
+        android:layout_height="0.6dp"
+        android:layout_marginStart="16dp"
+        android:layout_marginEnd="16dp"
+        android:layout_marginTop="20dp"
+        android:layout_marginBottom="6dp"
+        android:background="@color/divider" />
     <!-- ========== 评论标题栏 ========== -->
     <LinearLayout
         android:layout_width="match_parent"
@@ -312,7 +323,7 @@
         android:gravity="center_vertical"
         android:layout_marginStart="16dp"
         android:layout_marginEnd="16dp"
-        android:layout_marginTop="12dp">
+        android:layout_marginTop="10dp">
 
         <TextView
             android:layout_width="wrap_content"

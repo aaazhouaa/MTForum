@@ -422,8 +422,7 @@ class ThreadDetailActivity : AppCompatActivity() {
                 val author = if (item != null) item.author else ""
                 if (!TextUtils.isEmpty(author)) {
                     currentReplyPid = if (item != null) item.pid ?: "" else ""
-                    // build71: 不再把"回复 xx:"当预填文本塞进输入框(它会被一起发出去)
-                    currentReplyTarget = ""
+                    currentReplyTarget = "回复 @$author："
                 } else {
                     currentReplyPid = ""
                     currentReplyTarget = ""
@@ -662,7 +661,7 @@ class ThreadDetailActivity : AppCompatActivity() {
             val displayHtml: String
             if (unlocked) {
                 // 已解锁：保留正文中的所有隐藏内容/引用块原位展示（与网页端排版顺序一致）
-                // 统一将正文中的 comiis_quote / locked 转换为带有金黄色高亮标题的 customquote 质感卡片
+                // 统一将正文中的 comiis_quote / locked 转换为带有专属金色高亮标题与一键复制的 unlocked-hidden-card 质感卡片
                 val quotePattern = Pattern.compile(
                     "<div\\s+class=[\"'](?:comiis_quote|locked)[^\"']*[\"']>(.*?)</div>",
                     Pattern.CASE_INSENSITIVE or Pattern.DOTALL
@@ -673,20 +672,13 @@ class ThreadDetailActivity : AppCompatActivity() {
                 while (qMatcher.find()) {
                     quoteFound = true
                     var inner = qMatcher.group(1) ?: ""
-                    inner = inner.replace(
-                        Regex("(?i)(本帖隐藏的内容[:：]?)"),
-                        "<font color=\"#F59E0B\"><b>$1</b></font>"
-                    )
-                    qMatcher.appendReplacement(sbQuote, Matcher.quoteReplacement("<br><customquote>$inner</customquote><br>"))
+                    qMatcher.appendReplacement(sbQuote, Matcher.quoteReplacement("<div class=\"unlocked-hidden-card\">$inner</div>"))
                 }
                 qMatcher.appendTail(sbQuote)
                 var resolvedHtml = sbQuote.toString()
                 if (!quoteFound && !TextUtils.isEmpty(postDetail.hiddenContentHtml)) {
-                    val fallbackHidden = postDetail.hiddenContentHtml!!.replace(
-                        Regex("(?i)(本帖隐藏的内容[:：]?)"),
-                        "<font color=\"#F59E0B\"><b>$1</b></font>"
-                    )
-                    resolvedHtml = "<br><customquote>$fallbackHidden</customquote><br><br>" + resolvedHtml
+                    val fallbackHidden = postDetail.hiddenContentHtml!!
+                    resolvedHtml = "<div class=\"unlocked-hidden-card\">$fallbackHidden</div>" + resolvedHtml
                 }
                 displayHtml = resolvedHtml
                 headerBinding!!.layoutHiddenContent.visibility = View.GONE
@@ -4342,8 +4334,8 @@ class ThreadDetailActivity : AppCompatActivity() {
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT
             ).apply {
-                topMargin = dpToPx(8)
-                bottomMargin = dpToPx(10)
+                topMargin = dpToPx(12)
+                bottomMargin = dpToPx(14)
             }
             layoutParams = lp
             layoutManager = GridLayoutManager(this@ThreadDetailActivity, spanCount)
@@ -4431,13 +4423,18 @@ class ThreadDetailActivity : AppCompatActivity() {
         val hb = headerBinding ?: return
         val container = hb.llContentContainer
         val cleanedHtml = stripPostRedundantElements(displayHtml)
-        val processedHtml = groupContinuousImages(cleanedHtml)
+        // 关键：将连续 2 个以上的换行或空段落压缩，彻底根除正文大面积空白
+        val collapsedHtml = Regex("(?i)(?:<br\\s*/?>\\s*){2,}").replace(cleanedHtml, "<br>")
+            .replace(Regex("(?i)<p\\s*>\\s*(?:&nbsp;|&#160;|\\s)*</p>"), "")
+            .replace(Regex("(?i)(?:\\r?\\n\\s*){3,}"), "\n\n")
+        val processedHtml = groupContinuousImages(collapsedHtml)
 
         val hasTable = processedHtml.contains("<table", ignoreCase = true)
         val hasGallery = processedHtml.contains("continuous-image-gallery", ignoreCase = true)
+        val hasHiddenCard = processedHtml.contains("unlocked-hidden-card", ignoreCase = true)
 
-        if (!hasTable && !hasGallery) {
-            // 无表格且无连续图片组：保留原单个 tvContent
+        if (!hasTable && !hasGallery && !hasHiddenCard) {
+            // 无表格、无画廊、无解锁隐藏卡片：保留原单个 tvContent
             for (i in container.childCount - 1 downTo 0) {
                 val child = container.getChildAt(i)
                 if (child !== hb.tvContent) container.removeViewAt(i)
@@ -4455,7 +4452,7 @@ class ThreadDetailActivity : AppCompatActivity() {
             return
         }
 
-        // 包含表格或连续图片组：分段渲染文本、原生 TableLayout 与横向图片画廊
+        // 包含表格、连续图片组或专属解锁卡片：分段渲染文本与专属原生成分
         // 关键：保留 hb.tvContent 在视图树内（仅设为 GONE），绝不从父容器移除，杜绝 ViewBinding 抛出 Missing required view 崩溃
         for (i in container.childCount - 1 downTo 0) {
             val child = container.getChildAt(i)
@@ -4463,7 +4460,7 @@ class ThreadDetailActivity : AppCompatActivity() {
         }
         hb.tvContent.visibility = View.GONE
 
-        val p = Pattern.compile("(?is)(<table\\b.*?</table\\s*>|<div\\s+class=[\"']continuous-image-gallery[\"'][^>]*>.*?</div>)")
+        val p = Pattern.compile("(?is)(<table\\b.*?</table\\s*>|<div\\s+class=[\"']continuous-image-gallery[\"'][^>]*>.*?</div>|<div\\s+class=[\"']unlocked-hidden-card[\"'][^>]*>.*?</div>)")
         val m = p.matcher(processedHtml)
         var lastIdx = 0
 
@@ -4510,6 +4507,10 @@ class ThreadDetailActivity : AppCompatActivity() {
                     val galleryCard = createGridImageGallery(urls)
                     container.addView(galleryCard)
                 }
+            } else if (matchedBlock.contains("unlocked-hidden-card", ignoreCase = true)) {
+                val inner = matchedBlock.replace(Regex("(?is)^<div[^>]*>"), "").replace(Regex("(?is)</div>$"), "")
+                val card = createUnlockedHiddenCard(inner)
+                container.addView(card)
             }
 
             lastIdx = m.end()
@@ -4517,6 +4518,104 @@ class ThreadDetailActivity : AppCompatActivity() {
 
         val textAfter = processedHtml.substring(lastIdx)
         addTextChunk(textAfter)
+    }
+
+    private fun createUnlockedHiddenCard(innerHtml: String): View {
+        val card = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            val lp = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply {
+                topMargin = dpToPx(10)
+                bottomMargin = dpToPx(12)
+            }
+            layoutParams = lp
+            val isDark = (resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) == android.content.res.Configuration.UI_MODE_NIGHT_YES
+            val bgColor = if (isDark) 0x1AF59E0B.toInt() else 0x14F59E0B.toInt()
+            val strokeColor = if (isDark) 0x59F59E0B.toInt() else 0x66F59E0B.toInt()
+            val gd = android.graphics.drawable.GradientDrawable().apply {
+                setColor(bgColor)
+                cornerRadius = dpToPx(10).toFloat()
+                setStroke(dpToPx(1), strokeColor)
+            }
+            background = gd
+            val pad = dpToPx(12)
+            setPadding(pad, pad, pad, pad)
+        }
+
+        // 顶栏：左侧标题「🔓 本帖隐藏的内容」，右侧「复制」胶囊按钮
+        val topRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            )
+        }
+
+        val tvTitle = TextView(this).apply {
+            text = "🔓 本帖隐藏的内容"
+            textSize = 13.5f
+            typeface = Typeface.DEFAULT_BOLD
+            setTextColor(0xFFD97706.toInt())
+            layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+        }
+        topRow.addView(tvTitle)
+
+        // 纯文本内容提取
+        val cleanContent = innerHtml.replace(Regex("(?i)^.*?本帖隐藏的内容[:：]?\\s*"), "")
+            .replace(Regex("(?i)<br\\s*/?>"), "\n")
+            .replace(Regex("<[^>]+>"), "")
+            .trim()
+
+        val btnCopy = TextView(this).apply {
+            text = "复制"
+            textSize = 11.5f
+            setTextColor(0xFFD97706.toInt())
+            typeface = Typeface.DEFAULT_BOLD
+            setPadding(dpToPx(10), dpToPx(3), dpToPx(10), dpToPx(3))
+            val isDark = (resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) == android.content.res.Configuration.UI_MODE_NIGHT_YES
+            val btnBg = android.graphics.drawable.GradientDrawable().apply {
+                setColor(if (isDark) 0x33F59E0B.toInt() else 0x24F59E0B.toInt())
+                cornerRadius = dpToPx(12).toFloat()
+            }
+            background = btnBg
+            isClickable = true
+            isFocusable = true
+            setOnClickListener {
+                if (cleanContent.isNotEmpty()) {
+                    val cm = getSystemService(Context.CLIPBOARD_SERVICE) as? android.content.ClipboardManager
+                    cm?.setPrimaryClip(android.content.ClipData.newPlainText("隐藏内容", cleanContent))
+                    Toast.makeText(this@ThreadDetailActivity, "已复制隐藏内容", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+        topRow.addView(btnCopy)
+        card.addView(topRow)
+
+        // 内容展示区
+        val tvBody = TextView(this).apply {
+            val lp = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply {
+                topMargin = dpToPx(8)
+            }
+            layoutParams = lp
+            textSize = 14.5f
+            setTextColor(getColor(R.color.text_primary))
+            setLineSpacing(dpToPx(5).toFloat(), 1.0f)
+            val bodyHtml = innerHtml.replace(Regex("(?i)^.*?本帖隐藏的内容[:：]?\\s*"), "")
+            text = safeFromHtml(
+                bodyHtml,
+                createInlineImageGetter(this),
+                BBCodeUtil.createTagHandler(this@ThreadDetailActivity)
+            )
+            setupClickableLinks(this)
+        }
+        card.addView(tvBody)
+        return card
     }
 
     private fun createTableLayoutView(tableHtml: String): View? {

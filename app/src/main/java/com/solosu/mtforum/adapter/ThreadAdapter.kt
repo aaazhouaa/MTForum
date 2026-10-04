@@ -169,9 +169,9 @@ class ThreadAdapter(private val context: Context) : RecyclerView.Adapter<ThreadA
             holder.tvForum!!.setVisibility(View.GONE)
         }
 
-        // 摘要
-        val summary = thread.summary
-        if (summary != null && !summary.isEmpty()) {
+        // 摘要：深度清洗网址、标签等噪音字符，保留清爽纯正文
+        val summary = cleanThreadSummary(thread.summary)
+        if (!summary.isEmpty()) {
             holder.tvSummary!!.setVisibility(View.VISIBLE)
             holder.tvSummary!!.setText(summary)
         } else {
@@ -442,11 +442,11 @@ class ThreadAdapter(private val context: Context) : RecyclerView.Adapter<ThreadA
         val totalCount = list.size
 
         if (totalCount == 1) {
-            // 单图展示：恢复大图尺寸（高度 190dp），圆角 10dp，并带有清晰精致边框
+            // 单图展示：舒适高度（155dp），圆角 8dp，并带有清晰精致边框
             val singleIv = holder.ivThumbnail ?: return
             singleIv.visibility = View.VISIBLE
             val lp = singleIv.layoutParams
-            lp.height = dp(190)
+            lp.height = dp(155)
             singleIv.layoutParams = lp
             singleIv.clipToOutline = true
             singleIv.setBackgroundResource(R.drawable.bg_thread_single_img)
@@ -456,7 +456,7 @@ class ThreadAdapter(private val context: Context) : RecyclerView.Adapter<ThreadA
                 .load(list[0])
                 .placeholder(R.drawable.ic_image_placeholder)
                 .error(R.drawable.ic_image_error)
-                .transform(CenterCrop(), RoundedCorners(dp(10)))
+                .transform(CenterCrop(), RoundedCorners(dp(8)))
                 .into(singleIv)
 
             singleIv.setOnClickListener {
@@ -471,15 +471,15 @@ class ThreadAdapter(private val context: Context) : RecyclerView.Adapter<ThreadA
 
         when (totalCount) {
             2 -> {
-                // 双图并排：等宽 2 列，高度 140dp，间距 6dp
-                val row = createHorizontalRow(dp(140))
-                val gap = dp(6)
+                // 双图并排：等宽 2 列，高度 130dp，间距 5dp
+                val row = createHorizontalRow(dp(130))
+                val gap = dp(5)
                 for (i in 0 until 2) {
-                    val iv = createGridImageView(dp(8))
+                    val iv = createGridImageView(dp(6))
                     val lp = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f)
                     if (i == 0) lp.rightMargin = gap / 2 else lp.leftMargin = gap / 2
                     iv.layoutParams = lp
-                    loadIntoImageView(iv, list[i], dp(8))
+                    loadIntoImageView(iv, list[i], dp(6))
                     val pos = i
                     iv.setOnClickListener { openImagePreview(list, pos) }
                     row.addView(iv)
@@ -487,16 +487,16 @@ class ThreadAdapter(private val context: Context) : RecyclerView.Adapter<ThreadA
                 container.addView(row)
             }
             3 -> {
-                // 三图并排：等宽 3 列，高度 115dp，间距 5dp
-                val row = createHorizontalRow(dp(115))
-                val gap = dp(5)
+                // 三图并排：等宽 3 列，高度 100dp，间距 4dp
+                val row = createHorizontalRow(dp(100))
+                val gap = dp(4)
                 for (i in 0 until 3) {
-                    val iv = createGridImageView(dp(8))
+                    val iv = createGridImageView(dp(6))
                     val lp = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f)
                     if (i > 0) lp.leftMargin = gap / 2
                     if (i < 2) lp.rightMargin = gap / 2
                     iv.layoutParams = lp
-                    loadIntoImageView(iv, list[i], dp(8))
+                    loadIntoImageView(iv, list[i], dp(6))
                     val pos = i
                     iv.setOnClickListener { openImagePreview(list, pos) }
                     row.addView(iv)
@@ -504,10 +504,10 @@ class ThreadAdapter(private val context: Context) : RecyclerView.Adapter<ThreadA
                 container.addView(row)
             }
             4 -> {
-                // 四图：2x2 网格，每行高度 110dp，行间距与列间距 5dp
-                val gap = dp(5)
+                // 四图：2x2 网格，每行高度 98dp，间距 4dp
+                val gap = dp(4)
                 for (rowIdx in 0 until 2) {
-                    val row = createHorizontalRow(dp(110))
+                    val row = createHorizontalRow(dp(98))
                     if (rowIdx > 0) {
                         val rowLp = row.layoutParams as LinearLayout.LayoutParams
                         rowLp.topMargin = gap
@@ -515,11 +515,11 @@ class ThreadAdapter(private val context: Context) : RecyclerView.Adapter<ThreadA
                     }
                     for (colIdx in 0 until 2) {
                         val i = rowIdx * 2 + colIdx
-                        val iv = createGridImageView(dp(8))
+                        val iv = createGridImageView(dp(6))
                         val lp = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f)
                         if (colIdx == 0) lp.rightMargin = gap / 2 else lp.leftMargin = gap / 2
                         iv.layoutParams = lp
-                        loadIntoImageView(iv, list[i], dp(8))
+                        loadIntoImageView(iv, list[i], dp(6))
                         val pos = i
                         iv.setOnClickListener { openImagePreview(list, pos) }
                         row.addView(iv)
@@ -617,6 +617,17 @@ class ThreadAdapter(private val context: Context) : RecyclerView.Adapter<ThreadA
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
         context.startActivity(intent)
+    }
+
+    private fun cleanThreadSummary(raw: String?): String {
+        if (raw.isNullOrBlank()) return ""
+        // 过滤裸露的长网址 URL、BBCode 标签、隐藏提示等噪点，保证信息流纯净优雅
+        var s = raw.replace(Regex("(?i)https?://[a-zA-Z0-9./_?=&%-]+"), "")
+        s = s.replace(Regex("(?i)\\[/?(?:quote|hide|attach|url|img|b|color)[^\\]]*\\]"), "")
+        s = s.replace(Regex("(?i)本帖隐藏的内容.*?($|\n)"), "")
+        s = s.replace(Regex("(?i)查看本帖隐藏内容请回复"), "")
+        s = s.replace(Regex("\\s+"), " ").trim()
+        return s
     }
 
     private fun formatCount(count: Int): String {

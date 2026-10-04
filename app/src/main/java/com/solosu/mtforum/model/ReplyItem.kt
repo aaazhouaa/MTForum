@@ -27,4 +27,9 @@ class ReplyItem {
     var time: String? = null            // 时间（如 "半小时前"）
     var location: String? = null        // 地点（如 "来自 广东"）
     var imageUrls: ArrayList<String> = ArrayList() // 评论包含的附件大图列表
+
+    // 楼中楼（二级回复/评论内嵌套回复）
+    var subReplies: MutableList<ReplyItem> = ArrayList() // 挂在该回复下的子回复列表
+    var isSubReply: Boolean = false                      // 是否已被归为子回复（不单独占楼）
+    var isSubRepliesExpanded: Boolean = true             // 子回复是否展开（默认展开）
 }

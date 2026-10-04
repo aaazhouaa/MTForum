@@ -86,7 +86,52 @@ class ReplyAdapter(rawReplies: List<ReplyItem>?) :
     private var replyLongClickListener: OnReplyLongClickListener? = null
 
     init {
+        organizeReplies()
         rebuildDisplayList()
+    }
+
+    private fun organizeReplies() {
+        val all = rawReplyList
+        if (all.isEmpty()) return
+
+        val authorMap = HashMap<String, MutableList<ReplyItem>>()
+        for (item in all) {
+            item.subReplies.clear()
+            item.isSubReply = false
+            val author = item.author
+            if (!author.isNullOrBlank()) {
+                authorMap.getOrPut(author) { ArrayList() }.add(item)
+            }
+        }
+
+        val pattern = Pattern.compile("^(.*?)(?:\\s*发表于|\\s*:|\\s*：)")
+
+        for (item in all) {
+            val quote = item.quotedContentText
+            if (quote.isNullOrBlank()) continue
+
+            var parent: ReplyItem? = null
+            val matcher = pattern.matcher(quote.trim())
+            if (matcher.find()) {
+                val targetAuthor = matcher.group(1)?.trim()
+                if (!targetAuthor.isNullOrEmpty()) {
+                    val candidates = authorMap[targetAuthor]
+                    if (!candidates.isNullOrEmpty()) {
+                        for (cand in candidates.asReversed()) {
+                            if (cand !== item && !cand.isSubReply) {
+                                parent = cand
+                                break
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (parent != null && parent !== item) {
+                item.isSubReply = true
+                parent.subReplies.add(item)
+            }
+        }
     }
 
     private fun isSequentialOrRepeatedDigits(s: String): Boolean {
@@ -186,6 +231,10 @@ class ReplyAdapter(rawReplies: List<ReplyItem>?) :
 
         var count = 0
         for (item in rawReplyList) {
+            if (item.isSubReply) {
+                // 已归类为楼中楼子回复，在主评论下方嵌套展示，不再单独占一楼
+                continue
+            }
             val isWater = isWaterReply(item)
             if (isWater) {
                 count++
@@ -280,6 +329,7 @@ class ReplyAdapter(rawReplies: List<ReplyItem>?) :
 
     fun updateData(newList: List<ReplyItem>?) {
         this.rawReplyList = newList ?: ArrayList()
+        organizeReplies()
         rebuildDisplayList()
         notifyDataSetChanged()
     }
@@ -377,6 +427,14 @@ class ReplyAdapter(rawReplies: List<ReplyItem>?) :
         private val ivCollapsedIcon: ImageView? = itemView.findViewById(R.id.iv_collapsed_icon)
         private val tvCollapsedText: TextView? = itemView.findViewById(R.id.tv_collapsed_text)
 
+        // 图六楼中楼与底栏新控件
+        private val tvReplyBottomTime: TextView? = itemView.findViewById(R.id.tv_reply_bottom_time)
+        private val btnToggleSubReplies: TextView? = itemView.findViewById(R.id.btn_toggle_sub_replies)
+        private val btnReplyText: TextView? = itemView.findViewById(R.id.btn_reply_text)
+        private val btnReplyMore: ImageView? = itemView.findViewById(R.id.btn_reply_more)
+        private val layoutSubRepliesContainer: LinearLayout? = itemView.findViewById(R.id.layout_sub_replies_container)
+        private val llSubRepliesList: LinearLayout? = itemView.findViewById(R.id.ll_sub_replies_list)
+
         fun bind(row: DisplayRow) {
             // 普通回复行：先收起折叠提示，避免复用残留
             layoutCollapsedHint?.visibility = View.GONE
@@ -452,18 +510,8 @@ class ReplyAdapter(rawReplies: List<ReplyItem>?) :
 
             // 评论区按参考样式仅显示时间，不显示回复项地点，避免与回复按钮并列出现重复灰色定位文字。
 
-            // 回复按钮
-            val author = item.author
-            if (!TextUtils.isEmpty(author)) {
-                btnReplyTo.visibility = View.VISIBLE
-                btnReplyTo.setOnClickListener {
-                    if (replyClickListener != null) {
-                        replyClickListener!!.onReplyClick(item, bindingAdapterPosition)
-                    }
-                }
-            } else {
-                btnReplyTo.visibility = View.GONE
-            }
+            // 回复按钮：旧版头像旁图标废弃隐藏，统一由图六底栏呈现
+            btnReplyTo.visibility = View.GONE
 
             // 内容 - 优先显示纯文本
 
@@ -623,8 +671,133 @@ class ReplyAdapter(rawReplies: List<ReplyItem>?) :
                 llReplyImages.visibility = View.GONE
             }
 
+            // 隐藏旧版头像旁的时间和回复图标，统一由图六底栏呈现
+            btnReplyTo.visibility = View.GONE
+            tvTime.visibility = View.GONE
+
+            // 图六底栏：左侧显示「时间 来自 属地」
+            val timeStr = item.time ?: ""
+            val locStr = item.location ?: ""
+            val fullTimeLoc = when {
+                timeStr.isNotEmpty() && locStr.isNotEmpty() -> "$timeStr  $locStr"
+                timeStr.isNotEmpty() -> timeStr
+                else -> locStr
+            }
+            tvReplyBottomTime?.text = fullTimeLoc
+            tvReplyBottomTime?.visibility = if (fullTimeLoc.isNotEmpty()) View.VISIBLE else View.GONE
+
+            // 图六底栏：回复按钮
+            val author = item.author
+            if (!TextUtils.isEmpty(author)) {
+                btnReplyText?.visibility = View.VISIBLE
+                btnReplyText?.setOnClickListener {
+                    replyClickListener?.onReplyClick(item, bindingAdapterPosition)
+                }
+            } else {
+                btnReplyText?.visibility = View.GONE
+            }
+
+            // 图六底栏：更多操作按钮（三个点）
+            btnReplyMore?.visibility = View.VISIBLE
+            btnReplyMore?.setOnClickListener {
+                replyLongClickListener?.onReplyLongClick(item, bindingAdapterPosition)
+            }
+
+            // 楼中楼折叠与展开控制
+            val subCount = item.subReplies.size
+            if (subCount > 0) {
+                btnToggleSubReplies?.visibility = View.VISIBLE
+                btnToggleSubReplies?.text = if (item.isSubRepliesExpanded) "收起回复" else "展开回复 ($subCount)"
+                btnToggleSubReplies?.setOnClickListener {
+                    item.isSubRepliesExpanded = !item.isSubRepliesExpanded
+                    btnToggleSubReplies?.text = if (item.isSubRepliesExpanded) "收起回复" else "展开回复 ($subCount)"
+                    bindSubReplies(item)
+                }
+            } else {
+                btnToggleSubReplies?.visibility = View.GONE
+            }
+
+            // 渲染楼中楼子回复
+            bindSubReplies(item)
+
             // 用户要求：废弃原卡片内的折叠胶囊，统一折叠到顶部标题栏
             layoutCollapsedHint?.visibility = View.GONE
+        }
+
+        private fun bindSubReplies(item: ReplyItem) {
+            val container = layoutSubRepliesContainer ?: return
+            val listLayout = llSubRepliesList ?: return
+            listLayout.removeAllViews()
+
+            if (item.subReplies.isEmpty() || !item.isSubRepliesExpanded) {
+                container.visibility = View.GONE
+                return
+            }
+
+            container.visibility = View.VISIBLE
+            val inflater = LayoutInflater.from(itemView.context)
+
+            for (subItem in item.subReplies) {
+                val subView = inflater.inflate(R.layout.item_sub_reply, listLayout, false)
+                val ivSubAvatar = subView.findViewById<ImageView>(R.id.iv_sub_avatar)
+                val tvSubAuthor = subView.findViewById<TextView>(R.id.tv_sub_author)
+                val tvSubOpBadge = subView.findViewById<TextView>(R.id.tv_sub_op_badge)
+                val tvSubContent = subView.findViewById<TextView>(R.id.tv_sub_content)
+                val tvSubTimeLoc = subView.findViewById<TextView>(R.id.tv_sub_time_location)
+                val btnSubReply = subView.findViewById<TextView>(R.id.btn_sub_reply)
+
+                if (!TextUtils.isEmpty(subItem.avatarUrl)) {
+                    Glide.with(ivSubAvatar.context)
+                        .load(subItem.avatarUrl)
+                        .transform(CircleCrop())
+                        .placeholder(R.drawable.ic_account)
+                        .error(R.drawable.ic_account)
+                        .into(ivSubAvatar)
+                } else {
+                    ivSubAvatar.setImageResource(R.drawable.ic_account)
+                }
+
+                ivSubAvatar.setOnClickListener {
+                    if (!TextUtils.isEmpty(subItem.authorUid)) {
+                        userClickListener?.onUserClick(subItem, bindingAdapterPosition)
+                    }
+                }
+                tvSubAuthor.setOnClickListener {
+                    if (!TextUtils.isEmpty(subItem.authorUid)) {
+                        userClickListener?.onUserClick(subItem, bindingAdapterPosition)
+                    }
+                }
+
+                tvSubAuthor.text = subItem.author ?: "匿名"
+                tvSubOpBadge.visibility = if (subItem.isOP) View.VISIBLE else View.GONE
+
+                val cleanSubText = subItem.contentText ?: subItem.contentHtml?.replace(Regex("<[^>]+>"), "") ?: ""
+                tvSubContent.text = cleanSubText
+                tvSubContent.setOnLongClickListener {
+                    replyLongClickListener?.onReplyLongClick(subItem, bindingAdapterPosition)
+                    true
+                }
+
+                val sTime = subItem.time ?: ""
+                val sLoc = subItem.location ?: ""
+                val fullSubTime = when {
+                    sTime.isNotEmpty() && sLoc.isNotEmpty() -> "$sTime  $sLoc"
+                    sTime.isNotEmpty() -> sTime
+                    else -> sLoc
+                }
+                tvSubTimeLoc.text = fullSubTime
+
+                btnSubReply.setOnClickListener {
+                    replyClickListener?.onReplyClick(subItem, bindingAdapterPosition)
+                }
+
+                subView.setOnLongClickListener {
+                    replyLongClickListener?.onReplyLongClick(subItem, bindingAdapterPosition)
+                    true
+                }
+
+                listLayout.addView(subView)
+            }
         }
     }
 
