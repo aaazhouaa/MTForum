@@ -28,8 +28,15 @@ class ReplyItem {
     var location: String? = null        // 地点（如 "来自 广东"）
     var imageUrls: ArrayList<String> = ArrayList() // 评论包含的附件大图列表
 
+    // 被引用对象（用于建「楼中楼」父子关系）
+    var quotedPid: String? = null       // 被引用楼层 pid
+    var quotedUid: String? = null       // 被引用作者 uid
+    var quotedAuthorName: String? = null // 被引用作者名（从引用头的“回复 xx 发表于”解析）
+
     // 楼中楼（二级回复/评论内嵌套回复）
     var subReplies: MutableList<ReplyItem> = ArrayList() // 挂在该回复下的子回复列表
     var isSubReply: Boolean = false                      // 是否已被归为子回复（不单独占楼）
     var isSubRepliesExpanded: Boolean = true             // 子回复是否展开（默认展开）
+    var inReplyToName: String? = null                    // 回复对象为子回复时，被回复者昵称（用于展示“回复 xx”）
+    var orderIndex: Int = -1                             // 在原回复列表中的顺序号（用于判定回复先后）
 }

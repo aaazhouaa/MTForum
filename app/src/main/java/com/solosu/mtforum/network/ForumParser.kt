@@ -1731,9 +1731,22 @@ object ForumParser {
             val opTimeArea = opTop.select("div.comiis_postli_time").first()
             if (opTimeArea != null) {
                 val timeEl = opTimeArea.select("span.kmtime").first()
-                if (timeEl != null) detail.publishTime = timeEl.text().trim()
+                var rawTime = timeEl?.text()?.replace('\u00a0', ' ')?.trim() ?: ""
+                // 部分模板把属地也写在时间节点里，剔出来避免与下方地点节点重复渲染
+                var locFromTime: String? = null
+                val locIdx = rawTime.indexOf("来自")
+                if (locIdx > 0) {
+                    locFromTime = rawTime.substring(locIdx).trim()
+                    rawTime = rawTime.substring(0, locIdx).trim()
+                }
+                if (rawTime.isNotEmpty()) detail.publishTime = rawTime
                 val locCode = opTimeArea.select("code.comiis_iplocality").first()
-                if (locCode != null) detail.location = locCode.text().trim()
+                val locText = locCode?.text()?.replace('\u00a0', ' ')?.trim()
+                detail.location = when {
+                    !locText.isNullOrEmpty() -> locText
+                    !locFromTime.isNullOrEmpty() -> locFromTime
+                    else -> null
+                }
             }
         }
 
@@ -1982,6 +1995,27 @@ object ForumParser {
                     // 引用与当前回复必须拆开保存，否则客户端会把引用文本和新回复连成一段。
                     val quote = rContent.select("div.comiis_quote, blockquote, .quote").first()
                     if (quote != null) {
+                        // 引用头（“回复 mt007 发表于 2026-10-4 23:48”）单独提取出被引用者信息。
+                        // 注意：不能从 DOM 里删掉它，引用正文里还要保留这段 meta（客户端右下角要展示）。
+                        // 取节点要按优先级：“引用头”应优先于块内任意带 pid 的链接。
+                        val quoteHead = quote.selectFirst("a.quote_author, .quote_author, cite")
+                            ?: quote.selectFirst("a[href*=pid=]")
+                        if (quoteHead != null) {
+                            val headText = quoteHead.text().replace('\u00a0', ' ').trim()
+                            if (!TextUtils.isEmpty(headText)) {
+                                reply.quotedAuthorName = headText
+                                    .replace(Regex("^回复\\s*"), "")
+                                    .replace(Regex("\\s*发表于.*$"), "")
+                                    .trim()
+                            }
+                            // 仅当引用头自身带 pid 链接时才认定是被引用楼层的 pid；
+                            // 否则宁可留空，也不要把块内其他 pid 误当成父楼层。
+                            val href = quoteHead.attr("href")
+                            val pidM = Pattern.compile("pid=(\\d+)").matcher(href)
+                            if (pidM.find()) reply.quotedPid = pidM.group(1)
+                            val uidM = uidPtn.matcher(href)
+                            if (uidM.find()) reply.quotedUid = uidM.group(1)
+                        }
                         reply.quotedContentHtml = quote.html().trim()
                         reply.quotedContentText = quote.text().replace('\u00a0', ' ').trim()
                         quote.remove()
@@ -2009,9 +2043,23 @@ object ForumParser {
                 val rTimes = rp.select("div.comiis_postli_times").first()
                 if (rTimes != null) {
                     val timeEl = rTimes.select("span.comiis_tm").first()
-                    if (timeEl != null) reply.time = timeEl.text().trim()
+                    var rawTime = timeEl?.text()?.replace('\u00a0', ' ')?.trim() ?: ""
+                    // 部分模板把属地塞在时间节点里（“1 小时前 来自 安徽”），
+                    // 若不剔出，底栏拼接时会把属地渲染两遍。
+                    var locFromTime: String? = null
+                    val locIdx = rawTime.indexOf("来自")
+                    if (locIdx > 0) {
+                        locFromTime = rawTime.substring(locIdx).trim()
+                        rawTime = rawTime.substring(0, locIdx).trim()
+                    }
+                    if (rawTime.isNotEmpty()) reply.time = rawTime
                     val locCode = rTimes.select("code.comiis_iplocality").first()
-                    if (locCode != null) reply.location = locCode.text().trim()
+                    val locText = locCode?.text()?.replace('\u00a0', ' ')?.trim()
+                    reply.location = when {
+                        !locText.isNullOrEmpty() -> locText
+                        !locFromTime.isNullOrEmpty() -> locFromTime
+                        else -> null
+                    }
                 }
 
                 replies.add(reply)

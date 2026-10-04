@@ -94,44 +94,103 @@ class ReplyAdapter(rawReplies: List<ReplyItem>?) :
         val all = rawReplyList
         if (all.isEmpty()) return
 
-        val authorMap = HashMap<String, MutableList<ReplyItem>>()
-        for (item in all) {
+        // 先清空上一轮的归并结果：updateData 会被翻页反复调用，
+        // subReplies 若不清理会越累越多，同一子回复重复渲染。
+        val pidMap = HashMap<String, ReplyItem>()
+        val nameMap = HashMap<String, MutableList<ReplyItem>>()
+        for ((index, item) in all.withIndex()) {
             item.subReplies.clear()
             item.isSubReply = false
+            item.inReplyToName = null
+            item.orderIndex = index
+            item.pid?.let { pidMap[it] = item }
             val author = item.author
             if (!author.isNullOrBlank()) {
-                authorMap.getOrPut(author) { ArrayList() }.add(item)
+                nameMap.getOrPut(author) { ArrayList() }.add(item)
             }
         }
 
-        val pattern = Pattern.compile("^(.*?)(?:\\s*发表于|\\s*:|\\s*：)")
-
         for (item in all) {
-            val quote = item.quotedContentText
-            if (quote.isNullOrBlank()) continue
+            // 被引用楼层：可能是顶层评论，也可能是一条子回复
+            var target: ReplyItem? = null
 
-            var parent: ReplyItem? = null
-            val matcher = pattern.matcher(quote.trim())
-            if (matcher.find()) {
-                val targetAuthor = matcher.group(1)?.trim()
-                if (!targetAuthor.isNullOrEmpty()) {
-                    val candidates = authorMap[targetAuthor]
-                    if (!candidates.isNullOrEmpty()) {
-                        for (cand in candidates.asReversed()) {
-                            if (cand !== item && !cand.isSubReply) {
-                                parent = cand
-                                break
-                            }
+            // 引用块里一旦带有明确的 pid，就说明消息指向的是「某一条具体楼层」。
+            // 命中不了只有一种可能：那条被引用楼层不在当前已加载的楼层里，
+            // 此时必须放弃归并 —— 绝不能退化成“按作者名找个人”，
+            // 否则会把回复挂到该作者另一条无关楼层上，出现父子挂反。
+            val quotedPid = item.quotedPid
+            if (!quotedPid.isNullOrEmpty()) {
+                val cand = pidMap[quotedPid]
+                if (cand != null && cand !== item) target = cand
+            } else {
+                // 无 pid 的模板只能按 uid / 昵称匹配，
+                // 并用「列表顺序号」作先后约束（被引用楼层必须排在引用者之前）。
+                // 不再解析楼层文字（沙发/下水道/7# 等节点名无法穷举，
+                // 一旦解析成 -1 会让约束失效，取到同名者最后一条而挂反）。
+                if (target == null) {
+                    val uid = item.quotedUid
+                    if (!uid.isNullOrEmpty()) {
+                        target = all.lastOrNull {
+                            it !== item && it.authorUid == uid && it.orderIndex < item.orderIndex
+                        }
+                    }
+                }
+
+                if (target == null) {
+                    val name = item.quotedAuthorName ?: extractQuotedNameFromQuote(item)
+                    if (!name.isNullOrEmpty()) {
+                        target = nameMap[name]?.lastOrNull {
+                            it !== item && it.orderIndex < item.orderIndex
                         }
                     }
                 }
             }
 
-            if (parent != null && parent !== item) {
-                item.isSubReply = true
-                parent.subReplies.add(item)
+            if (target == null || target === item) continue
+
+            // 压平到该子线程的顶层评论下：
+            // 若被引用者本身就是子回复，则挂到它所属的顶层评论（同一子线程回复平铺）
+            val root = if (target.isSubReply) topLevelOf(target, all) else target
+            if (root == null || root === item) continue
+            // 只允许「较晚的回复」挂到「较早的楼层」下，
+            // 避免两条互相引用的回复因遍历顺序不同而把父子方向弄反。
+            if (root.orderIndex >= item.orderIndex) continue
+
+            item.isSubReply = true
+            // 回复对象不是顶层评论时，子回复项要标明“回复 xx”（回复顶层评论不加，保持清爽）
+            if (root !== target) {
+                item.inReplyToName = target.author
             }
+            root.subReplies.add(item)
         }
+    }
+
+    /** 向上找到某条回复所属的顶层评论（其 subReplies 中包含它的那条）。 */
+    private fun topLevelOf(child: ReplyItem, all: List<ReplyItem>): ReplyItem? {
+        return all.firstOrNull { !it.isSubReply && it.subReplies.contains(child) }
+    }
+
+    /**
+     * 从引用正文里抽被引用者昵称。
+     *
+     * 引用块的文本形态在不同模板下有两种：文本在前（“回复 mt007 发表于 …”）
+     * 或 meta 在尾部（“依旧给力… 回复 mt007 发表于 …”），两者都要能解析到。
+     */
+    private fun extractQuotedNameFromQuote(item: ReplyItem): String? {
+        val quote = item.quotedContentText ?: return null
+        // “回复 xxx 发表于” / “xxx 发表于”
+        Regex("(?:回复\\s*)?([^\\n]{1,24}?)\\s*发表于").find(quote)?.let {
+            val name = it.groupValues[1].trim()
+                .removePrefix("回复").trim()
+                .removePrefix("@").trim()
+            if (name.isNotEmpty() && name != item.author) return name
+        }
+        // “回复 xxx” 且没有“发表于”（部分手机版只带这句）
+        Regex("回复\\s*@?([^\\s，。,:：]{1,24})").find(quote)?.let {
+            val name = it.groupValues[1].trim()
+            if (name.isNotEmpty() && name != item.author) return name
+        }
+        return null
     }
 
     private fun isSequentialOrRepeatedDigits(s: String): Boolean {
@@ -771,8 +830,39 @@ class ReplyAdapter(rawReplies: List<ReplyItem>?) :
                 tvSubAuthor.text = subItem.author ?: "匿名"
                 tvSubOpBadge.visibility = if (subItem.isOP) View.VISIBLE else View.GONE
 
-                val cleanSubText = subItem.contentText ?: subItem.contentHtml?.replace(Regex("<[^>]+>"), "") ?: ""
-                tvSubContent.text = cleanSubText
+                // 子回复正文：优先按 HTML 富文本渲染（保留表情图等内联元素）。
+                // 注意：纯表情/纯图片帖子的 contentText 会是「空串」而非 null，
+                // 不能再用 ?: 兜底，否则内容会被判空而整段丢失。
+                val subHtml = subItem.contentHtml
+                val subBody: CharSequence? = if (!TextUtils.isEmpty(subHtml)) {
+                    val rendered = Html.fromHtml(
+                        BBCodeUtil.stripHtmlColors(subHtml),
+                        Html.FROM_HTML_MODE_COMPACT,
+                        createInlineImageGetter(tvSubContent),
+                        BBCodeUtil.createTagHandler(itemView.context)
+                    )
+                    BBCodeUtil.stripForegroundColorSpans(rendered) ?: rendered
+                } else {
+                    subItem.contentText
+                }
+
+                val inReplyTo = subItem.inReplyToName
+                val subSb = android.text.SpannableStringBuilder()
+                if (!TextUtils.isEmpty(inReplyTo)) {
+                    val prefix = "回复 $inReplyTo："
+                    val prefixSpan = android.text.SpannableString(prefix)
+                    val primaryColor = com.solosu.mtforum.util.ThemeManager.getThemeColor(itemView.context)
+                    prefixSpan.setSpan(
+                        android.text.style.ForegroundColorSpan(primaryColor),
+                        0, prefix.length,
+                        android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+                    )
+                    subSb.append(prefixSpan)
+                }
+                if (!TextUtils.isEmpty(subBody)) {
+                    subSb.append(trimSpanned(subBody!!))
+                }
+                tvSubContent.text = subSb
                 tvSubContent.setOnLongClickListener {
                     replyLongClickListener?.onReplyLongClick(subItem, bindingAdapterPosition)
                     true
