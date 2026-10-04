@@ -20,8 +20,9 @@ import java.util.regex.Pattern
  * 验证，与浏览器执行结果一致。
  *
  * <p>注意：置换表与密钥取自站点当前版本。若站点更换挑战实现，本类会失配；
- * 调用方需配合 [looksLikeChallenge] 判断，失配时不静默——见
- * HttpClient 中挑战处理后的重试结果检查。
+ * 调用方需配合 [looksLikeChallenge] 判断。失配（本地求解后仍返回挑战页）时不再
+ * 计入熔断窗口，而是由 [HttpClient.hasPendingWafChallenge] 置位，交由
+ * WafVerificationActivity 让用户手动通过人机验证（见 HttpClient 挑战处理）。
  */
 object WafChallenge {
 
@@ -46,9 +47,12 @@ object WafChallenge {
     /**
      * 判断响应体是否为 WAF 挑战页。
      *
-     * <p>判定刻意不只看 {@code arg1}：挑战页的共同结构是「没有 {@code <body>}
-     * 的完整 HTML 文档 + 内嵌 script」。真实 Discuz 页面必然带 {@code <body>}，
-     * 因此该判据对换版后的挑战页同样成立。
+     * <p>判定分两级：先按「没有 {@code <body>} 的完整 HTML + 内嵌 script」识别经典注入式
+     * 挑战页；对可能带 {@code <body>} 的新版挑战页，再用阿里云挑战标识
+     * （{@code acw_sc__v2} / {@code arg1=}）兜底。
+     *
+     * <p>不直接依赖 HTTP 403：本站下发的 JS 挑战页是 200 正常响应的 HTML，浏览器执行
+     * 脚本写 Cookie 后 reload 才放行；而 403 也可能是非 JS 挑战的硬拦截，两者不能混判。
      */
     @JvmStatic
     fun looksLikeChallenge(body: String?): Boolean {
@@ -57,9 +61,12 @@ object WafChallenge {
         if (body.length > 64 * 1024) return false
         val lower = body.lowercase()
         if (!lower.contains("<html")) return false
-        // 有 body 就不是这种注入式挑战页
-        if (lower.contains("<body")) return false
-        return lower.contains("<script") || lower.contains("<meta")
+        if (!lower.contains("<body")) {
+            // 经典注入式挑战页：无 body、有 script/meta
+            return lower.contains("<script") || lower.contains("<meta")
+        }
+        // 新版挑战页可能已带 body，但必定出现阿里云挑战标识
+        return lower.contains("acw_sc__v2") || P_ARG1.matcher(body).find()
     }
 
     /** 从挑战页提取 arg1，提取不到返回 null。 */

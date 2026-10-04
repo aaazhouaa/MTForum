@@ -43,6 +43,14 @@ class SettingsActivity : AppCompatActivity() {
         binding.toolbar.setNavigationIcon(R.drawable.ic_arrow_left)
         binding.toolbar.setNavigationOnClickListener { finish() }
 
+        // 主题设置
+        binding.layoutThemeSetting.setOnClickListener {
+            com.solosu.mtforum.util.ThemeManager.showColorPickerDialog(this) {
+                updateThemeStatus()
+            }
+        }
+        updateThemeStatus()
+
         // AI 接口配置
         binding.layoutAiConfig.setOnClickListener {
             startActivity(Intent(this, com.solosu.mtforum.ai.AiConfigActivity::class.java))
@@ -72,7 +80,13 @@ class SettingsActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
+        updateThemeStatus()
         updateAiConfigStatus()
+    }
+
+    private fun updateThemeStatus() {
+        val cur = com.solosu.mtforum.util.ThemeManager.getCurrentThemeColor(this)
+        binding.tvThemeStatus.text = "当前色彩：${cur.name}"
     }
 
     private fun updateAiConfigStatus() {

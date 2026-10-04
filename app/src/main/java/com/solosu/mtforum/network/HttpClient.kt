@@ -98,15 +98,37 @@ class HttpClient private constructor() {
     @Throws(IOException::class)
     private fun executeGetWithChallenge(request: Request): String {
         val body = executeBody(request)
-        if (!WafChallenge.looksLikeChallenge(body)) return body
-        if (RateLimiter.isCircuitHost(request.url.toString())) {
-            RateLimiter.reportBlocked("WAF 挑战页")
+        if (!WafChallenge.looksLikeChallenge(body)) {
+            wafChallengePending.set(false)
+            return body
         }
-        // 挑战页：求解后重放同一请求
+        // 挑战页：本地求解后重放同一请求。注意：这只说明站点下发了 JS 挑战，
+        // 不等于 IP 被风控封禁，因此不计入熔断窗口；若本地算法失配则交由用户在
+        // WebView 中手动通过人机验证（见 WafVerificationActivity）。
+        wafChallengePending.set(true)
+        // 记录触发挑战的 UA：WAF 的 clearance cookie 绑定 UA，验证页必须用同一 UA
+        // 打开 WebView，否则移动/桌面两套 UA 之间会互相不匹配。
+        wafChallengeUa.set(request.header("User-Agent"))
         val url = request.url.toString()
         if (!solveWafChallenge(url, body)) return body
         val retry = request.newBuilder().build()
-        return executeBody(retry)
+        val retried = executeBody(retry)
+        if (!WafChallenge.looksLikeChallenge(retried)) wafChallengePending.set(false)
+        return retried
+    }
+
+    /** 最近一次请求是否命中 WAF 挑战页（本地求解后仍命中时保持 true）。 */
+    fun hasPendingWafChallenge(): Boolean = wafChallengePending.get()
+
+    /**
+     * 触发 WAF 挑战的那次请求所用的 UA；验证页用它打开 WebView，
+     * 保证 clearance cookie 的 UA 指纹与后续原生请求一致。未记录时回退移动 UA。
+     */
+    fun getWafChallengeUserAgent(): String = wafChallengeUa.get() ?: USER_AGENT
+
+    /** 用户已在 WebView 中手动通过验证，清除待验证标记。 */
+    fun clearWafChallenge() {
+        wafChallengePending.set(false)
     }
 
     /** 执行请求并读取响应体（统一出口，便于挑战处理复用） */
@@ -122,6 +144,12 @@ class HttpClient private constructor() {
     /** 飞行中请求去重：相同 URL 的请求未完成时复用同一结果，避免重复发送 */
     private val pendingGets = ConcurrentHashMap<String, CompletableFuture<String>>()
     private val pendingPosts = ConcurrentHashMap<String, CompletableFuture<String>>()
+
+    /** 命中 WAF 挑战页且本地求解未成功时置位，供上层提示用户手动验证。 */
+    private val wafChallengePending = java.util.concurrent.atomic.AtomicBoolean(false)
+
+    /** 触发挑战那次请求的 UA，供验证页对齐；见 getWafChallengeUserAgent()。 */
+    private val wafChallengeUa = java.util.concurrent.atomic.AtomicReference<String?>(null)
 
     init {
         cookieStore = HashMap()
@@ -249,7 +277,7 @@ class HttpClient private constructor() {
         try {
             val request = Request.Builder()
                 .url(url)
-                .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+                .header("User-Agent", DESKTOP_USER_AGENT)
                 .header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
                 .header("Accept-Language", "zh-CN,zh;q=0.9,en;q=0.8")
                 .get()
@@ -307,10 +335,10 @@ class HttpClient private constructor() {
             val body = executeBody(request)
             // POST 是写操作，不自动重放（避免重复提交）；但若命中挑战页，
             // 本地求解并存入 Cookie，让后续请求（含本次失败后的重试）能通过。
+            // 同上：挑战页不计入熔断窗口，失配时交由 WebView 手动验证兜底。
             if (WafChallenge.looksLikeChallenge(body)) {
-                if (RateLimiter.isCircuitHost(url)) {
-                    RateLimiter.reportBlocked("WAF 挑战页(POST)")
-                }
+                wafChallengePending.set(true)
+                wafChallengeUa.set(USER_AGENT)
                 if (solveWafChallenge(url, body) && DEBUG_WAF) {
                     AiLog.e("waf", "POST 命中挑战页，已存 Cookie 但未重放（防重复提交）url=$url")
                 }
@@ -367,9 +395,8 @@ class HttpClient private constructor() {
             val body = executeBody(request)
             // 同 post()：写操作不自动重放，仅求解并留存 Cookie
             if (WafChallenge.looksLikeChallenge(body)) {
-                if (RateLimiter.isCircuitHost(url)) {
-                    RateLimiter.reportBlocked("WAF 挑战页(POST)")
-                }
+                wafChallengePending.set(true)
+                wafChallengeUa.set(USER_AGENT)
                 if (solveWafChallenge(url, body) && DEBUG_WAF) {
                     AiLog.e("waf", "POST(带Referer) 命中挑战页，已存 Cookie 但未重放 url=$url")
                 }

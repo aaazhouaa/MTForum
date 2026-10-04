@@ -10,12 +10,17 @@
     app:cardElevation="0dp"
     app:cardBackgroundColor="@android:color/transparent">
 
-    <LinearLayout
+    <androidx.core.widget.NestedScrollView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:padding="16dp"
-        android:paddingBottom="24dp">
+        android:fillViewport="true">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="16dp"
+            android:paddingBottom="24dp">
 
         <!-- 标题栏:标题 + 关闭按钮 -->
         <LinearLayout
@@ -192,5 +197,6 @@
             android:textColor="@color/link_color"
             android:clickable="true"
             android:focusable="true" />
-    </LinearLayout>
+        </LinearLayout>
+    </androidx.core.widget.NestedScrollView>
 </com.google.android.material.card.MaterialCardView>

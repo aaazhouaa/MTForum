@@ -131,5 +131,12 @@
             android:name="com.solosu.mtforum.ui.BlacklistActivity"
             android:exported="false"
             android:label="个人小黑屋" />
+
+        <!-- WAF 人机验证兜底（用户手动通过验证后回注 Cookie） -->
+        <activity
+            android:name=".ui.security.WafVerificationActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|keyboardHidden"
+            android:windowSoftInputMode="adjustResize" />
     </application>
 </manifest>

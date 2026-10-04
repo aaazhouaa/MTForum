@@ -163,4 +163,79 @@ object AccountManager {
             null
         }
     }
+
+    /** 弹出账号切换弹窗：当前账号高亮，点选切换，支持登录新账号 */
+    @JvmStatic
+    fun showAccountSwitcherDialog(
+        activity: androidx.fragment.app.FragmentActivity,
+        onAccountChanged: (() -> Unit)? = null
+    ) {
+        var accounts = list(activity)
+        var activeUid = activeUid(activity)
+        val curName = UserSessionManager.getInstance().getUsername(activity)
+        val curUid = UserSessionManager.getInstance().getUid(activity)
+        val curLogged = UserSessionManager.getInstance().isLoggedIn(activity)
+
+        // 若当前登录账号未入库，先补存
+        if (curLogged && !android.text.TextUtils.isEmpty(curUid)) {
+            saveCurrent(
+                activity, curUid, curName,
+                UserSessionManager.getInstance().getAvatarUrl(activity),
+                UserSessionManager.getInstance().getLevel(activity)
+            )
+            accounts = list(activity)
+            activeUid = activeUid(activity)
+        }
+        val fAccounts = accounts
+        val fActiveUid = activeUid
+
+        val labels = ArrayList<String>()
+        for (a in fAccounts) {
+            val mark = if (fActiveUid != null && fActiveUid == a.uid) "  [当前]" else ""
+            labels.add((a.username ?: "UID_${a.uid}") + mark)
+        }
+        labels.add("＋ 登录新账号")
+
+        val arr = labels.toTypedArray()
+        androidx.appcompat.app.AlertDialog.Builder(activity)
+            .setTitle("切换账号")
+            .setItems(arr) { _, which ->
+                if (which == fAccounts.size) {
+                    // 登录新账号
+                    com.solosu.mtforum.ui.login.LoginBottomSheet.show(activity) {
+                        val n = UserSessionManager.getInstance().getUsername(activity)
+                        val u = UserSessionManager.getInstance().getUid(activity)
+                        if (!android.text.TextUtils.isEmpty(u)) {
+                            saveCurrent(
+                                activity, u, n,
+                                UserSessionManager.getInstance().getAvatarUrl(activity),
+                                UserSessionManager.getInstance().getLevel(activity)
+                            )
+                        }
+                        onAccountChanged?.invoke()
+                    }
+                    return@setItems
+                }
+                val target = fAccounts[which]
+                if (target.uid == curUid && curLogged) {
+                    com.solosu.mtforum.util.ToastUtil.makeText(activity, "已是当前账号", com.solosu.mtforum.util.ToastUtil.LENGTH_SHORT).show()
+                    return@setItems
+                }
+                val ok = switchTo(activity, target.uid)
+                if (ok) {
+                    val info = HashMap<String, String>()
+                    info["username"] = target.username ?: ""
+                    info["uid"] = target.uid ?: ""
+                    info["avatarUrl"] = target.avatar ?: ""
+                    info["level"] = target.level ?: ""
+                    UserSessionManager.getInstance().saveLoginInfo(activity, info)
+                    com.solosu.mtforum.util.ToastUtil.makeText(activity, "已切换到 ${target.username}", com.solosu.mtforum.util.ToastUtil.LENGTH_SHORT).show()
+                    onAccountChanged?.invoke()
+                } else {
+                    com.solosu.mtforum.util.ToastUtil.makeText(activity, "切换失败，请重新登录该账号", com.solosu.mtforum.util.ToastUtil.LENGTH_SHORT).show()
+                }
+            }
+            .setNegativeButton("关闭", null)
+            .show()
+    }
 }

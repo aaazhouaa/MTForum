@@ -26,7 +26,6 @@ object AiConfigManager {
 
     // ---- 自动回复 ----
     private const val KEY_AUTO_REPLY_ENABLED = "auto_reply_enabled"
-    private const val KEY_AUTO_REPLY_SILENT = "auto_reply_silent"
     private const val KEY_AUTO_REPLY_INTERVAL = "auto_reply_interval"
     private const val KEY_AUTO_REPLY_PROMPT = "auto_reply_prompt"
     private const val KEY_AUTO_REPLY_MAX_PER_RUN = "auto_reply_max_per_run"
@@ -189,17 +188,6 @@ object AiConfigManager {
         sp(c).edit().putBoolean(KEY_AUTO_REPLY_ENABLED, v).apply()
     }
 
-    /** 静默模式：不弹通知、不在界面提示，后台悄悄回复（默认关闭） */
-    @JvmStatic
-    fun isSilentMode(c: Context): Boolean {
-        return sp(c).getBoolean(KEY_AUTO_REPLY_SILENT, false)
-    }
-
-    @JvmStatic
-    fun setSilentMode(c: Context, v: Boolean) {
-        sp(c).edit().putBoolean(KEY_AUTO_REPLY_SILENT, v).apply()
-    }
-
     /** 轮询间隔，秒 */
     @JvmStatic
     fun getReplyInterval(c: Context): Int {
@@ -271,7 +259,7 @@ object AiConfigManager {
 
     /**
      * 侧边栏功能默认全关闭迁移处理：
-     * 隐藏运行、自动签到、自动解锁隐藏内容、演练模式、底部栏滚动自动隐藏全部默认置为关闭。
+     * 自动签到、自动解锁隐藏内容、演练模式、底部栏滚动自动隐藏全部默认置为关闭。
      */
     @JvmStatic
     fun migrateDefaults(c: Context) {
@@ -279,7 +267,6 @@ object AiConfigManager {
             val p = sp(c)
             if (p.getBoolean(KEY_MIGRATE_DRAWER_ALL_OFF, false)) return
             p.edit()
-                .putBoolean(KEY_AUTO_REPLY_SILENT, false)
                 .putBoolean(KEY_AUTO_UNLOCK_HIDDEN, false)
                 .putBoolean(KEY_UNLOCK_ON_VIEW, false)
                 .putBoolean(KEY_AUTO_REPLY_DRY_RUN, false)

@@ -192,7 +192,7 @@ class NoticeActivity : AppCompatActivity() {
     companion object {
         private const val REQUEST_CODE_DETAIL = 1001
 
-        // build68: 六类角标 onResume 拉取节流
-        private const val BADGE_RESUME_THROTTLE_MS = 60000L
+        // 六类角标 onResume 拉取节流
+        private const val BADGE_RESUME_THROTTLE_MS = 15000L
     }
 }

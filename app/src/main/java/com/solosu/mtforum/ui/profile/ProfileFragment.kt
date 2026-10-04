@@ -27,6 +27,8 @@ import com.solosu.mtforum.ui.space.FriendListActivity
 import com.solosu.mtforum.ui.space.CreditDetailActivity
 import com.solosu.mtforum.ui.space.EditProfileActivity
 import com.solosu.mtforum.ui.space.SettingsActivity
+import com.solosu.mtforum.ui.BlacklistActivity
+import com.solosu.mtforum.session.AccountManager
 
 /**
  * 个人中心 Fragment（全新 UI）
@@ -60,6 +62,7 @@ class ProfileFragment : Fragment() {
         applyFrostedGlassToIcon(binding!!.ivEmojiFriends)
         applyFrostedGlassToIcon(binding!!.ivEmojiCredits)
         applyFrostedGlassToIcon(binding!!.ivEmojiEdit)
+        applyFrostedGlassToIcon(binding!!.ivEmojiBlacklist)
         applyFrostedGlassToIcon(binding!!.ivEmojiSettings)
 
         httpClient = HttpClient.getInstance()
@@ -128,9 +131,23 @@ class ProfileFragment : Fragment() {
             startActivity(intent)
         }
 
+        binding!!.layoutBlacklist.setOnClickListener {
+            val intent = Intent(requireContext(), BlacklistActivity::class.java)
+            startActivity(intent)
+        }
+
         binding!!.layoutSettings.setOnClickListener {
             val intent = Intent(requireContext(), SettingsActivity::class.java)
             startActivity(intent)
+        }
+
+        // 用户名后的切换账号图标
+        binding!!.btnSwitchAccount.setOnClickListener {
+            AccountManager.showAccountSwitcherDialog(requireActivity()) {
+                if (isAdded) {
+                    updateLoginState()
+                }
+            }
         }
 
         // 登录/退出图标（靠右，随登录状态切换）

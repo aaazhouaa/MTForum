@@ -79,6 +79,11 @@ object LoginBottomSheet {
             }
         }
 
+        // 防止软键盘遮挡输入框
+        dialog.window?.setSoftInputMode(
+            android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
+        )
+
         // 预取 formhash(仅账号密码模式需要,失败静默)
         // build57: [0]=formhash [1]=登录表单 action(含 loginhash)
         val formhashRef = arrayOfNulls<String>(2)
@@ -143,14 +148,15 @@ object LoginBottomSheet {
             if (parent != null) {
                 parent.setBackgroundResource(android.R.color.transparent)
                 val behavior = BottomSheetBehavior.from(parent)
+                behavior.skipCollapsed = true
+                behavior.state = BottomSheetBehavior.STATE_EXPANDED
                 parent.viewTreeObserver.addOnGlobalLayoutListener(
                     object : ViewTreeObserver.OnGlobalLayoutListener {
                         override fun onGlobalLayout() {
                             parent.viewTreeObserver.removeOnGlobalLayoutListener(this)
                             val contentHeight = dialogView.height
                             if (contentHeight > 0) {
-                                val maxHeight = (activity.resources.displayMetrics.heightPixels * 0.75).toInt()
-                                behavior.peekHeight = Math.min(contentHeight + dp(activity, 48f), maxHeight)
+                                behavior.peekHeight = contentHeight + dp(activity, 48f)
                             }
                         }
                     }

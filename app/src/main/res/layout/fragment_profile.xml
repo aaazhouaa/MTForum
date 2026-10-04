@@ -62,13 +62,32 @@
                             android:layout_weight="1"
                             android:orientation="vertical">
 
-                            <TextView
-                                android:id="@+id/tv_username"
+                            <LinearLayout
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:textColor="@color/text_primary"
-                                android:textSize="20sp"
-                                android:textStyle="bold" />
+                                android:gravity="center_vertical"
+                                android:orientation="horizontal">
+
+                                <TextView
+                                    android:id="@+id/tv_username"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:textColor="@color/text_primary"
+                                    android:textSize="20sp"
+                                    android:textStyle="bold" />
+
+                                <ImageView
+                                    android:id="@+id/btn_switch_account"
+                                    android:layout_width="32dp"
+                                    android:layout_height="32dp"
+                                    android:layout_marginStart="8dp"
+                                    android:background="?attr/selectableItemBackgroundBorderless"
+                                    android:padding="5dp"
+                                    android:src="@drawable/ic_switch_account"
+                                    android:scaleType="fitCenter"
+                                    app:tint="@color/text_secondary"
+                                    android:contentDescription="切换账号" />
+                            </LinearLayout>
 
                             <LinearLayout
                                 android:layout_width="wrap_content"
@@ -346,8 +365,8 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:paddingHorizontal="16dp"
-                        android:paddingTop="12dp"
-                        android:paddingBottom="4dp"
+                        android:paddingTop="14dp"
+                        android:paddingBottom="6dp"
                         android:text="功能"
                         android:textColor="@color/text_primary"
                         android:textSize="15sp"
@@ -355,15 +374,15 @@
 
                     <View
                         android:layout_width="match_parent"
-                        android:layout_height="1dp"
-                        android:layout_marginVertical="8dp"
+                        android:layout_height="0.5dp"
+                        android:layout_marginBottom="4dp"
                         android:background="@color/divider" />
 
                     <!-- 我的帖子 -->
                     <LinearLayout
                         android:id="@+id/layout_my_threads"
                         android:layout_width="match_parent"
-                        android:layout_height="48dp"
+                        android:layout_height="52dp"
                         android:background="?attr/selectableItemBackground"
                         android:clickable="true"
                         android:focusable="true"
@@ -375,7 +394,7 @@
                             android:layout_width="36dp"
                             android:layout_height="36dp"
                             android:background="@drawable/menu_icon_bg"
-                            android:padding="7dp"
+                            android:padding="8dp"
                             android:src="@drawable/ic_history"
                             app:tint="?attr/colorPrimary"
                             android:contentDescription="我的帖子"
@@ -383,30 +402,30 @@
                         <TextView
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
-                            android:layout_marginStart="12dp"
+                            android:layout_marginStart="14dp"
                             android:layout_weight="1"
                             android:text="我的帖子"
                             android:textColor="@color/text_primary"
                             android:textSize="15sp" />
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="›"
-                            android:textColor="@color/text_hint"
-                            android:textSize="18sp" />
+                        <ImageView
+                            android:layout_width="16dp"
+                            android:layout_height="16dp"
+                            android:src="@drawable/ic_arrow_right"
+                            app:tint="@color/text_hint"
+                            android:contentDescription="前往" />
                     </LinearLayout>
 
                     <View
                         android:layout_width="match_parent"
-                        android:layout_height="1dp"
-                        android:layout_marginStart="64dp"
+                        android:layout_height="0.5dp"
+                        android:layout_marginStart="66dp"
                         android:background="@color/divider" />
 
                     <!-- 我的收藏 -->
                     <LinearLayout
                         android:id="@+id/layout_my_favorites"
                         android:layout_width="match_parent"
-                        android:layout_height="48dp"
+                        android:layout_height="52dp"
                         android:background="?attr/selectableItemBackground"
                         android:clickable="true"
                         android:focusable="true"
@@ -418,7 +437,7 @@
                             android:layout_width="36dp"
                             android:layout_height="36dp"
                             android:background="@drawable/menu_icon_bg"
-                            android:padding="7dp"
+                            android:padding="8dp"
                             android:src="@drawable/ic_star_filled"
                             app:tint="?attr/colorPrimary"
                             android:contentDescription="我的收藏"
@@ -426,30 +445,30 @@
                         <TextView
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
-                            android:layout_marginStart="12dp"
+                            android:layout_marginStart="14dp"
                             android:layout_weight="1"
                             android:text="我的收藏"
                             android:textColor="@color/text_primary"
                             android:textSize="15sp" />
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="›"
-                            android:textColor="@color/text_hint"
-                            android:textSize="18sp" />
+                        <ImageView
+                            android:layout_width="16dp"
+                            android:layout_height="16dp"
+                            android:src="@drawable/ic_arrow_right"
+                            app:tint="@color/text_hint"
+                            android:contentDescription="前往" />
                     </LinearLayout>
 
                     <View
                         android:layout_width="match_parent"
-                        android:layout_height="1dp"
-                        android:layout_marginStart="64dp"
+                        android:layout_height="0.5dp"
+                        android:layout_marginStart="66dp"
                         android:background="@color/divider" />
 
                     <!-- 我的好友 -->
                     <LinearLayout
                         android:id="@+id/layout_my_friends"
                         android:layout_width="match_parent"
-                        android:layout_height="48dp"
+                        android:layout_height="52dp"
                         android:background="?attr/selectableItemBackground"
                         android:clickable="true"
                         android:focusable="true"
@@ -461,7 +480,7 @@
                             android:layout_width="36dp"
                             android:layout_height="36dp"
                             android:background="@drawable/menu_icon_bg"
-                            android:padding="7dp"
+                            android:padding="8dp"
                             android:src="@drawable/ic_account"
                             app:tint="?attr/colorPrimary"
                             android:contentDescription="我的好友"
@@ -469,30 +488,30 @@
                         <TextView
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
-                            android:layout_marginStart="12dp"
+                            android:layout_marginStart="14dp"
                             android:layout_weight="1"
                             android:text="我的好友"
                             android:textColor="@color/text_primary"
                             android:textSize="15sp" />
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="›"
-                            android:textColor="@color/text_hint"
-                            android:textSize="18sp" />
+                        <ImageView
+                            android:layout_width="16dp"
+                            android:layout_height="16dp"
+                            android:src="@drawable/ic_arrow_right"
+                            app:tint="@color/text_hint"
+                            android:contentDescription="前往" />
                     </LinearLayout>
 
                     <View
                         android:layout_width="match_parent"
-                        android:layout_height="1dp"
-                        android:layout_marginStart="64dp"
+                        android:layout_height="0.5dp"
+                        android:layout_marginStart="66dp"
                         android:background="@color/divider" />
 
                     <!-- 积分详情 -->
                     <LinearLayout
                         android:id="@+id/layout_credits_detail"
                         android:layout_width="match_parent"
-                        android:layout_height="48dp"
+                        android:layout_height="52dp"
                         android:background="?attr/selectableItemBackground"
                         android:clickable="true"
                         android:focusable="true"
@@ -504,7 +523,7 @@
                             android:layout_width="36dp"
                             android:layout_height="36dp"
                             android:background="@drawable/menu_icon_bg"
-                            android:padding="7dp"
+                            android:padding="8dp"
                             android:src="@drawable/ic_reward"
                             app:tint="?attr/colorPrimary"
                             android:contentDescription="积分详情"
@@ -512,30 +531,30 @@
                         <TextView
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
-                            android:layout_marginStart="12dp"
+                            android:layout_marginStart="14dp"
                             android:layout_weight="1"
                             android:text="积分详情"
                             android:textColor="@color/text_primary"
                             android:textSize="15sp" />
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="›"
-                            android:textColor="@color/text_hint"
-                            android:textSize="18sp" />
+                        <ImageView
+                            android:layout_width="16dp"
+                            android:layout_height="16dp"
+                            android:src="@drawable/ic_arrow_right"
+                            app:tint="@color/text_hint"
+                            android:contentDescription="前往" />
                     </LinearLayout>
 
                     <View
                         android:layout_width="match_parent"
-                        android:layout_height="1dp"
-                        android:layout_marginStart="64dp"
+                        android:layout_height="0.5dp"
+                        android:layout_marginStart="66dp"
                         android:background="@color/divider" />
 
                     <!-- 个人资料 -->
                     <LinearLayout
                         android:id="@+id/layout_edit_profile"
                         android:layout_width="match_parent"
-                        android:layout_height="48dp"
+                        android:layout_height="52dp"
                         android:background="?attr/selectableItemBackground"
                         android:clickable="true"
                         android:focusable="true"
@@ -547,7 +566,7 @@
                             android:layout_width="36dp"
                             android:layout_height="36dp"
                             android:background="@drawable/menu_icon_bg"
-                            android:padding="7dp"
+                            android:padding="8dp"
                             android:src="@drawable/ic_profile"
                             app:tint="?attr/colorPrimary"
                             android:contentDescription="个人资料"
@@ -555,30 +574,73 @@
                         <TextView
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
-                            android:layout_marginStart="12dp"
+                            android:layout_marginStart="14dp"
                             android:layout_weight="1"
                             android:text="@string/profile_edit"
                             android:textColor="@color/text_primary"
                             android:textSize="15sp" />
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="›"
-                            android:textColor="@color/text_hint"
-                            android:textSize="18sp" />
+                        <ImageView
+                            android:layout_width="16dp"
+                            android:layout_height="16dp"
+                            android:src="@drawable/ic_arrow_right"
+                            app:tint="@color/text_hint"
+                            android:contentDescription="前往" />
                     </LinearLayout>
 
                     <View
                         android:layout_width="match_parent"
-                        android:layout_height="1dp"
-                        android:layout_marginStart="64dp"
+                        android:layout_height="0.5dp"
+                        android:layout_marginStart="66dp"
+                        android:background="@color/divider" />
+
+                    <!-- 个人小黑屋 -->
+                    <LinearLayout
+                        android:id="@+id/layout_blacklist"
+                        android:layout_width="match_parent"
+                        android:layout_height="52dp"
+                        android:background="?attr/selectableItemBackground"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal"
+                        android:paddingHorizontal="16dp">
+                        <ImageView
+                            android:id="@+id/iv_emoji_blacklist"
+                            android:layout_width="36dp"
+                            android:layout_height="36dp"
+                            android:background="@drawable/menu_icon_bg"
+                            android:padding="8dp"
+                            android:src="@drawable/ic_block"
+                            app:tint="?attr/colorPrimary"
+                            android:contentDescription="个人小黑屋"
+                            android:scaleType="fitCenter" />
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="14dp"
+                            android:layout_weight="1"
+                            android:text="个人小黑屋"
+                            android:textColor="@color/text_primary"
+                            android:textSize="15sp" />
+                        <ImageView
+                            android:layout_width="16dp"
+                            android:layout_height="16dp"
+                            android:src="@drawable/ic_arrow_right"
+                            app:tint="@color/text_hint"
+                            android:contentDescription="前往" />
+                    </LinearLayout>
+
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="0.5dp"
+                        android:layout_marginStart="66dp"
                         android:background="@color/divider" />
 
                     <!-- 设置 -->
                     <LinearLayout
                         android:id="@+id/layout_settings"
                         android:layout_width="match_parent"
-                        android:layout_height="48dp"
+                        android:layout_height="52dp"
                         android:background="?attr/selectableItemBackground"
                         android:clickable="true"
                         android:focusable="true"
@@ -590,7 +652,7 @@
                             android:layout_width="36dp"
                             android:layout_height="36dp"
                             android:background="@drawable/menu_icon_bg"
-                            android:padding="7dp"
+                            android:padding="8dp"
                             android:src="@drawable/ic_gear"
                             app:tint="?attr/colorPrimary"
                             android:contentDescription="设置"
@@ -598,17 +660,17 @@
                         <TextView
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
-                            android:layout_marginStart="12dp"
+                            android:layout_marginStart="14dp"
                             android:layout_weight="1"
                             android:text="@string/settings"
                             android:textColor="@color/text_primary"
                             android:textSize="15sp" />
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="›"
-                            android:textColor="@color/text_hint"
-                            android:textSize="18sp" />
+                        <ImageView
+                            android:layout_width="16dp"
+                            android:layout_height="16dp"
+                            android:src="@drawable/ic_arrow_right"
+                            app:tint="@color/text_hint"
+                            android:contentDescription="前往" />
                     </LinearLayout>
                 </LinearLayout>
             </androidx.cardview.widget.CardView>

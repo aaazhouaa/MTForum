@@ -14,8 +14,8 @@ android {
         applicationId 'com.solosu.mtforum.tp'
         minSdk 29
         targetSdk 36
-        versionCode 8
-        versionName "2.3.1"
+        versionCode 9
+        versionName "2.3.2"
     }
 
     signingConfigs {

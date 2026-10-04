@@ -78,68 +78,6 @@
             android:paddingTop="10dp"
             android:paddingBottom="20dp">
 
-            <!-- ===== 主题色彩移到第一位 ===== -->
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:paddingHorizontal="10dp"
-                android:paddingTop="8dp"
-                android:paddingBottom="6dp"
-                android:text="个性化"
-                android:textColor="@color/text_hint"
-                android:textSize="11sp" />
-
-            <!-- 主题色彩切换 -->
-            <LinearLayout
-                android:id="@+id/drawer_theme_color"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginBottom="6dp"
-                android:background="@drawable/bg_drawer_item"
-                android:gravity="center_vertical"
-                android:orientation="horizontal"
-                android:paddingHorizontal="10dp"
-                android:paddingVertical="12dp">
-
-                <ImageView
-                    android:layout_width="20dp"
-                    android:layout_height="20dp"
-                    android:src="@drawable/ic_fire"
-                    android:contentDescription="主题色彩"
-                    app:tint="?attr/colorPrimary" />
-
-                <LinearLayout
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="12dp"
-                    android:layout_weight="1"
-                    android:orientation="vertical">
-
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:text="主题色彩"
-                        android:textColor="@color/text_primary"
-                        android:textSize="14sp" />
-
-                    <TextView
-                        android:id="@+id/drawer_theme_color_desc"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="2dp"
-                        android:text="个性化选择应用主色调"
-                        android:textColor="@color/text_hint"
-                        android:textSize="11sp" />
-                </LinearLayout>
-
-                <ImageView
-                    android:layout_width="16dp"
-                    android:layout_height="16dp"
-                    android:src="@drawable/ic_arrow_right"
-                    android:contentDescription="前往"
-                    app:tint="@color/text_hint" />
-            </LinearLayout>
-
             <!-- ===== 自动化开关组 ===== -->
             <TextView
                 android:layout_width="match_parent"
@@ -152,55 +90,6 @@
                 android:textSize="11sp" />
 
 
-            <!-- 后台隐藏模式 -->
-            <LinearLayout
-                android:id="@+id/drawer_silent_row"
-                android:layout_marginBottom="6dp"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:background="@drawable/bg_drawer_item"
-                android:gravity="center_vertical"
-                android:orientation="horizontal"
-                android:paddingHorizontal="10dp"
-                android:paddingVertical="12dp">
-
-                <ImageView
-                    android:layout_width="20dp"
-                    android:layout_height="20dp"
-                    android:src="@drawable/ic_block"
-                    android:contentDescription="屏蔽"
-                    app:tint="?attr/colorPrimary" />
-
-                <LinearLayout
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="12dp"
-                    android:layout_weight="1"
-                    android:orientation="vertical">
-
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:text="隐藏运行"
-                        android:textColor="@color/text_primary"
-                        android:textSize="14sp" />
-
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="2dp"
-                        android:text="静默执行，不弹提示"
-                        android:textColor="@color/text_hint"
-                        android:textSize="11sp" />
-                </LinearLayout>
-
-                <com.google.android.material.switchmaterial.SwitchMaterial
-                    android:id="@+id/drawer_switch_silent"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:clickable="false"
-                    android:focusable="false" />
-            </LinearLayout>
 
             <!-- 自动签到 -->
             <LinearLayout
@@ -457,71 +346,6 @@
                     android:focusable="false" />
             </LinearLayout>
 
-            <!-- ===== 操作组 ===== -->
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:paddingHorizontal="10dp"
-                android:paddingTop="16dp"
-                android:paddingBottom="6dp"
-                android:text="操作"
-                android:textColor="@color/text_hint"
-                android:textSize="11sp" />
-
-            <LinearLayout
-                android:id="@+id/drawer_run_reply"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:background="@drawable/bg_drawer_item"
-                android:gravity="center_vertical"
-                android:orientation="horizontal"
-                android:paddingHorizontal="10dp"
-                android:paddingVertical="12dp">
-
-                <ImageView
-                    android:layout_width="20dp"
-                    android:layout_height="20dp"
-                    android:src="@drawable/ic_refresh"
-                    android:contentDescription="刷新"
-                    app:tint="?attr/colorPrimary" />
-
-                <TextView
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="12dp"
-                    android:layout_weight="1"
-                    android:text="立即执行一轮自动回复"
-                    android:textColor="@color/text_primary"
-                    android:textSize="14sp" />
-            </LinearLayout>
-
-            <LinearLayout
-                android:id="@+id/drawer_run_sign_in"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:background="@drawable/bg_drawer_item"
-                android:gravity="center_vertical"
-                android:orientation="horizontal"
-                android:paddingHorizontal="10dp"
-                android:paddingVertical="12dp">
-
-                <ImageView
-                    android:layout_width="20dp"
-                    android:layout_height="20dp"
-                    android:src="@drawable/ic_star"
-                    android:contentDescription="收藏"
-                    app:tint="?attr/colorPrimary" />
-
-                <TextView
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="12dp"
-                    android:layout_weight="1"
-                    android:text="立即签到"
-                    android:textColor="@color/text_primary"
-                    android:textSize="14sp" />
-            </LinearLayout>
-
 
             <!-- ===== 其他 ===== -->
             <TextView
@@ -534,8 +358,9 @@
                 android:textColor="@color/text_hint"
                 android:textSize="11sp" />
 
+            <!-- 人机验证 -->
             <LinearLayout
-                android:id="@+id/drawer_accounts"
+                android:id="@+id/drawer_waf_verify"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:background="@drawable/bg_drawer_item"
@@ -547,58 +372,8 @@
                 <ImageView
                     android:layout_width="20dp"
                     android:layout_height="20dp"
-                    android:src="@drawable/ic_account"
-                    android:contentDescription="账号"
-                    app:tint="?attr/colorPrimary" />
-
-
-<LinearLayout
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="12dp"
-                    android:layout_weight="1"
-                    android:orientation="vertical">
-
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:text="切换账号"
-                        android:textColor="@color/text_primary"
-                        android:textSize="14sp" />
-
-                    <TextView
-                        android:id="@+id/drawer_accounts_desc"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="2dp"
-                        android:text="当前账号：未登录"
-                        android:textColor="@color/text_hint"
-                        android:textSize="11sp" />
-                </LinearLayout>
-
-                <ImageView
-                    android:layout_width="16dp"
-                    android:layout_height="16dp"
-                    android:src="@drawable/ic_arrow_right"
-                    android:contentDescription="前往"
-                    app:tint="@color/text_hint" />
-            </LinearLayout>
-
-                        <LinearLayout
-                android:id="@+id/drawer_blacklist"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:background="@drawable/bg_drawer_item"
-                android:gravity="center_vertical"
-                android:orientation="horizontal"
-                android:paddingHorizontal="10dp"
-                android:paddingVertical="12dp">
-
-                <ImageView
-                    android:layout_width="20dp"
-                    android:layout_height="20dp"
-                    android:src="@drawable/ic_block"
-                    android:contentDescription="黑名单"
+                    android:src="@drawable/ic_report_shield"
+                    android:contentDescription="人机验证"
                     app:tint="?attr/colorPrimary" />
 
                 <LinearLayout
@@ -611,16 +386,16 @@
                     <TextView
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:text="个人小黑屋"
+                        android:text="人机验证"
                         android:textColor="@color/text_primary"
                         android:textSize="14sp" />
 
                     <TextView
-                        android:id="@+id/drawer_blacklist_desc"
+                        android:id="@+id/drawer_waf_desc"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="2dp"
-                        android:text="拉黑后隐藏 TA 的帖子和回帖"
+                        android:text="内容加载不出时，在此通过网页验证"
                         android:textColor="@color/text_hint"
                         android:textSize="11sp" />
                 </LinearLayout>
@@ -631,68 +406,6 @@
                     android:src="@drawable/ic_arrow_right"
                     android:contentDescription="前往"
                     app:tint="@color/text_hint" />
-            </LinearLayout>
-
-            <!-- AI 接口设置入口 -->
-            <LinearLayout
-                android:id="@+id/drawer_ai_config"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:background="@drawable/bg_drawer_item"
-                android:gravity="center_vertical"
-                android:orientation="horizontal"
-                android:paddingHorizontal="10dp"
-                android:paddingVertical="12dp">
-
-                <ImageView
-                    android:layout_width="20dp"
-                    android:layout_height="20dp"
-                    android:src="@drawable/ic_ai_spark"
-                    android:contentDescription="AI设置"
-                    app:tint="?attr/colorPrimary" />
-
-                <TextView
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="12dp"
-                    android:layout_weight="1"
-                    android:text="AI 接口设置"
-                    android:textColor="@color/text_primary"
-                    android:textSize="14sp" />
-
-                <ImageView
-                    android:layout_width="16dp"
-                    android:layout_height="16dp"
-                    android:src="@drawable/ic_arrow_right"
-                    android:contentDescription="前往"
-                    app:tint="@color/text_hint" />
-            </LinearLayout>
-
-            <LinearLayout
-                android:id="@+id/drawer_settings"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:background="@drawable/bg_drawer_item"
-                android:gravity="center_vertical"
-                android:orientation="horizontal"
-                android:paddingHorizontal="10dp"
-                android:paddingVertical="12dp">
-
-                <ImageView
-                    android:layout_width="20dp"
-                    android:layout_height="20dp"
-                    android:src="@drawable/ic_gear"
-                    android:contentDescription="设置"
-                    app:tint="?attr/colorPrimary" />
-
-                <TextView
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="12dp"
-                    android:layout_weight="1"
-                    android:text="设置"
-                    android:textColor="@color/text_primary"
-                    android:textSize="14sp" />
             </LinearLayout>
 
             <LinearLayout

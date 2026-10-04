@@ -51,13 +51,6 @@ class CommunityFragment : Fragment() {
 
         FrostedGlassHelper.applyToCardViews(view, requireContext())
 
-        // 数据统计:4 个单元格各自使用玻璃卡片背景
-        val statsGlass = FrostedGlassDrawable.create(requireContext(), 12f)
-        binding!!.llStats1.background = statsGlass
-        binding!!.llStats2.background = statsGlass
-        binding!!.llStats3.background = statsGlass
-        binding!!.llStats4.background = statsGlass
-
         httpClient = HttpClient.getInstance()
         // 版块页面不启用下拉刷新，避免普通滑动被误触发。
 
@@ -158,12 +151,6 @@ class CommunityFragment : Fragment() {
                             UserSessionManager.getInstance().saveSignInDate(requireContext())
                         }
                     }
-
-                    // 2. Stats cards
-                    binding!!.tvStatsValue1.text = data.todayPosts.toString()
-                    binding!!.tvStatsValue2.text = data.yesterdayPosts.toString()
-                    binding!!.tvStatsValue3.text = data.totalPosts.toString()
-                    binding!!.tvStatsValue4.text = data.totalMembers.toString()
 
                     // 3. Forum grid — deduplicate by fid
                     val dedupMap = LinkedHashMap<String, ForumCategory.Forum>()

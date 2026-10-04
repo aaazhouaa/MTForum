@@ -23,10 +23,8 @@ import androidx.viewpager2.widget.ViewPager2
 
 import com.google.android.material.switchmaterial.SwitchMaterial
 import com.solosu.mtforum.ai.AiChatActivity
-import com.solosu.mtforum.ai.AiConfigActivity
 import com.solosu.mtforum.ai.AiConfigManager
 import com.solosu.mtforum.ai.AiLog
-import com.solosu.mtforum.ai.AutoReplyEngine
 import com.solosu.mtforum.ai.AutoReplyScheduler
 import com.solosu.mtforum.databinding.ActivityMainBinding
 import com.solosu.mtforum.network.ForumParser
@@ -72,6 +70,7 @@ class MainActivity : AppCompatActivity() {
     private val badgeRefreshInFlight = AtomicBoolean(false)
     private var lastBadgeRefreshAt = 0L // build68: 上次角标刷新时间戳(节流用)
     private var unreadBaselineReady = false
+    private var lastWafPromptAt = 0L // 人机验证提示节流(避免反复弹窗)
 
     // 双击返回退出
     private var lastBackPressTime = 0L
@@ -134,7 +133,6 @@ class MainActivity : AppCompatActivity() {
 
     private var drawerLayout: DrawerLayout? = null
     private var drawerPanel: View? = null
-    private var swSilent: SwitchMaterial? = null
     private var swSignIn: SwitchMaterial? = null
     private var swUnlock: SwitchMaterial? = null
     private var swDryRun: SwitchMaterial? = null
@@ -175,7 +173,6 @@ class MainActivity : AppCompatActivity() {
         })
 
         drawerPanel = findViewById(R.id.drawer_panel)
-        swSilent = findViewById(R.id.drawer_switch_silent)
         swSignIn = findViewById(R.id.drawer_switch_sign_in)
         swUnlock = findViewById(R.id.drawer_switch_unlock)
         swDryRun = findViewById(R.id.drawer_switch_dry_run)
@@ -195,17 +192,7 @@ class MainActivity : AppCompatActivity() {
             openBtn.setOnClickListener { drawerLayout!!.openDrawer(drawerPanel!!) }
         }
 
-        bindSwitchRow(R.id.drawer_silent_row, swSilent)
         bindSwitchRow(R.id.drawer_sign_in_row, swSignIn)
-
-        // 静默模式开关
-        if (swSilent != null) {
-            swSilent!!.isChecked = AiConfigManager.isSilentMode(this)
-            swSilent!!.setOnCheckedChangeListener { v, checked ->
-                AiConfigManager.setSilentMode(this, checked)
-                AiLog.i("drawer", "隐藏运行 " + (if (checked) "开启" else "关闭"))
-            }
-        }
 
         // 自动签到开关：复用既有 AutoSignInManager
         if (swSignIn != null) {
@@ -282,82 +269,28 @@ class MainActivity : AppCompatActivity() {
             unlockTextRow.setOnClickListener { showUnlockTextDialog() }
         }
 
-        // 立即执行一轮自动回复
-        val runReply = findViewById<View>(R.id.drawer_run_reply)
-        if (runReply != null) {
-            runReply.setOnClickListener {
-                drawerLayout!!.closeDrawer(drawerPanel!!)
-                Toast.makeText(this, "开始执行一轮自动回复…", Toast.LENGTH_SHORT).show()
-                AutoReplyEngine.runOnce(this, object : AutoReplyEngine.Callback {
-                    override fun onFinished(replied: Int, skipped: Int, detail: String?) {
-                        Toast.makeText(
-                            this@MainActivity,
-                            "本轮：回复 " + replied + " 条，跳过 " + skipped + " 条\n" + detail,
-                            Toast.LENGTH_LONG
-                        ).show()
-                    }
-                })
-            }
-        }
 
-        // 立即签到
-        val runSignIn = findViewById<View>(R.id.drawer_run_sign_in)
-        if (runSignIn != null) {
-            runSignIn.setOnClickListener { doSignInNow() }
-        }
 
-        // 切换账号
-        val accountsRow = findViewById<View>(R.id.drawer_accounts)
-        if (accountsRow != null) {
-            accountsRow.setOnClickListener { showAccountSwitcher() }
-        }
-
-        // 个人小黑屋
-        val blacklistRow = findViewById<View>(R.id.drawer_blacklist)
-        if (blacklistRow != null) {
-            blacklistRow.setOnClickListener {
-                drawerLayout!!.closeDrawer(drawerPanel!!)
-                startActivity(
-                    Intent(
-                        this@MainActivity,
-                        com.solosu.mtforum.ui.BlacklistActivity::class.java
+        // 人机验证
+        val wafVerifyRow = findViewById<View>(R.id.drawer_waf_verify)
+        if (wafVerifyRow != null) {
+            updateDrawerWafDesc()
+            wafVerifyRow.setOnClickListener {
+                if (drawerLayout != null && drawerPanel != null && drawerLayout!!.isDrawerOpen(drawerPanel!!)) {
+                    drawerLayout!!.addDrawerListener(object : DrawerLayout.SimpleDrawerListener() {
+                        override fun onDrawerClosed(drawerView: View) {
+                            drawerLayout?.removeDrawerListener(this)
+                            startActivity(
+                                com.solosu.mtforum.ui.security.WafVerificationActivity.intent(this@MainActivity)
+                            )
+                        }
+                    })
+                    drawerLayout!!.closeDrawer(drawerPanel!!)
+                } else {
+                    startActivity(
+                        com.solosu.mtforum.ui.security.WafVerificationActivity.intent(this)
                     )
-                )
-            }
-        }
-
-        // 主题色彩切换
-        val themeColorRow = findViewById<View>(R.id.drawer_theme_color)
-        val tvThemeColorDesc = findViewById<TextView>(R.id.drawer_theme_color_desc)
-        if (themeColorRow != null) {
-            val cur = com.solosu.mtforum.util.ThemeManager.getCurrentThemeColor(this)
-            tvThemeColorDesc?.text = "当前：${cur.name}"
-            themeColorRow.setOnClickListener {
-                drawerLayout!!.closeDrawer(drawerPanel!!)
-                com.solosu.mtforum.util.ThemeManager.showColorPickerDialog(this)
-            }
-        }
-
-        // AI 接口设置
-        val aiConfigRow = findViewById<View>(R.id.drawer_ai_config)
-        if (aiConfigRow != null) {
-            aiConfigRow.setOnClickListener {
-                drawerLayout!!.closeDrawer(drawerPanel!!)
-                startActivity(Intent(this@MainActivity, AiConfigActivity::class.java))
-            }
-        }
-
-        // 设置
-        val settings = findViewById<View>(R.id.drawer_settings)
-        if (settings != null) {
-            settings.setOnClickListener {
-                drawerLayout!!.closeDrawer(drawerPanel!!)
-                startActivity(
-                    Intent(
-                        this@MainActivity,
-                        com.solosu.mtforum.ui.space.SettingsActivity::class.java
-                    )
-                )
+                }
             }
         }
 
@@ -368,6 +301,15 @@ class MainActivity : AppCompatActivity() {
         }
 
         refreshDrawerHeader()
+    }
+
+    private fun updateDrawerWafDesc() {
+        val desc = findViewById<TextView>(R.id.drawer_waf_desc) ?: return
+        if (com.solosu.mtforum.network.HttpClient.getInstance().hasPendingWafChallenge()) {
+            desc.text = "检测到站点要求人机验证，点击通过"
+        } else {
+            desc.text = "内容加载不出时，在此通过网页验证"
+        }
     }
 
     /** 整行点击等于切换开关 */
@@ -428,80 +370,7 @@ class MainActivity : AppCompatActivity() {
             .show()
     }
 
-    /** 账号切换弹窗:当前账号高亮,点选切换,支持登录新账号/删除 */
-    private fun showAccountSwitcher() {
-        var accounts: List<com.solosu.mtforum.session.AccountManager.Account> =
-            com.solosu.mtforum.session.AccountManager.list(this)
-        var activeUid = com.solosu.mtforum.session.AccountManager.activeUid(this)
-        val curName = UserSessionManager.getInstance().getUsername(this)
-        val curUid = UserSessionManager.getInstance().getUid(this)
-        val curLogged = UserSessionManager.getInstance().isLoggedIn(this)
 
-        // 若当前登录账号未入库(比如老用户),先补存
-        if (curLogged && !android.text.TextUtils.isEmpty(curUid)) {
-            com.solosu.mtforum.session.AccountManager.saveCurrent(
-                this, curUid, curName,
-                UserSessionManager.getInstance().getAvatarUrl(this),
-                UserSessionManager.getInstance().getLevel(this)
-            )
-            accounts = com.solosu.mtforum.session.AccountManager.list(this)
-            activeUid = com.solosu.mtforum.session.AccountManager.activeUid(this)
-        }
-        val fAccounts = accounts
-        val fActiveUid = activeUid
-
-        val labels = ArrayList<String>()
-        for (a in fAccounts) {
-            val mark = if (fActiveUid != null && fActiveUid == a.uid) "  [当前]" else ""
-            labels.add(a.username + mark)
-        }
-        labels.add("＋ 登录新账号")
-
-        val arr = labels.toTypedArray()
-        androidx.appcompat.app.AlertDialog.Builder(this)
-            .setTitle("切换账号")
-            .setItems(arr) { d, which ->
-                if (which == fAccounts.size) {
-                    // 登录新账号:先保存当前,再弹登录
-                    drawerLayout!!.closeDrawer(drawerPanel!!)
-                    com.solosu.mtforum.ui.login.LoginBottomSheet.show(this) {
-                        // 登录成功后入库并刷新
-                        val n = UserSessionManager.getInstance().getUsername(this)
-                        val u = UserSessionManager.getInstance().getUid(this)
-                        if (!android.text.TextUtils.isEmpty(u)) {
-                            com.solosu.mtforum.session.AccountManager.saveCurrent(
-                                this, u, n,
-                                UserSessionManager.getInstance().getAvatarUrl(this),
-                                UserSessionManager.getInstance().getLevel(this)
-                            )
-                        }
-                        refreshDrawerHeader()
-                    }
-                    return@setItems
-                }
-                val target = fAccounts[which]
-                if (target.uid == curUid && curLogged) {
-                    Toast.makeText(this, "已是当前账号", Toast.LENGTH_SHORT).show()
-                    return@setItems
-                }
-                // 切换:cookie 快照回灌 + 更新 UserSessionManager 展示层
-                val ok = com.solosu.mtforum.session.AccountManager.switchTo(this, target.uid)
-                if (ok) {
-                    val info = HashMap<String, String>()
-                    info["username"] = target.username!!
-                    info["uid"] = target.uid!!
-                    info["avatarUrl"] = if (target.avatar != null) target.avatar!! else ""
-                    info["level"] = if (target.level != null) target.level!! else ""
-                    UserSessionManager.getInstance().saveLoginInfo(this, info)
-                    Toast.makeText(this, "已切换到 " + target.username, Toast.LENGTH_SHORT).show()
-                    refreshDrawerHeader()
-                } else {
-                    Toast.makeText(this, "切换失败，请重新登录该账号", Toast.LENGTH_SHORT).show()
-                }
-            }
-            .setNegativeButton("关闭", null)
-            .show()
-    }
 
     private fun openOwnProfile() {
         val session = UserSessionManager.getInstance()
@@ -596,9 +465,8 @@ class MainActivity : AppCompatActivity() {
         val hint = if (android.text.TextUtils.isEmpty(path))
             "" else "\n\n日志文件：\n" + path
 
-        androidx.appcompat.app.AlertDialog.Builder(this)
+        val dlg = androidx.appcompat.app.AlertDialog.Builder(this)
             .setTitle("运行日志（" + AiLog.size() + " 条）")
-            .setMessage(if (hint.trim().isEmpty()) null else hint)
             .setView(sv)
             .setNeutralButton("复制") { d, w ->
                 val cm = getSystemService(CLIPBOARD_SERVICE) as? android.content.ClipboardManager
@@ -617,6 +485,14 @@ class MainActivity : AppCompatActivity() {
             }
             .setNegativeButton("关闭", null)
             .show()
+
+        com.solosu.mtforum.ui.widget.DialogHelper.applyToAlertDialog(dlg, this)
+        val themeColor = com.solosu.mtforum.util.ThemeManager.getThemeColor(this)
+        dlg.getButton(androidx.appcompat.app.AlertDialog.BUTTON_POSITIVE)?.setTextColor(0xFFEF4444.toInt()) // 醒目红色清除
+        dlg.getButton(androidx.appcompat.app.AlertDialog.BUTTON_NEUTRAL)?.setTextColor(themeColor)
+        dlg.getButton(androidx.appcompat.app.AlertDialog.BUTTON_NEGATIVE)?.setTextColor(
+            androidx.core.content.ContextCompat.getColor(this, R.color.text_secondary)
+        )
     }
 
     /**
@@ -975,6 +851,28 @@ class MainActivity : AppCompatActivity() {
         mainHandler!!.postDelayed(badgeRunnable, delayMs)
     }
 
+    /**
+     * 检测到 WAF 挑战页且本地求解未能通过时，提示用户去网页版人机验证页。
+     * 只提示不自动发请求；用时间戳节流，避免每次 onResume 都弹。
+     */
+    private fun maybePromptWafIfNeeded() {
+        if (!HttpClient.getInstance().hasPendingWafChallenge()) return
+        val now = System.currentTimeMillis()
+        if (now - lastWafPromptAt < WAF_PROMPT_THROTTLE_MS) return
+        lastWafPromptAt = now
+        val dlg = androidx.appcompat.app.AlertDialog.Builder(this)
+            .setTitle("需要人机验证")
+            .setMessage("站点要求完成一次人机验证才能继续加载内容。是否现在通过网页验证？")
+            .setPositiveButton("去验证") { _, _ ->
+                startActivity(
+                    com.solosu.mtforum.ui.security.WafVerificationActivity.intent(this)
+                )
+            }
+            .setNegativeButton("稍后", null)
+            .show()
+        com.solosu.mtforum.ui.widget.DialogHelper.applyToAlertDialog(dlg, this)
+    }
+
     private val badgeRunnable = Runnable { refreshMessageBadge() }
 
     override fun onStart() {
@@ -1007,6 +905,9 @@ class MainActivity : AppCompatActivity() {
         }
         // 登录状态 / AI 配置可能已变化，刷新侧边栏头部
         refreshDrawerHeader()
+        updateDrawerWafDesc()
+        // 本地 JS 挑战求解失配时提示用户手动通过人机验证（节流，不反复弹窗）
+        maybePromptWafIfNeeded()
         val themeColor = com.solosu.mtforum.util.ThemeManager.getThemeColor(this)
         currentNavThemeColor.value = androidx.compose.ui.graphics.Color(themeColor)
     }
@@ -1053,8 +954,9 @@ class MainActivity : AppCompatActivity() {
     companion object {
         private const val NAV_HIDE_ANIM_MS = 200L
 
-        private const val BADGE_REFRESH_INTERVAL_MS = 60000L // 60秒刷新一次(降频防ESA 403,6类并行=6发/分钟)
-        private const val BADGE_RESUME_THROTTLE_MS = 60000L // build68: onResume 即时刷新节流(防频繁返回重复拉6类)
+        private const val BADGE_REFRESH_INTERVAL_MS = 30000L // 30秒刷新一次(6类并行=12发/分钟，兼顾及时性与防ESA 403)
+        private const val BADGE_RESUME_THROTTLE_MS = 15000L // onResume 即时刷新节流(防频繁返回重复拉6类)
+        private const val WAF_PROMPT_THROTTLE_MS = 5 * 60 * 1000L // 人机验证提示节流
 
         /** build83: 分类被查看时本地即时清零对应红点(零额外请求) */
         private val BADGE_TYPES = arrayOf("pm", "follower", "mypost", "interactive", "system", "app")
