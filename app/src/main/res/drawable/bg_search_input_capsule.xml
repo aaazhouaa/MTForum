@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 搜索输入框胶囊背景：微浅灰底，带 18dp 圆角与极细微描边 -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="@color/background_secondary" />
+    <corners android:radius="20dp" />
+    <stroke
+        android:width="0.8dp"
+        android:color="@color/divider" />
+</shape>

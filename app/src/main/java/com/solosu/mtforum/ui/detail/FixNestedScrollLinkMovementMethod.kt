@@ -126,11 +126,13 @@ class FixNestedScrollLinkMovementMethod : LinkMovementMethod() {
          * @param onClickListener 点击链接时的回调，传入处理后的URL
          */
         @JvmStatic
+        @JvmOverloads
         fun matcherLinkify(
             spannable: Spannable?,
             pattern: Pattern?,
             urlProcessor: java.util.function.Function<String, String>?,
-            onClickListener: java.util.function.Consumer<String>?
+            onClickListener: java.util.function.Consumer<String>?,
+            linkColor: Int = 0xFF2563EB.toInt()
         ) {
             if (spannable == null || pattern == null) return
 
@@ -162,7 +164,7 @@ class FixNestedScrollLinkMovementMethod : LinkMovementMethod() {
                     }
 
                     override fun updateDrawState(ds: TextPaint) {
-                        ds.color = 0xFF1976D2.toInt()
+                        ds.color = linkColor
                         ds.isUnderlineText = true
                     }
                 }, start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)

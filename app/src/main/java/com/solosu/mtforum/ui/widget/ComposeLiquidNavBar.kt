@@ -117,8 +117,8 @@ fun MTForumLiquidNavBar(
 
     val isLightTheme = !isSystemInDarkTheme()
     val containerColor =
-        if (isLightTheme) Color.White.copy(0.65f)
-        else Color(0xFF1E1E20).copy(0.65f)
+        if (isLightTheme) Color.White.copy(0.50f)
+        else Color(0xFF1E1E20).copy(0.50f)
     val contentNormalColor =
         if (isLightTheme) Color.Black.copy(0.70f)
         else Color.White.copy(0.70f)

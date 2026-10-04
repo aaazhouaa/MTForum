@@ -1,11 +1,18 @@
 package com.solosu.mtforum.ui.search
 
+import android.content.Context
 import android.content.Intent
+import android.graphics.Typeface
+import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
+import android.text.Editable
 import android.text.TextUtils
+import android.text.TextWatcher
 import android.view.View
 import android.view.inputmethod.EditorInfo
+import android.view.inputmethod.InputMethodManager
 import android.widget.EditText
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.TextView
@@ -14,6 +21,7 @@ import androidx.annotation.Nullable
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.Toolbar
 import androidx.core.content.ContextCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 
@@ -24,6 +32,7 @@ import com.solosu.mtforum.network.ForumParser
 import com.solosu.mtforum.network.HttpClient
 import com.solosu.mtforum.ui.detail.ThreadDetailActivity
 import com.solosu.mtforum.ui.space.UserProfileActivity
+import com.solosu.mtforum.util.ThemeManager
 
 import java.util.ArrayList
 
@@ -34,14 +43,19 @@ class SearchActivity : AppCompatActivity() {
 
     private lateinit var toolbar: Toolbar
     private lateinit var etSearch: EditText
+    private lateinit var ivClear: ImageView
+    private lateinit var btnSearch: TextView
     private lateinit var progressBar: ProgressBar
     private lateinit var recyclerView: RecyclerView
+    private lateinit var layoutEmptyState: LinearLayout
+    private lateinit var ivEmptyIcon: ImageView
     private lateinit var tvEmpty: TextView
     private lateinit var tvError: TextView
     private lateinit var threadAdapter: ThreadAdapter
 
     // 排序相关
     private lateinit var layoutSortBar: LinearLayout
+    private lateinit var vSortDivider: View
     private lateinit var btnSortLastpost: TextView
     private lateinit var btnSortDateline: TextView
     private lateinit var btnSortReplies: TextView
@@ -56,20 +70,31 @@ class SearchActivity : AppCompatActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        com.solosu.mtforum.util.ThemeManager.applyTheme(this)
+        ThemeManager.applyTheme(this)
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_search)
 
+        // === 纯白状态栏沉浸 + 适配深浅色状态栏文字图标 ===
+        setupWhiteStatusBar()
+
         toolbar = findViewById(R.id.toolbar)
         etSearch = findViewById(R.id.et_search)
+        ivClear = findViewById(R.id.iv_clear)
+        btnSearch = findViewById(R.id.btn_search)
         progressBar = findViewById(R.id.progress_bar)
         recyclerView = findViewById(R.id.recycler_view)
+        layoutEmptyState = findViewById(R.id.layout_empty_state)
+        ivEmptyIcon = findViewById(R.id.iv_empty_icon)
         tvEmpty = findViewById(R.id.tv_empty)
         tvError = findViewById(R.id.tv_error)
         layoutSortBar = findViewById(R.id.layout_sort_bar)
+        vSortDivider = findViewById(R.id.v_sort_divider)
         btnSortLastpost = findViewById(R.id.btn_sort_lastpost)
         btnSortDateline = findViewById(R.id.btn_sort_dateline)
         btnSortReplies = findViewById(R.id.btn_sort_replies)
+
+        // 动态绑定主题色到搜索按钮
+        applySearchButtonTheme()
 
         // === Toolbar ===
         setSupportActionBar(toolbar)
@@ -82,6 +107,30 @@ class SearchActivity : AppCompatActivity() {
 
         // 顶栏双击快速回到顶部
         com.solosu.mtforum.util.ScrollToTopHelper.attachRecyclerView(toolbar, recyclerView)
+
+        // === 一键清空图标 ===
+        ivClear.setOnClickListener {
+            etSearch.text?.clear()
+            etSearch.requestFocus()
+            showKeyboard(etSearch)
+        }
+
+        // 监听输入文字变化：有字显清空，无字隐藏
+        etSearch.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                ivClear.visibility = if (!s.isNullOrEmpty()) View.VISIBLE else View.GONE
+            }
+            override fun afterTextChanged(s: Editable?) {}
+        })
+
+        // === 进入页面自动获焦并拉起软键盘 ===
+        etSearch.postDelayed({
+            if (!isFinishing && !isDestroyed) {
+                etSearch.requestFocus()
+                showKeyboard(etSearch)
+            }
+        }, 200)
 
         // === RecyclerView ===
         threadAdapter = ThreadAdapter(this)
@@ -104,7 +153,7 @@ class SearchActivity : AppCompatActivity() {
         recyclerView.layoutManager = LinearLayoutManager(this)
         recyclerView.adapter = threadAdapter
 
-        // 滚动监听实现 10 条批次自动预载（滑到第 6 条时触发下一批 10 条）
+        // 滚动监听实现 10 条批次自动预载
         recyclerView.addOnScrollListener(object : RecyclerView.OnScrollListener() {
             override fun onScrolled(rv: RecyclerView, dx: Int, dy: Int) {
                 super.onScrolled(rv, dx, dy)
@@ -119,11 +168,15 @@ class SearchActivity : AppCompatActivity() {
         })
 
         // === 搜索按钮 ===
-        findViewById<View>(R.id.btn_search).setOnClickListener { performSearch() }
+        btnSearch.setOnClickListener {
+            hideKeyboard()
+            performSearch()
+        }
 
         // === 键盘搜索动作 ===
-        etSearch.setOnEditorActionListener { v, actionId, event ->
+        etSearch.setOnEditorActionListener { _, actionId, _ ->
             if (actionId == EditorInfo.IME_ACTION_SEARCH) {
+                hideKeyboard()
                 performSearch()
                 return@setOnEditorActionListener true
             }
@@ -143,6 +196,37 @@ class SearchActivity : AppCompatActivity() {
         }
     }
 
+    private fun setupWhiteStatusBar() {
+        val topBarColor = ContextCompat.getColor(this, R.color.top_bar)
+        window.statusBarColor = topBarColor
+        WindowInsetsControllerCompat(window, window.decorView).apply {
+            val isDark = ThemeManager.isDarkMode(this@SearchActivity)
+            isAppearanceLightStatusBars = !isDark
+            isAppearanceLightNavigationBars = !isDark
+        }
+    }
+
+    private fun applySearchButtonTheme() {
+        val themeColor = ThemeManager.getThemeColor(this)
+        val bg = GradientDrawable().apply {
+            cornerRadius = (resources.displayMetrics.density * 18 + 0.5f)
+            setColor(themeColor)
+        }
+        btnSearch.background = bg
+    }
+
+    private fun showKeyboard(view: View) {
+        val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
+        imm?.showSoftInput(view, InputMethodManager.SHOW_IMPLICIT)
+    }
+
+    private fun hideKeyboard() {
+        val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
+        currentFocus?.let {
+            imm?.hideSoftInputFromWindow(it.windowToken, 0)
+        }
+    }
+
     /**
      * 切换排序方式
      */
@@ -156,38 +240,24 @@ class SearchActivity : AppCompatActivity() {
     }
 
     /**
-     * 更新排序按钮的激活/非激活样式
+     * 更新排序分段药丸样式：白底卡片选中，灰字未选中（图二样式）
      */
     private fun updateSortChips() {
-        btnSortLastpost.setBackgroundResource(
-            if ("lastpost" == currentSortBy) R.drawable.chip_active_bg else R.drawable.chip_inactive_bg
-        )
-        btnSortLastpost.setTextColor(
-            ContextCompat.getColor(
-                this,
-                if ("lastpost" == currentSortBy) R.color.text_white else R.color.text_hint
-            )
-        )
+        updateSegmentItem(btnSortLastpost, "lastpost" == currentSortBy)
+        updateSegmentItem(btnSortDateline, "dateline" == currentSortBy)
+        updateSegmentItem(btnSortReplies, "replies" == currentSortBy)
+    }
 
-        btnSortDateline.setBackgroundResource(
-            if ("dateline" == currentSortBy) R.drawable.chip_active_bg else R.drawable.chip_inactive_bg
-        )
-        btnSortDateline.setTextColor(
-            ContextCompat.getColor(
-                this,
-                if ("dateline" == currentSortBy) R.color.text_white else R.color.text_hint
-            )
-        )
-
-        btnSortReplies.setBackgroundResource(
-            if ("replies" == currentSortBy) R.drawable.chip_active_bg else R.drawable.chip_inactive_bg
-        )
-        btnSortReplies.setTextColor(
-            ContextCompat.getColor(
-                this,
-                if ("replies" == currentSortBy) R.color.text_white else R.color.text_hint
-            )
-        )
+    private fun updateSegmentItem(tv: TextView, isSelected: Boolean) {
+        if (isSelected) {
+            tv.setBackgroundResource(R.drawable.bg_segment_pill_selected)
+            tv.setTextColor(getColor(R.color.text_primary))
+            tv.setTypeface(null, Typeface.BOLD)
+        } else {
+            tv.setBackgroundColor(android.graphics.Color.TRANSPARENT)
+            tv.setTextColor(getColor(R.color.text_secondary))
+            tv.setTypeface(null, Typeface.NORMAL)
+        }
     }
 
     private fun performSearch() {
@@ -200,37 +270,35 @@ class SearchActivity : AppCompatActivity() {
         currentSortBy = "lastpost"
         updateSortChips()
         layoutSortBar.visibility = View.VISIBLE
+        vSortDivider.visibility = View.VISIBLE
         fetchAllResults(keyword, currentSortBy)
     }
 
     /**
      * 一次性加载全部搜索结果
-     * @param keyword 搜索关键词
-     * @param orderby 排序方式：lastpost/dateline/replies
      */
     private fun fetchAllResults(keyword: String, orderby: String) {
         pendingKeyword = keyword
         if (!HttpClient.getInstance().isLoggedIn()) {
             tvError.setText(R.string.search_login_required)
             tvError.visibility = View.VISIBLE
+            layoutEmptyState.visibility = View.GONE
             return
         }
 
         progressBar.visibility = View.VISIBLE
         recyclerView.visibility = View.GONE
-        tvEmpty.visibility = View.GONE
+        layoutEmptyState.visibility = View.GONE
         tvError.visibility = View.GONE
 
         java.lang.Thread {
             try {
-                // === 1. 抓第1页，提取 searchid & totalPages ===
                 val htmlP1 = HttpClient.getInstance().get(ForumParser.getSearchUrl(keyword, 1, orderby))
                 var allResults: MutableList<Thread> = ForumParser.parseSearchResults(htmlP1)
 
                 val searchId = ForumParser.extractSearchId(htmlP1)
                 val totalPages = ForumParser.parseSearchTotalPages(htmlP1)
 
-                // === 2. 如果有 searchid 且不止一页，并发抓取剩余页 ===
                 if (searchId != null && totalPages > 1) {
                     val futures = ArrayList<java.util.concurrent.Future<MutableList<Thread>?>>()
                     val executor = java.util.concurrent.Executors.newFixedThreadPool(4)
@@ -268,7 +336,6 @@ class SearchActivity : AppCompatActivity() {
                     executor.shutdown()
                 }
 
-                // === 3. 初始只展示前 10 条，滑到第 6 条自动加载后续 10 条 ===
                 val finalResults = allResults
                 runOnUiThread {
                     if (isFinishing || isDestroyed) return@runOnUiThread
@@ -276,6 +343,7 @@ class SearchActivity : AppCompatActivity() {
                     pendingBuffer.clear()
                     displayedResults.clear()
                     if (finalResults.isNotEmpty()) {
+                        layoutEmptyState.visibility = View.GONE
                         pendingBuffer.addAll(finalResults)
                         val countToTake = minOf(BATCH_STEP, pendingBuffer.size)
                         val firstBatch = ArrayList(pendingBuffer.subList(0, countToTake))
@@ -288,7 +356,7 @@ class SearchActivity : AppCompatActivity() {
                     } else {
                         threadAdapter.setThreadList(ArrayList())
                         tvEmpty.setText(R.string.search_no_results)
-                        tvEmpty.visibility = View.VISIBLE
+                        layoutEmptyState.visibility = View.VISIBLE
                     }
                 }
             } catch (e: Exception) {
@@ -296,6 +364,7 @@ class SearchActivity : AppCompatActivity() {
                     if (isFinishing || isDestroyed) return@runOnUiThread
                     progressBar.visibility = View.GONE
                     tvError.visibility = View.VISIBLE
+                    layoutEmptyState.visibility = View.GONE
                 }
             }
         }.start()

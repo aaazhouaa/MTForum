@@ -438,15 +438,8 @@ class ReplyAdapter(rawReplies: List<ReplyItem>?) :
                 tvOpBadge.visibility = View.GONE
             }
 
-            // 等级/称号（灰白字体）
-            val level = item.authorLevel
-            if (!TextUtils.isEmpty(level)) {
-                tvLevel.visibility = View.VISIBLE
-                tvLevel.text = level
-                tvLevel.setTextColor(androidx.core.content.ContextCompat.getColor(itemView.context, R.color.text_secondary))
-            } else {
-                tvLevel.visibility = View.GONE
-            }
+            // 等级/称号：按用户要求在评论区完全隐藏，保持作者栏清爽统一
+            tvLevel.visibility = View.GONE
 
             // 时间
             val time = item.time
@@ -757,11 +750,14 @@ class ReplyAdapter(rawReplies: List<ReplyItem>?) :
                         "(?<![,.;:!?)>])",  // 后面不是标点符号
                 Pattern.CASE_INSENSITIVE or Pattern.DOTALL
             )
+            val themeColor = com.solosu.mtforum.util.ThemeManager.getThemeColor(textView.context)
+
             FixNestedScrollLinkMovementMethod.matcherLinkify(
                 spannable,
                 urlPattern,
                 { url -> url },  // URL处理器：直接返回原始URL
-                { url -> openContentLink(url, textView.context) }  // 点击处理器：打开链接
+                { url -> openContentLink(url, textView.context) },  // 点击处理器：打开链接
+                themeColor
             )
 
             // Html.fromHtml() 产生 URLSpan；统一替换为应用自己的 ClickableSpan
@@ -789,7 +785,7 @@ class ReplyAdapter(rawReplies: List<ReplyItem>?) :
                         }
 
                         override fun updateDrawState(ds: TextPaint) {
-                            ds.color = 0xFF1976D2.toInt()
+                            ds.color = themeColor
                             ds.isUnderlineText = true
                         }
                     }, start, end, flags)

@@ -2948,7 +2948,7 @@ object ForumParser {
         val signBtn = doc.select("a.signBtn").first()
         if (signBtn != null) {
             var signHref = signBtn.attr("href")
-            data.signInText = signBtn.text().trim()
+            data.signInText = signBtn.text().replace(Regex("[^\\u4e00-\\u9fa5]"), "").trim()
             if (!signHref.isEmpty()) {
                 if (!signHref.startsWith("http")) {
                     signHref = BASE_DOMAIN + signHref
@@ -2964,7 +2964,7 @@ object ForumParser {
             val signInLink = doc.select("a:containsOwn(签到)").first()
             if (signInLink != null) {
                 val signText = signInLink.text().trim()
-                data.signInText = signText
+                data.signInText = signText.replace(Regex("[^\\u4e00-\\u9fa5]"), "").trim()
                 var signHref = signInLink.attr("href")
                 if (!signHref.isEmpty()) {
                     if (!signHref.startsWith("http")) {
@@ -2979,7 +2979,7 @@ object ForumParser {
                 // 2c. 兜底：查找包含 "签到" 图标文字的元素
                 val signIcon = doc.select("i:contains(签到), span:contains(签到), em:contains(签到)").first()
                 if (signIcon != null) {
-                    data.signInText = signIcon.text().trim()
+                    data.signInText = signIcon.text().replace(Regex("[^\\u4e00-\\u9fa5]"), "").trim()
                 }
             }
         }

@@ -146,10 +146,12 @@ class CommunityFragment : Fragment() {
                     if (alreadySignedIn) {
                         showAlreadySignedIn()
                     } else if (data.signInText != null && !data.signInText.isEmpty()) {
-                        binding!!.tvSignInStatus.text = data.signInText
-                        binding!!.btnSignIn.text = data.signInText
+                        val isSigned = data.signInText.contains("已")
+                        val cleanText = if (isSigned) "已签到" else "签到"
+                        binding!!.tvSignInStatus.text = cleanText
+                        binding!!.btnSignIn.text = cleanText
                         // If text contains "已签到" or "已", treat as already signed in
-                        if (data.signInText.contains("已")) {
+                        if (isSigned) {
                             binding!!.btnSignIn.setBackgroundResource(R.drawable.rounded_btn_gray)
                             binding!!.btnSignIn.isEnabled = false
                             // 同步到本地持久化

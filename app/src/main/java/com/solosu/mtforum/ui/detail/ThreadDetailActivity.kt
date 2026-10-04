@@ -3947,7 +3947,7 @@ class ThreadDetailActivity : AppCompatActivity() {
             spannable = SpannableString(value ?: "")
             textView.setText(spannable, TextView.BufferType.SPANNABLE)
         }
-        val linkColor = getColor(R.color.link_color)
+        val linkColor = com.solosu.mtforum.util.ThemeManager.getThemeColor(this)
         val urlPattern = Pattern.compile(
             "(?<!\\w)(?:https?://[^\\s<>\"\\x00-\\x1f\\x7f-\\xff]+|www\\.[^\\s<>\"\\x00-\\x1f\\x7f-\\xff]+)(?<![,.;:!?)>])",
             Pattern.CASE_INSENSITIVE or Pattern.MULTILINE
@@ -3955,7 +3955,8 @@ class ThreadDetailActivity : AppCompatActivity() {
         FixNestedScrollLinkMovementMethod.matcherLinkify(
             spannable, urlPattern,
             { url -> canonicalizeUrl(url) ?: url },
-            { url -> openLink(url) }
+            { url -> openLink(url) },
+            linkColor
         )
         val urlSpans = spannable.getSpans(0, spannable.length, URLSpan::class.java)
         for (oldSpan in urlSpans) {
