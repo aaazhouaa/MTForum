@@ -307,7 +307,10 @@ fun MTForumLiquidNavBar(
                             refractionHeight = 10f.dp.toPx() * progress,
                             refractionAmount = 14f.dp.toPx() * progress,
                             depthEffect = true,
-                            chromaticAberration = true // 水珠精美边缘彩虹色散
+                            chromaticAberration = true, // 水珠精美边缘彩虹色散
+                            // 色散因子已改为沿边缘均匀衰减（circleMap），不再是对角分段的
+                            // (x*y)/(halfW*halfH)，因此重标定强度：边缘总跨度约 1.7dp 的细彩边。
+                            dispersionScale = 0.06f
                         )
                     },
                     highlight = {

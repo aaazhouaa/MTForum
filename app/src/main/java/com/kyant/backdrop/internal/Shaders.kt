@@ -94,6 +94,7 @@ uniform float refractionHeight;
 uniform float refractionAmount;
 uniform float depthEffect;
 uniform float chromaticAberration;
+uniform float dispersionScale;
 
 $RoundedRectSDF
 
@@ -117,7 +118,7 @@ half4 main(float2 coord) {
     float2 grad = normalize(gradSdRoundedRect(centeredCoord, halfSize, gradRadius) + depthEffect * normalize(centeredCoord));
     
     float2 refractedCoord = coord + d * grad;
-    float dispersionIntensity = chromaticAberration * ((centeredCoord.x * centeredCoord.y) / (halfSize.x * halfSize.y));
+    float dispersionIntensity = dispersionScale * chromaticAberration * circleMap(1.0 - -sd / refractionHeight);
     float2 dispersedCoord = d * grad * dispersionIntensity;
     
     half4 color = half4(0.0);

@@ -17,7 +17,8 @@ fun BackdropEffectScope.lens(
     @FloatRange(from = 0.0) refractionHeight: Float,
     @FloatRange(from = 0.0) refractionAmount: Float,
     depthEffect: Boolean = false,
-    chromaticAberration: Boolean = false
+    chromaticAberration: Boolean = false,
+    dispersionScale: Float = 1f
 ) {
     if (!isRuntimeShaderSupported()) return
     if (!size.isSpecified) return
@@ -51,6 +52,7 @@ fun BackdropEffectScope.lens(
                 setFloatUniform("depthEffect", if (depthEffect) 1f else 0f)
                 if (chromaticAberration) {
                     setFloatUniform("chromaticAberration", 1f)
+                    setFloatUniform("dispersionScale", dispersionScale)
                 }
             }
             RuntimeShaderEffect(shader, "content")
