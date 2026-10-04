@@ -345,7 +345,7 @@ class MainActivity : AppCompatActivity() {
                 tvDrawerSubtitle!!.text = if (android.text.TextUtils.isEmpty(lv))
                     "UID " + uid else "UID " + uid + " · Lv." + lv
             } else {
-                tvDrawerSubtitle!!.text = "点击侧边栏开启自动化"
+                tvDrawerSubtitle!!.text = "点击查看个人主页"
             }
         }
 

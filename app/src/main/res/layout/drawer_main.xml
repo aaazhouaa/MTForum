@@ -57,7 +57,7 @@
                 android:layout_marginTop="3dp"
                 android:ellipsize="end"
                 android:maxLines="1"
-                android:text="点击侧边栏开启自动化"
+                android:text="点击查看个人主页"
                 android:textColor="@color/text_secondary"
                 android:textSize="12sp" />
         </LinearLayout>
