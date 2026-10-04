@@ -61,8 +61,8 @@ class MainActivity : AppCompatActivity() {
     private val currentSelectedNavTab = androidx.compose.runtime.mutableIntStateOf(0)
     private val currentNavThemeColor = androidx.compose.runtime.mutableStateOf(androidx.compose.ui.graphics.Color(0xFF0088FF.toInt()))
 
-    // ★ 消息角标
-    private var tvMessageBadge: TextView? = null
+    // ★ 消息红点状态（由 Compose 底栏直接渲染在消息图标右上角）
+    private val hasUnreadMessage = androidx.compose.runtime.mutableStateOf(false)
     private var mainHandler: Handler? = null
     private var executor: ExecutorService? = null
 
@@ -116,11 +116,7 @@ class MainActivity : AppCompatActivity() {
                 onNoticeViewed(viewType)
             }
         })
-        tvMessageBadge = findViewById(R.id.nav_message_badge)
-        if (tvMessageBadge != null) {
-            tvMessageBadge!!.visibility = View.GONE
-            refreshMessageBadge()
-        }
+        refreshMessageBadge()
 
         // 初始化导航视图引用（含凸起发布按钮）
         initNavigationBar()
@@ -658,7 +654,8 @@ class MainActivity : AppCompatActivity() {
                     openPost()
                 },
                 themeColor = currentNavThemeColor.value,
-                backdropSourceView = mainPager
+                backdropSourceView = mainPager,
+                hasUnreadMessage = hasUnreadMessage.value
             )
         }
     }
@@ -756,7 +753,7 @@ class MainActivity : AppCompatActivity() {
         if (isFinishing() || (android.os.Build.VERSION.SDK_INT >= 17 && isDestroyed())) return
         if (!HttpClient.getInstance().isLoggedIn()) {
             badgeRefreshInFlight.set(false)
-            if (tvMessageBadge != null) tvMessageBadge!!.visibility = View.GONE
+            hasUnreadMessage.value = false
             scheduleNextBadgeRefresh()
             return
         }
@@ -940,15 +937,9 @@ class MainActivity : AppCompatActivity() {
         scheduleNextBadgeRefresh()
     }
 
-    /** build83: 只渲染红点, 不重置 60s 轮询计时 */
+    /** 只渲染红点, 不显示数字 */
     private fun renderBadge(count: Int) {
-        if (tvMessageBadge == null) return
-        if (count > 0) {
-            tvMessageBadge!!.visibility = View.VISIBLE
-            tvMessageBadge!!.text = if (count > 99) "99+" else count.toString()
-        } else {
-            tvMessageBadge!!.visibility = View.GONE
-        }
+        hasUnreadMessage.value = (count > 0)
     }
 
     /** build83: 消息分类被查看 → 本地即时清零该分类计数并重算总数, 红点立即消失, 不发任何请求 */
@@ -999,7 +990,7 @@ class MainActivity : AppCompatActivity() {
         super.onResume()
         // build68: 从消息页/后台返回时刷新，但加 60 秒节流——频繁返回不再重复全量拉 6 类(防 ESA 403)。
         // 角标本身已有 60 秒定时轮询兜底, 这里的即时刷新只是锦上添花。
-        if (mainHandler != null && tvMessageBadge != null) {
+        if (mainHandler != null) {
             val now = System.currentTimeMillis()
             if (now - lastBadgeRefreshAt >= BADGE_RESUME_THROTTLE_MS) {
                 mainHandler!!.removeCallbacks(badgeRunnable)

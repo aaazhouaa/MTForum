@@ -102,7 +102,8 @@ fun MTForumLiquidNavBar(
     onPostClicked: () -> Unit,
     themeColor: Color,
     modifier: Modifier = Modifier,
-    backdropSourceView: View? = null
+    backdropSourceView: View? = null,
+    hasUnreadMessage: Boolean = false
 ) {
     val tabs = remember {
         listOf(
@@ -252,10 +253,12 @@ fun MTForumLiquidNavBar(
             verticalAlignment = Alignment.CenterVertically
         ) {
             tabs.forEachIndexed { _, tab ->
+                val showBadge = tab.titleRes == R.string.tab_message && hasUnreadMessage
                 TabItemView(
                     tab = tab,
                     tint = contentNormalColor,
                     themeColor = themeColor,
+                    showBadge = showBadge,
                     modifier = Modifier.weight(1f)
                 )
             }
@@ -298,10 +301,12 @@ fun MTForumLiquidNavBar(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 tabs.forEachIndexed { _, tab ->
+                    val showBadge = tab.titleRes == R.string.tab_message && hasUnreadMessage
                     TabItemView(
                         tab = tab,
                         tint = themeColor,
                         themeColor = themeColor,
+                        showBadge = showBadge,
                         modifier = Modifier.weight(1f)
                     )
                 }
@@ -468,6 +473,7 @@ private fun TabItemView(
     tab: NavTabItem,
     tint: Color,
     themeColor: Color,
+    showBadge: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val scale = LocalLiquidBottomTabScale.current
@@ -500,12 +506,24 @@ private fun TabItemView(
                 )
             }
         } else {
-            androidx.compose.foundation.Image(
-                painter = painter,
-                contentDescription = null,
-                colorFilter = ColorFilter.tint(tint),
+            Box(
                 modifier = Modifier.size(24.dp)
-            )
+            ) {
+                androidx.compose.foundation.Image(
+                    painter = painter,
+                    contentDescription = null,
+                    colorFilter = ColorFilter.tint(tint),
+                    modifier = Modifier.size(24.dp)
+                )
+                if (showBadge) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .size(7.dp)
+                            .background(Color(0xFFFF3B30), CircleShape)
+                    )
+                }
+            }
             BasicText(
                 text = stringResource(tab.titleRes),
                 style = TextStyle(color = tint, fontSize = 10.sp, fontWeight = FontWeight.Medium)
