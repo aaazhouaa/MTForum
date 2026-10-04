@@ -23,10 +23,12 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -122,7 +124,25 @@ fun MTForumLiquidNavBar(
 
     // 捕获底层 ViewPager2 真实内容并施加底色垫层，呈现真实毛玻璃背景
     val navView = LocalView.current
+    var refreshTick by remember { mutableLongStateOf(0L) }
+    DisposableEffect(backdropSourceView) {
+        val source = backdropSourceView ?: return@DisposableEffect onDispose {}
+        val listener = android.view.ViewTreeObserver.OnDrawListener {
+            refreshTick = System.nanoTime()
+        }
+        val vto = source.viewTreeObserver
+        vto.addOnDrawListener(listener)
+        onDispose {
+            if (vto.isAlive) {
+                vto.removeOnDrawListener(listener)
+            } else {
+                source.viewTreeObserver.removeOnDrawListener(listener)
+            }
+        }
+    }
+
     val hostBackdrop = rememberCanvasBackdrop {
+        val _tick = refreshTick
         drawRect(if (isLightTheme) Color(0xFFFAFAFA) else Color(0xFF141416))
         val source = backdropSourceView ?: return@rememberCanvasBackdrop
         val canvas = drawContext.canvas.nativeCanvas

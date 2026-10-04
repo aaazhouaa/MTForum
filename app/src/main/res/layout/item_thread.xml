@@ -107,12 +107,11 @@
                 android:layout_height="26dp"
                 android:layout_marginEnd="6dp"
                 android:gravity="center"
-                android:paddingHorizontal="10dp"
+                android:paddingHorizontal="4dp"
                 android:text="AI总结"
-                android:textColor="@color/accent_ai"
+                android:textColor="@color/text_secondary"
                 android:textSize="11sp"
-                android:textStyle="bold"
-                android:background="@drawable/thread_ai_summary_bg" />
+                android:background="?attr/selectableItemBackgroundBorderless" />
 
             <TextView
                 android:id="@+id/btn_thread_follow"
@@ -170,7 +169,7 @@
             android:layout_width="match_parent"
             android:layout_height="190dp"
             android:layout_marginTop="10dp"
-            android:background="@drawable/thread_image_bg"
+            android:background="@drawable/bg_thread_single_img"
             android:foreground="@drawable/bg_thread_image_border"
             android:scaleType="centerCrop"
             android:contentDescription="单图配图"

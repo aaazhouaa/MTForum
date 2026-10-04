@@ -173,6 +173,7 @@ class MainActivity : AppCompatActivity() {
                 setBottomNavVisible(true)
                 // 关闭后恢复锁定，杜绝手势右滑唤出
                 drawerLayout?.setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_CLOSED)
+                findViewById<View>(R.id.bottom_nav_container)?.postInvalidate()
             }
         })
 
@@ -694,22 +695,22 @@ class MainActivity : AppCompatActivity() {
 
     /** 显示/隐藏底部导航栏(带动画) */
     private fun setBottomNavVisible(show: Boolean) {
-        val nav = findViewById<View>(R.id.bottom_nav_container)
-        if (nav == null) return
+        val nav = findViewById<View>(R.id.bottom_nav_container) ?: return
         if (show) {
-            if (!navHidden && nav.visibility == View.VISIBLE) return
+            if (!navHidden && nav.translationY == 0f) return
             navHidden = false
             nav.visibility = View.VISIBLE
+            nav.animate().cancel()
             nav.animate().translationY(0f).setDuration(NAV_HIDE_ANIM_MS)
-                .setListener(null).start()
+                .withEndAction {
+                    nav.postInvalidate()
+                }.start()
         } else {
             if (navHidden) return
             navHidden = true
             val hidden = if (nav.height > 0) nav.height + dp(24f) else dp(92f)
-            nav.animate().translationY(hidden).setDuration(NAV_HIDE_ANIM_MS)
-                .withEndAction {
-                    if (navHidden) nav.visibility = View.GONE
-                }.start()
+            nav.animate().cancel()
+            nav.animate().translationY(hidden).setDuration(NAV_HIDE_ANIM_MS).start()
         }
     }
 

@@ -630,9 +630,17 @@ class ThreadDetailActivity : AppCompatActivity() {
             val imageList = ArrayList<String>()
             val footerSplit = splitEditFooter(converted)
             val cleaned = extractAndSeparateImages(footerSplit[0], imageList)
-            val imageUrls = postDetail.imageUrls
+            val imageUrls = postDetail.imageUrls ?: ArrayList<String>().also { postDetail.imageUrls = it }
+            val passedImages = intent.getStringArrayListExtra("extra_image_urls")
+            if (passedImages != null && passedImages.isNotEmpty()) {
+                for (pImg in passedImages) {
+                    if (!imageUrls.contains(pImg)) {
+                        imageUrls.add(pImg)
+                    }
+                }
+            }
             val missingImages = ArrayList<String>()
-            if (imageUrls != null && !imageUrls.isEmpty()) {
+            if (imageUrls.isNotEmpty()) {
                 for (str in imageUrls) {
                     if (!imageList.contains(str)) {
                         imageList.add(str)

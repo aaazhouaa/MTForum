@@ -1797,11 +1797,14 @@ object ForumParser {
                 }
             }
 
-            // 无论正文使用哪一个选择器，都必须提取正文中的懒加载图片。
+            // 无论正文使用哪一个选择器，都提取正文与附件中的全部内容图片（包含未登录时的附件图）
             var messagesDiv = opMsg.select("div.comiis_messages").first()
             if (messagesDiv == null) messagesDiv = opMsg
             val attachImageUrls = ArrayList<String>()
-            for (img in messagesDiv.select("img")) {
+            val postImages = opPostli.select("div.comiis_messages img, div.comiis_message_table img, div.comiis_attach img, div.viewimg img, .comiis_pyqlist_imgs img, .mmlist_li_box img, .attach_image img, img.comiis_loadimages, img[zoomfile], img[file]")
+            val targetImgs = if (postImages.isNotEmpty()) postImages else messagesDiv.select("img")
+            for (img in targetImgs) {
+                if (img.hasClass("top_tximg") || img.closest(".comiis_postli_top") != null) continue
                 val realSrc = firstNonEmptyAttr(
                     img,
                     "zoomfile", "file", "comiis_loadimages", "data-original", "data-src",

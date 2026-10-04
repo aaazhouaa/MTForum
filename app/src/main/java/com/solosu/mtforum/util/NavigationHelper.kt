@@ -21,7 +21,7 @@ object NavigationHelper {
     @JvmStatic
     fun openThread(context: Context, thread: Thread?) {
         if (thread == null) return
-        openThread(context, thread.tid, thread.title, thread.author)
+        openThread(context, thread.tid, thread.title, thread.author, thread)
     }
 
     /**
@@ -29,11 +29,11 @@ object NavigationHelper {
      */
     @JvmStatic
     fun openThread(context: Context, tid: String?) {
-        openThread(context, tid, null, null)
+        openThread(context, tid, null, null, null)
     }
 
     private fun openThread(context: Context, tid: String?,
-                           title: String?, author: String?) {
+                           title: String?, author: String?, thread: Thread?) {
         if (context == null || tid == null || tid.isEmpty()) return
 
         // 防重复点击:500ms 内只响应一次
@@ -45,6 +45,17 @@ object NavigationHelper {
         intent.putExtra("tid", tid)
         if (title != null) intent.putExtra("title", title)
         if (author != null) intent.putExtra("author", author)
+        if (thread != null) {
+            val imgs = ArrayList<String>()
+            if (thread.imageUrls.isNotEmpty()) {
+                imgs.addAll(thread.imageUrls)
+            } else if (!thread.thumbnailUrl.isNullOrEmpty()) {
+                imgs.add(thread.thumbnailUrl!!)
+            }
+            if (imgs.isNotEmpty()) {
+                intent.putStringArrayListExtra("extra_image_urls", imgs)
+            }
+        }
         context.startActivity(intent)
     }
 }

@@ -461,6 +461,7 @@ class ThreadAdapter(private val context: Context) : RecyclerView.Adapter<ThreadA
             lp.height = dp(190)
             singleIv.layoutParams = lp
             singleIv.clipToOutline = true
+            singleIv.setBackgroundResource(R.drawable.bg_thread_single_img)
             singleIv.foreground = androidx.core.content.ContextCompat.getDrawable(context, R.drawable.bg_thread_image_border)
 
             Glide.with(context)
@@ -605,7 +606,7 @@ class ThreadAdapter(private val context: Context) : RecyclerView.Adapter<ThreadA
     private fun createGridImageView(radiusDp: Int): ImageView {
         val iv = ImageView(context)
         iv.scaleType = ImageView.ScaleType.CENTER_CROP
-        iv.setBackgroundResource(R.drawable.thread_image_bg)
+        iv.setBackgroundResource(R.drawable.bg_thread_grid_img)
         iv.foreground = androidx.core.content.ContextCompat.getDrawable(context, R.drawable.bg_thread_grid_border)
         iv.clipToOutline = true
         return iv

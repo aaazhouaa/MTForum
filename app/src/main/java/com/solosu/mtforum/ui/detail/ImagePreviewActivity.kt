@@ -68,7 +68,8 @@ class ImagePreviewActivity : AppCompatActivity() {
 
         val fUrls: MutableList<String> = urls // lambda 引用需 final
         val adapter = PagerAdapter(fUrls)
-        pager.setAdapter(adapter)
+        pager.adapter = adapter
+        pager.offscreenPageLimit = 2
         pager.setCurrentItem(initPos, false)
         if (fUrls.size > 1) {
             tvIndicator.setText((initPos + 1).toString() + "/" + fUrls.size)
@@ -111,8 +112,6 @@ class ImagePreviewActivity : AppCompatActivity() {
             Glide.with(holder.itemView.context)
                     .load(url)
                     .diskCacheStrategy(DiskCacheStrategy.ALL)
-                    .placeholder(android.graphics.drawable.ColorDrawable(0xFF333333.toInt()))
-                    .error(android.graphics.drawable.ColorDrawable(0xFF111111.toInt()))
                     .into(holder.ivImage)
         }
 

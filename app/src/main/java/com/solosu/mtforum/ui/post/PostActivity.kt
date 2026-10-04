@@ -955,6 +955,7 @@ class PostActivity : AppCompatActivity() {
         val colCount = 3
         val gap = Math.round(8 * density)
         val chipHeight = Math.round(40 * density)
+        val themeColor = com.solosu.mtforum.util.ThemeManager.getThemeColor(this)
 
         for (category in categories) {
             val forums = category.forums
@@ -977,7 +978,7 @@ class PostActivity : AppCompatActivity() {
             val barLp = LinearLayout.LayoutParams(Math.round(3 * density), Math.round(14 * density))
             barLp.rightMargin = Math.round(6 * density)
             bar.layoutParams = barLp
-            bar.setBackgroundColor(getColor(R.color.primary))
+            bar.setBackgroundColor(themeColor)
             headerLayout.addView(bar)
 
             // 分区名
@@ -1031,8 +1032,14 @@ class PostActivity : AppCompatActivity() {
                         chip.setPadding(Math.round(4 * density), 0, Math.round(4 * density), 0)
 
                         if (isSelected) {
-                            chip.setBackgroundResource(R.drawable.bg_post_forum_chip_selected)
-                            chip.setTextColor(getColor(R.color.primary))
+                            val bg = android.graphics.drawable.GradientDrawable().apply {
+                                shape = android.graphics.drawable.GradientDrawable.RECTANGLE
+                                cornerRadius = 16 * density
+                                setColor(androidx.core.graphics.ColorUtils.setAlphaComponent(themeColor, 0x1F))
+                                setStroke(Math.round(1 * density), androidx.core.graphics.ColorUtils.setAlphaComponent(themeColor, 0x66))
+                            }
+                            chip.background = bg
+                            chip.setTextColor(themeColor)
                             chip.typeface = android.graphics.Typeface.DEFAULT_BOLD
                         } else {
                             chip.setBackgroundResource(R.drawable.bg_post_forum_chip)
