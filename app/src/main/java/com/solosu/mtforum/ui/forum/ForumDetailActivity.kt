@@ -212,8 +212,8 @@ class ForumDetailActivity : AppCompatActivity() {
                     // 精华:filter=digest&digest=1,由服务端过滤
                     sortParam = "&filter=digest&digest=1"
                 } else if (tabPosition == 1) {
-                    // 最新发表:filter=lastpost&orderby=lastpost
-                    sortParam = "&filter=lastpost&orderby=lastpost"
+                    // 最新发表:filter=author&orderby=dateline（按发帖时间倒序）
+                    sortParam = "&filter=author&orderby=dateline"
                 } else if (tabPosition == 2) {
                     // 热门动态:Discuz 原生热度排序
                     sortParam = "&filter=heat&orderby=heats"

@@ -1990,6 +1990,21 @@ object ForumParser {
                     reply.contentText = rContent.text().replace('\u00a0', ' ').trim()
                 }
 
+                // 提取楼层评论中的附件图片
+                val replyImages = rp.select("div.comiis_messages img, div.comiis_message_table img, div.comiis_attach img, div.viewimg img, .attach_image img, img.comiis_loadimages, img[zoomfile], img[file]")
+                for (img in replyImages) {
+                    if (img.hasClass("top_tximg") || img.closest(".comiis_postli_top") != null) continue
+                    val realSrc = firstNonEmptyAttr(
+                        img,
+                        "zoomfile", "file", "comiis_loadimages", "data-original", "data-src",
+                        "data-file", "data-lazy-src", "src"
+                    )
+                    val fullUrl = resolveAttachmentUrl(realSrc)
+                    if (isPostImageUrl(fullUrl) && !reply.imageUrls.contains(fullUrl)) {
+                        reply.imageUrls.add(fullUrl!!)
+                    }
+                }
+
                 // 回复时间 & 地点（底栏 div.comiis_postli_times）
                 val rTimes = rp.select("div.comiis_postli_times").first()
                 if (rTimes != null) {
@@ -2562,17 +2577,16 @@ object ForumParser {
     private fun isPostImageUrl(url: String?): Boolean {
         if (TextUtils.isEmpty(url)) return false
         val lower = url!!.lowercase()
-        return !lower.contains("none.gif")
-                && !lower.contains("none.png")
-                && !lower.contains("loading")
-                && !lower.contains("smiley")
-                && !lower.contains("face")
-                && !lower.contains("icon")
-                && !lower.contains("stamp")
-                && !lower.contains("magic")
-                && !lower.contains("emoticon")
-                && !lower.contains("/static/image/")
-                && !lower.contains("avatar.php")
+        if (lower.contains("none.gif") || lower.contains("none.png") || lower.contains("blank.gif")
+            || lower.contains("loading") || lower.contains("avatar.php")
+            || lower.contains("/static/image/common/") || lower.contains("/static/image/filetype/")
+            || lower.contains("/static/image/smiley/")) {
+            return false
+        }
+        if (lower.contains("smiley") || lower.contains("emoticon")) {
+            return false
+        }
+        return true
     }
 
     /**

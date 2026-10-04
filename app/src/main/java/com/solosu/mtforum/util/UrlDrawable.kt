@@ -2,12 +2,16 @@ package com.solosu.mtforum.util
 
 import android.graphics.Canvas
 import android.graphics.ColorFilter
+import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.PixelFormat
 import android.graphics.RectF
+import android.graphics.drawable.Animatable
 import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.Drawable
+import android.os.SystemClock
 import android.view.View
+import android.widget.TextView
 
 /**
  * 配合 Glide 异步加载的占位 Drawable（用于 Html.ImageGetter）
@@ -15,7 +19,7 @@ import android.view.View
  * Glide 加载完成后回调 setReal() 填充真实图并触发宿主 TextView 重绘。
  * ImageSpan 持有的是本对象引用，draw() 委托内部 real，实现异步回显。
  */
-class UrlDrawable(targetView: View, sizePx: Int) : ColorDrawable(0x00000000) {
+class UrlDrawable(targetView: View, sizePx: Int) : ColorDrawable(0x00000000), Drawable.Callback {
 
     private var real: Drawable? = null
     private var target: View? = null
@@ -31,21 +35,26 @@ class UrlDrawable(targetView: View, sizePx: Int) : ColorDrawable(0x00000000) {
         this.target = targetView
         val drawableLocal = drawable
         if (drawableLocal != null) {
+            drawableLocal.callback = this
             val db = drawableLocal.bounds
             if (db.width() > 0 && db.height() > 0) {
                 setBounds(db)
             } else {
                 drawableLocal.bounds = getBounds()
             }
+            if (drawableLocal is Animatable) {
+                drawableLocal.start()
+            }
         }
-        if (targetView is android.widget.TextView) {
+        if (targetView is TextView) {
             // 图片尺寸变化后必须重新排版，否则图片框停留占位大小
-            val tv: android.widget.TextView = targetView
+            val tv: TextView = targetView
             tv.post(Runnable {
                 try {
                     val cs = tv.text
                     tv.text = cs
                 } catch (ignore: Exception) {
+                    tv.postInvalidate()
                 }
             })
         } else if (targetView != null) {
@@ -56,15 +65,47 @@ class UrlDrawable(targetView: View, sizePx: Int) : ColorDrawable(0x00000000) {
     /**
      * 仅回填真实图并重绘，**不**重新 setText。
      *
-     * 供 RecyclerView item 使用：那里 item 会被回收复用，setText 式的重排延迟到
-     * 下一帧、而此时 ViewHolder 可能已绑到别的条目，既造成跳动又白白多一次全量排版。
-     * 代价是行高按占位尺寸（表情 24dp）计算——评论内联图绝大多数是表情，够用。
+     * 供 RecyclerView item 使用：支持 GIF 动画及第一帧刷新。
      */
     fun setRealNoRelayout(drawable: Drawable?) {
         this.real = drawable
         val drawableLocal = drawable ?: return
-        drawableLocal.setBounds(getBounds())
+        drawableLocal.callback = this
+        val db = drawableLocal.bounds
+        if (db.width() > 0 && db.height() > 0) {
+            setBounds(db)
+        } else {
+            drawableLocal.bounds = getBounds()
+        }
+        if (drawableLocal is Animatable) {
+            drawableLocal.start()
+        }
+        val t = target
+        if (t is TextView) {
+            t.post(Runnable {
+                try {
+                    val cs = t.text
+                    t.text = cs
+                } catch (ignore: Exception) {
+                    t.postInvalidate()
+                }
+            })
+        } else {
+            t?.postInvalidate()
+        }
+    }
+
+    override fun invalidateDrawable(who: Drawable) {
         target?.postInvalidate()
+    }
+
+    override fun scheduleDrawable(who: Drawable, what: Runnable, `when`: Long) {
+        val delay = `when` - SystemClock.uptimeMillis()
+        target?.postDelayed(what, maxOf(0L, delay))
+    }
+
+    override fun unscheduleDrawable(who: Drawable, what: Runnable) {
+        target?.removeCallbacks(what)
     }
 
     override fun draw(canvas: Canvas) {
@@ -108,16 +149,29 @@ class UrlDrawable(targetView: View, sizePx: Int) : ColorDrawable(0x00000000) {
 }
 
 /**
- * 把内部 Drawable 裁剪成圆角矩形后再绘制。
- * Html.ImageGetter 得到的是内联 ImageSpan，无法用 View 背景做圆角，只能在绘制层面裁剪。
+ * 把内部 Drawable 裁剪成圆角矩形并在其外圈绘制细边框。
+ * Html.ImageGetter 得到的是内联 ImageSpan，无法用 View 背景做圆角，必须在绘制层面裁剪和描边。
  */
 class RoundedImageDrawable(
     private val content: Drawable,
-    private val radiusPx: Float
-) : Drawable() {
+    private val radiusPx: Float,
+    private val strokeWidthPx: Float = 0f,
+    private val strokeColor: Int = 0
+) : Drawable(), Drawable.Callback {
 
     private val path = Path()
     private val rect = RectF()
+    private val strokePaint = if (strokeWidthPx > 0f && strokeColor != 0) {
+        Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE
+            strokeWidth = strokeWidthPx
+            color = strokeColor
+        }
+    } else null
+
+    init {
+        content.callback = this
+    }
 
     override fun draw(canvas: Canvas) {
         val b = bounds
@@ -130,6 +184,26 @@ class RoundedImageDrawable(
         content.bounds = b
         content.draw(canvas)
         canvas.restoreToCount(save)
+
+        // 绘制圆角外边框
+        if (strokePaint != null) {
+            val inset = strokeWidthPx / 2f
+            val strokeRect = RectF(rect.left + inset, rect.top + inset, rect.right - inset, rect.bottom - inset)
+            val strokeRadius = maxOf(0f, radiusPx - inset)
+            canvas.drawRoundRect(strokeRect, strokeRadius, strokeRadius, strokePaint)
+        }
+    }
+
+    override fun invalidateDrawable(who: Drawable) {
+        invalidateSelf()
+    }
+
+    override fun scheduleDrawable(who: Drawable, what: Runnable, `when`: Long) {
+        scheduleSelf(what, `when`)
+    }
+
+    override fun unscheduleDrawable(who: Drawable, what: Runnable) {
+        unscheduleSelf(what)
     }
 
     override fun setAlpha(alpha: Int) {

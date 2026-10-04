@@ -26,4 +26,5 @@ class ReplyItem {
 
     var time: String? = null            // 时间（如 "半小时前"）
     var location: String? = null        // 地点（如 "来自 广东"）
+    var imageUrls: ArrayList<String> = ArrayList() // 评论包含的附件大图列表
 }

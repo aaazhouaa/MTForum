@@ -542,6 +542,14 @@ class ReplyAdapter(rawReplies: List<ReplyItem>?) :
                 ""
             }
 
+            if (item.imageUrls.isNotEmpty()) {
+                for (u in item.imageUrls) {
+                    if (isPostImageUrl(u) && replyImageUrls.none { isSameImage(it, u) }) {
+                        replyImageUrls.add(u)
+                    }
+                }
+            }
+
             var remainingSource = sourceHtml
             var editFooterText: String? = null
             val editPattern = Pattern.compile("(?is)(?:<(?:i|span|font|div|p|em)\\b[^>]*>|\\s)*本[帖贴]最后由[\\s\\S]*?编辑(?:\\s*</(?:i|span|font|div|p|em)>)*")
@@ -584,19 +592,22 @@ class ReplyAdapter(rawReplies: List<ReplyItem>?) :
             if (replyImageUrls.isNotEmpty()) {
                 llReplyImages.removeAllViews()
                 llReplyImages.visibility = View.VISIBLE
-                val maxImgWidth = getMaxImageWidth(itemView.context)
+                val cardWidth = dpToPx(itemView.context, 160)
                 for (imgUrl in replyImageUrls) {
                     val imageView = ImageView(itemView.context)
-                    imageView.layoutParams = LinearLayout.LayoutParams(
-                        LinearLayout.LayoutParams.MATCH_PARENT,
+                    val lp = LinearLayout.LayoutParams(
+                        cardWidth,
                         LinearLayout.LayoutParams.WRAP_CONTENT
-                    )
+                    ).apply {
+                        topMargin = dpToPx(itemView.context, 5)
+                        bottomMargin = dpToPx(itemView.context, 5)
+                    }
+                    imageView.layoutParams = lp
                     imageView.adjustViewBounds = true
                     imageView.scaleType = ImageView.ScaleType.FIT_CENTER
+                    imageView.maxHeight = (cardWidth * 1.6f).toInt()
                     imageView.setBackgroundResource(R.drawable.bg_post_image_rounded)
                     imageView.clipToOutline = true
-                    imageView.maxWidth = maxImgWidth
-                    imageView.maxHeight = (maxImgWidth * 1.2f).toInt()
                     imageView.isClickable = true
                     imageView.isFocusable = true
                     setImageClick(itemView.context, imageView, imgUrl)
@@ -862,44 +873,102 @@ class ReplyAdapter(rawReplies: List<ReplyItem>?) :
                     || lower.contains("common_")
         }
 
+        private fun isPostImageUrl(url: String?): Boolean {
+            if (TextUtils.isEmpty(url)) return false
+            val lower = url!!.lowercase(Locale.ROOT)
+            if (lower.contains("none.gif") || lower.contains("none.png") || lower.contains("blank.gif")
+                || lower.contains("loading") || lower.contains("avatar.php")
+                || lower.contains("/static/image/common/") || lower.contains("/static/image/filetype/")
+                || lower.contains("/static/image/smiley/")) {
+                return false
+            }
+            if (lower.contains("smiley") || lower.contains("emoticon")) {
+                return false
+            }
+            return true
+        }
+
+        private fun extractAidFromUrl(url: String): String {
+            val m = Pattern.compile("(?i)[?&]aid=([^&#]+)").matcher(url)
+            return if (m.find()) m.group(1) ?: "" else ""
+        }
+
+        private fun getImageCanonicalKey(url: String?): String {
+            if (url.isNullOrBlank()) return ""
+            val clean = url.trim().lowercase(Locale.ROOT)
+            val aid = extractAidFromUrl(clean)
+            if (aid.isNotEmpty()) return "aid:$aid"
+            val noQuery = clean.substringBefore("?").substringBefore("#")
+            val stripped = noQuery
+                .replace(".thumb.jpg", "")
+                .replace(".thumb.png", "")
+                .replace(".middle.jpg", "")
+                .replace(".middle.png", "")
+                .replace("_thumb.jpg", ".jpg")
+                .replace("_thumb.png", ".png")
+            val lastSlash = stripped.lastIndexOf('/')
+            val filename = if (lastSlash >= 0) stripped.substring(lastSlash + 1) else stripped
+            if (filename.endsWith(".php") || filename.isEmpty()) {
+                return clean
+            }
+            return filename
+        }
+
+        private fun isSameImage(url1: String?, url2: String?): Boolean {
+            if (url1.isNullOrBlank() || url2.isNullOrBlank()) return false
+            if (url1.equals(url2, ignoreCase = true)) return true
+            val key1 = getImageCanonicalKey(url1)
+            val key2 = getImageCanonicalKey(url2)
+            return key1.isNotEmpty() && key1 == key2
+        }
+
+        private fun firstNonEmptyAttr(element: org.jsoup.nodes.Element, vararg attrNames: String): String? {
+            for (attr in attrNames) {
+                if (element.hasAttr(attr)) {
+                    val value = element.attr(attr).trim()
+                    if (value.isNotEmpty()
+                        && !value.contains("none.gif", ignoreCase = true)
+                        && !value.contains("none.png", ignoreCase = true)
+                        && !value.contains("blank.gif", ignoreCase = true)) {
+                        return value
+                    }
+                }
+            }
+            return null
+        }
+
         private fun extractImagesFromHtml(html: String?, outImageUrls: MutableList<String>): String {
             if (TextUtils.isEmpty(html)) {
                 return ""
             }
-            val imgPattern = Pattern.compile("<img\\b[^>]*>", Pattern.CASE_INSENSITIVE)
-            val attrPattern = Pattern.compile(
-                "(?:zoomfile|file|comiis_loadimages|data-original|data-src|data-file|data-lazy-src|src)\\s*=\\s*['\"]([^'\"]+)['\"]",
-                Pattern.CASE_INSENSITIVE
-            )
-            val matcher = imgPattern.matcher(html!!)
-            val sb = StringBuffer()
-            while (matcher.find()) {
-                val tag = matcher.group(0)
-                val attrMatcher = attrPattern.matcher(tag)
-                var chosenUrl: String? = null
-                while (attrMatcher.find()) {
-                    val candidate = attrMatcher.group(1)
-                    val fullCandidate = normalizeImageUrl(candidate)
-                    if (fullCandidate != null && !fullCandidate.contains("none.gif") && !fullCandidate.contains("blank.gif")) {
-                        chosenUrl = fullCandidate
-                        break
-                    }
+            try {
+                val doc = org.jsoup.Jsoup.parseBodyFragment(html!!)
+                for (ignoreOp in doc.select("ignore_js_op")) {
+                    ignoreOp.unwrap()
                 }
-                if (chosenUrl != null) {
-                    if (isSmileyOrIcon(chosenUrl)) {
-                        matcher.appendReplacement(sb, Matcher.quoteReplacement("<img src=\"$chosenUrl\">"))
-                        continue
-                    }
-                    if (chosenUrl.startsWith("http://") || chosenUrl.startsWith("https://")) {
-                        if (!outImageUrls.contains(chosenUrl)) {
-                            outImageUrls.add(chosenUrl)
+                val imgs = doc.select("img")
+                for (img in imgs) {
+                    val realUrl = firstNonEmptyAttr(
+                        img,
+                        "zoomfile", "file", "comiis_loadimages", "data-original", "data-src",
+                        "data-file", "data-lazy-src", "src"
+                    )
+                    val fullUrl = normalizeImageUrl(realUrl)
+                    if (fullUrl != null && isPostImageUrl(fullUrl)) {
+                        if (outImageUrls.none { isSameImage(it, fullUrl) }) {
+                            outImageUrls.add(fullUrl)
                         }
+                        img.remove()
+                    } else if (fullUrl != null && isSmileyOrIcon(fullUrl)) {
+                        img.attr("src", fullUrl)
+                    } else {
+                        img.remove()
                     }
                 }
-                matcher.appendReplacement(sb, "")
+                return doc.body().html()
+            } catch (e: Exception) {
+                return html ?: ""
             }
-            matcher.appendTail(sb)
-            return sb.toString()
         }
 
         /**
@@ -960,17 +1029,17 @@ class ReplyAdapter(rawReplies: List<ReplyItem>?) :
         }
 
         /**
-         * 获取评论图片的最大显示宽度（屏幕宽度的80%，最多不超过360dp）
+         * 获取评论图片的最大显示宽度（屏幕宽度的50%，最多不超过180dp）
          */
         private fun getMaxImageWidth(context: Context): Int {
             val screenWidth = Resources.getSystem().displayMetrics.widthPixels
-            val maxDp = 340
+            val maxDp = 180
             val maxPx = TypedValue.applyDimension(
                 TypedValue.COMPLEX_UNIT_DIP, maxDp.toFloat(),
                 context.resources.displayMetrics
             ).toInt()
-            val width78 = (screenWidth * 0.78f).toInt()
-            return Math.min(width78, maxPx)
+            val widthHalf = (screenWidth * 0.52f).toInt()
+            return Math.min(widthHalf, maxPx)
         }
 
         // ==================== 内联图片渲染（表情等） ====================

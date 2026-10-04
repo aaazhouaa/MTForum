@@ -627,18 +627,11 @@ class ThreadDetailActivity : AppCompatActivity() {
             val footerSplit = splitEditFooter(converted)
             val cleaned = extractAndSeparateImages(footerSplit[0], imageList)
             val imageUrls = postDetail.imageUrls ?: ArrayList<String>().also { postDetail.imageUrls = it }
-            val passedImages = intent.getStringArrayListExtra("extra_image_urls")
-            if (passedImages != null && passedImages.isNotEmpty()) {
-                for (pImg in passedImages) {
-                    if (!imageUrls.contains(pImg)) {
-                        imageUrls.add(pImg)
-                    }
-                }
-            }
             val missingImages = ArrayList<String>()
             if (imageUrls.isNotEmpty()) {
                 for (str in imageUrls) {
-                    if (!imageList.contains(str)) {
+                    val alreadyInContent = imageList.any { isSameImage(it, str) }
+                    if (!alreadyInContent && missingImages.none { isSameImage(it, str) }) {
                         imageList.add(str)
                         missingImages.add(str)
                     }
@@ -2481,6 +2474,38 @@ class ThreadDetailActivity : AppCompatActivity() {
         return if (m.find()) m.group(1) ?: "" else ""
     }
 
+    /**
+     * 提取图片 URL 的核心规范化指纹，用于识别原图与缩略图、不同协议或不同参数是否指向同一张图片
+     */
+    private fun getImageCanonicalKey(url: String?): String {
+        if (url.isNullOrBlank()) return ""
+        val clean = sanitizeImageUrl(url).lowercase(Locale.ROOT)
+        val aid = extractAidFromUrl(clean)
+        if (aid.isNotEmpty()) {
+            return "aid:$aid"
+        }
+        val noQuery = clean.substringBefore("?").substringBefore("#")
+        val stripped = noQuery
+            .replace(".thumb.jpg", "")
+            .replace(".thumb.png", "")
+            .replace(".middle.jpg", "")
+            .replace(".middle.png", "")
+            .replace("_thumb.jpg", ".jpg")
+            .replace("_thumb.png", ".png")
+        val lastSlash = stripped.lastIndexOf('/')
+        return if (lastSlash >= 0) stripped.substring(lastSlash + 1) else stripped
+    }
+
+    private fun isSameImage(url1: String?, url2: String?): Boolean {
+        if (url1.isNullOrBlank() || url2.isNullOrBlank()) return false
+        val clean1 = sanitizeImageUrl(url1)
+        val clean2 = sanitizeImageUrl(url2)
+        if (clean1.equals(clean2, ignoreCase = true)) return true
+        val key1 = getImageCanonicalKey(clean1)
+        val key2 = getImageCanonicalKey(clean2)
+        return key1.isNotEmpty() && key1 == key2
+    }
+
     private fun openImagePreview(url: String?) {
         val cleanTarget = sanitizeImageUrl(url)
         if (TextUtils.isEmpty(cleanTarget)) {
@@ -2492,17 +2517,11 @@ class ThreadDetailActivity : AppCompatActivity() {
         val list = ArrayList<String>()
         for (item in rawList) {
             val s = sanitizeImageUrl(item)
-            if (s.isNotEmpty() && !list.contains(s)) {
+            if (s.isNotEmpty() && list.none { isSameImage(it, s) }) {
                 list.add(s)
             }
         }
-        var targetIndex = list.indexOf(cleanTarget)
-        if (targetIndex < 0) {
-            val targetAid = extractAidFromUrl(cleanTarget)
-            if (targetAid.isNotEmpty()) {
-                targetIndex = list.indexOfFirst { extractAidFromUrl(it) == targetAid }
-            }
-        }
+        var targetIndex = list.indexOfFirst { isSameImage(it, cleanTarget) }
         if (targetIndex < 0) {
             list.add(cleanTarget)
             targetIndex = list.size - 1
@@ -3763,7 +3782,9 @@ class ThreadDetailActivity : AppCompatActivity() {
                                 finalW = maxW
                                 finalH = maxH
                             }
-                            val rounded = RoundedImageDrawable(resource, radius)
+                            val strokeWidth = dpToPx(1).toFloat()
+                            val strokeColor = getColor(R.color.image_placeholder_stroke)
+                            val rounded = RoundedImageDrawable(resource, radius, strokeWidth, strokeColor)
                             rounded.setBounds(0, 0, finalW, finalH)
                             placeholder.setBounds(0, 0, finalW, finalH)
                             placeholder.setReal(rounded, tv)
@@ -4346,6 +4367,7 @@ class ThreadDetailActivity : AppCompatActivity() {
                     }
                     layoutParams = lp
                     setBackgroundResource(R.drawable.bg_post_image_rounded)
+                    foreground = androidx.core.content.ContextCompat.getDrawable(parent.context, R.drawable.bg_post_image_border_only)
                     outlineProvider = ViewOutlineProvider.BACKGROUND
                     clipToOutline = true
                     isClickable = true
