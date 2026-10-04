@@ -132,21 +132,23 @@
         android:visibility="gone">
 
         <TextView
-            android:id="@+id/tv_reply_quote_title"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text=""
-            android:textColor="@color/text_secondary"
-            android:textSize="11sp" />
-
-        <TextView
             android:id="@+id/tv_reply_quote"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="3dp"
             android:textColor="@color/reply_quote_content"
             android:textSize="13sp"
             android:lineSpacingExtra="2dp" />
+
+        <TextView
+            android:id="@+id/tv_reply_quote_title"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="end"
+            android:layout_marginTop="4dp"
+            android:text=""
+            android:textColor="@color/text_secondary"
+            android:textSize="11sp"
+            android:alpha="0.6" />
     </LinearLayout>
 
     <!-- 评论编辑标记（本帖最后由...编辑）：灰色斜体小字，与上方发布时间字号(11sp)完全一致 -->
