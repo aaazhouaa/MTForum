@@ -5,6 +5,8 @@ import android.os.Handler
 import android.os.Looper
 import android.util.Log
 
+import com.solosu.mtforum.network.RateLimiter
+
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
@@ -38,6 +40,12 @@ object AutoReplyScheduler {
     private fun tickOnce() {
         val ctx = appContext ?: return
 
+        // 风控熔断期间不发请求，等冷却结束再试，避免空转触发更多风控
+        if (RateLimiter.circuitRemainingMs() > 0) {
+            AiLog.i("scheduler", "风控冷却中，跳过本轮自动回复")
+            return
+        }
+
         // 未登录 / 未配置模型 时不空转
         if (!AiConfigManager.isAutoReplyEnabled(ctx)) return
         if (!AiConfigManager.isConfigured(ctx)) {
@@ -66,8 +74,12 @@ object AutoReplyScheduler {
         val ctx = appContext ?: return
         var interval = AiConfigManager.getReplyInterval(ctx)
         if (interval < 30) interval = 30
+        var delayMs = interval * 1000L
+        // 熔断冷却未结束时，把下一轮直接推到冷却之后
+        val cool = RateLimiter.circuitRemainingMs()
+        if (cool > delayMs) delayMs = cool
         HANDLER.removeCallbacks(TICK)
-        HANDLER.postDelayed(TICK, interval * 1000L)
+        HANDLER.postDelayed(TICK, delayMs)
     }
 
     /** 启动调度循环。重复调用无副作用。 */

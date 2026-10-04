@@ -99,7 +99,9 @@ class HttpClient private constructor() {
     private fun executeGetWithChallenge(request: Request): String {
         val body = executeBody(request)
         if (!WafChallenge.looksLikeChallenge(body)) return body
-        RateLimiter.reportBlocked("WAF 挑战页")
+        if (RateLimiter.isCircuitHost(request.url.toString())) {
+            RateLimiter.reportBlocked("WAF 挑战页")
+        }
         // 挑战页：求解后重放同一请求
         val url = request.url.toString()
         if (!solveWafChallenge(url, body)) return body
@@ -306,7 +308,9 @@ class HttpClient private constructor() {
             // POST 是写操作，不自动重放（避免重复提交）；但若命中挑战页，
             // 本地求解并存入 Cookie，让后续请求（含本次失败后的重试）能通过。
             if (WafChallenge.looksLikeChallenge(body)) {
-                RateLimiter.reportBlocked("WAF 挑战页(POST)")
+                if (RateLimiter.isCircuitHost(url)) {
+                    RateLimiter.reportBlocked("WAF 挑战页(POST)")
+                }
                 if (solveWafChallenge(url, body) && DEBUG_WAF) {
                     AiLog.e("waf", "POST 命中挑战页，已存 Cookie 但未重放（防重复提交）url=$url")
                 }
@@ -363,7 +367,9 @@ class HttpClient private constructor() {
             val body = executeBody(request)
             // 同 post()：写操作不自动重放，仅求解并留存 Cookie
             if (WafChallenge.looksLikeChallenge(body)) {
-                RateLimiter.reportBlocked("WAF 挑战页(POST)")
+                if (RateLimiter.isCircuitHost(url)) {
+                    RateLimiter.reportBlocked("WAF 挑战页(POST)")
+                }
                 if (solveWafChallenge(url, body) && DEBUG_WAF) {
                     AiLog.e("waf", "POST(带Referer) 命中挑战页，已存 Cookie 但未重放 url=$url")
                 }

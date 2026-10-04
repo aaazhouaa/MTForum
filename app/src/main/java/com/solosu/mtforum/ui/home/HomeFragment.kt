@@ -22,6 +22,7 @@ import com.solosu.mtforum.databinding.FragmentHomeBinding
 import com.solosu.mtforum.model.Thread
 import com.solosu.mtforum.network.ForumParser
 import com.solosu.mtforum.network.HttpClient
+import com.solosu.mtforum.network.RateLimiter
 import com.solosu.mtforum.util.NavigationHelper
 import com.solosu.mtforum.ui.space.UserProfileActivity
 import com.solosu.mtforum.ui.search.SearchActivity
@@ -332,6 +333,11 @@ class HomeFragment : Fragment() {
 
     private fun fetchNetworkPage(page: Int, isRefresh: Boolean) {
         if (isFetchingNetwork) return
+        // 风控冷却期间不发必然失败的请求，静默跳过并复位下拉刷新动画
+        if (RateLimiter.circuitRemainingMs() > 0) {
+            binding?.swipeRefresh?.isRefreshing = false
+            return
+        }
         isFetchingNetwork = true
         if (isRefresh) {
             binding?.swipeRefresh?.isRefreshing = true

@@ -24,6 +24,7 @@ import com.solosu.mtforum.ui.widget.FrostedGlassDrawable
 import com.solosu.mtforum.network.ForumParser
 import com.solosu.mtforum.network.HttpClient
 import com.solosu.mtforum.network.NoticeBadgeManager
+import com.solosu.mtforum.network.RateLimiter
 import com.solosu.mtforum.session.UserSessionManager
 import com.solosu.mtforum.ui.space.FriendListActivity
 
@@ -174,6 +175,8 @@ class NoticeFragment : Fragment() {
 
     private fun loadAllBadgeCounts() {
         lastBadgeLoadAt = System.currentTimeMillis() // build68: 记录本次拉取时刻
+        // 风控冷却期间不发请求，避免 6 类并发空转触发更多风控
+        if (RateLimiter.circuitRemainingMs() > 0) return
         loadCountBySnapshot(HttpClient.BASE_URL + "home.php?mod=space&do=pm&mobile=2", badgeMessages, "pm")
         loadCountBySnapshot(
             HttpClient.BASE_URL + "home.php?mod=follow&do=follower&uid=" + uid + "&mobile=2",

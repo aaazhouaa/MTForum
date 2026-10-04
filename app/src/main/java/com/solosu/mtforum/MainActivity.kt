@@ -32,6 +32,7 @@ import com.solosu.mtforum.databinding.ActivityMainBinding
 import com.solosu.mtforum.network.ForumParser
 import com.solosu.mtforum.network.HttpClient
 import com.solosu.mtforum.network.NoticeBadgeManager
+import com.solosu.mtforum.network.RateLimiter
 import com.solosu.mtforum.ui.MainPagerAdapter
 import com.solosu.mtforum.ui.post.PostActivity
 import com.solosu.mtforum.session.AutoSignInManager
@@ -757,6 +758,13 @@ class MainActivity : AppCompatActivity() {
             scheduleNextBadgeRefresh()
             return
         }
+        // 风控熔断期间不发必然失败的请求，直接延后到冷却结束再拉，避免 6 类并发空转刷屏。
+        val coolRemain = RateLimiter.circuitRemainingMs()
+        if (coolRemain > 0) {
+            badgeRefreshInFlight.set(false)
+            scheduleNextBadgeRefresh(coolRemain)
+            return
+        }
         // 防止上一次网络刷新尚未结束时重复提交任务。
         if (!badgeRefreshInFlight.compareAndSet(false, true)) return
         lastBadgeRefreshAt = System.currentTimeMillis() // build68: 记录本次刷新时刻
@@ -962,9 +970,9 @@ class MainActivity : AppCompatActivity() {
         renderBadge(total)
     }
 
-    private fun scheduleNextBadgeRefresh() {
+    private fun scheduleNextBadgeRefresh(delayMs: Long = BADGE_REFRESH_INTERVAL_MS) {
         mainHandler!!.removeCallbacks(badgeRunnable)
-        mainHandler!!.postDelayed(badgeRunnable, BADGE_REFRESH_INTERVAL_MS)
+        mainHandler!!.postDelayed(badgeRunnable, delayMs)
     }
 
     private val badgeRunnable = Runnable { refreshMessageBadge() }

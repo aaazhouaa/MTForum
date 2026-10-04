@@ -5,9 +5,11 @@ import com.solosu.mtforum.ai.AiLog
 import java.io.IOException
 import java.util.ArrayDeque
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
 
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.Interceptor
 import okhttp3.Response
 
@@ -53,6 +55,10 @@ object RateLimiter {
     @JvmStatic
     var circuitOpenMs: Long = 5 * 60 * 1000L
 
+    /** 连续熔断时的封顶时长（毫秒）。每次重开按 2 倍退避，避免刚恢复又被封的死循环。 */
+    @JvmStatic
+    var maxCircuitOpenMs: Long = 30 * 60 * 1000L
+
     private const val STATS_WINDOW_MS = 5 * 60 * 1000L
 
     private val globalConcurrent = AtomicInteger(0)
@@ -64,6 +70,12 @@ object RateLimiter {
     private val circuitOpenUntil = AtomicLong(0L)
     private val blockLock = Any()
     private val blockedTimes = ArrayDeque<Long>()
+
+    /** 连续熔断次数：用于指数退避，目标 host 健康放行后清零。 */
+    private val consecutiveOpens = AtomicInteger(0)
+
+    /** 半开探测闸门：冷却结束的恢复期只放行一个目标 host 请求试探，其余快速失败。 */
+    private val probeGate = AtomicBoolean(false)
 
     private val statsLock = Any()
     private var windowStartAt = 0L
@@ -78,6 +90,18 @@ object RateLimiter {
             if (prev != null) c = prev
         }
         return c
+    }
+
+    /** 参与熔断统计的站点主域；图片/CDN 等其它 host 只限流、不熔断。 */
+    private val circuitHost: String by lazy {
+        HttpClient.BASE_URL.toHttpUrlOrNull()?.host ?: ""
+    }
+
+    /** 该 URL 是否属于站点主域（即参与熔断的目标）。 */
+    @JvmStatic
+    fun isCircuitHost(url: String): Boolean {
+        val host = url.toHttpUrlOrNull()?.host ?: return false
+        return host == circuitHost
     }
 
     /** 熔断剩余毫秒，未熔断返回 0。 */
@@ -95,26 +119,44 @@ object RateLimiter {
     @JvmStatic
     fun reportBlocked(reason: String) {
         var openMs = 0L
+        var opens = 0
         synchronized(blockLock) {
             val now = System.currentTimeMillis()
             blockedTimes.addLast(now)
             while (blockedTimes.isNotEmpty() && now - blockedTimes.first() > blockWindowMs) {
                 blockedTimes.removeFirst()
             }
-            if (blockedTimes.size >= circuitThreshold) {
+            // 恢复期的探测请求只要再被拦一次就直接重开：刚放行就被拒，说明 IP 仍未解封，
+            // 没必要再等凑满阈值（否则会退化成逐个慢速试探）。
+            val stillBlocked = consecutiveOpens.get() > 0
+            if (blockedTimes.size >= circuitThreshold || stillBlocked) {
                 blockedTimes.clear()
-                openMs = circuitOpenMs
-                circuitOpenUntil.set(now + circuitOpenMs)
+                opens = consecutiveOpens.incrementAndGet()
+                var window = circuitOpenMs
+                var step = 1
+                while (step < opens && window < maxCircuitOpenMs) {
+                    window = window shl 1
+                    step++
+                }
+                if (window > maxCircuitOpenMs) window = maxCircuitOpenMs
+                circuitOpenUntil.set(now + window)
+                openMs = window
             }
         }
         if (openMs > 0) {
             AiLog.e(
                 "ratelimit",
-                "拦截信号频繁（" + reason + "），熔断 " + (openMs / 1000) + " 秒内暂停全部出站请求"
+                "拦截信号频繁（" + reason + "），熔断 " + (openMs / 1000) + " 秒内暂停站点出站请求（第 " +
+                        opens + " 次）"
             )
         } else {
             AiLog.e("ratelimit", "疑似被拦截（" + reason + "）")
         }
+    }
+
+    /** 目标 host 健康放行：退避计数复位。 */
+    private fun onHealthyResponse() {
+        if (consecutiveOpens.get() != 0) consecutiveOpens.set(0)
     }
 
     private fun throttle() {
@@ -169,6 +211,7 @@ object RateLimiter {
     val interceptor: Interceptor = Interceptor { chain ->
         val request = chain.request()
         val host = request.url.host
+        val isTargetHost = host == circuitHost
 
         if (observeOnly) {
             val response = chain.proceed(request)
@@ -176,9 +219,20 @@ object RateLimiter {
             return@Interceptor response
         }
 
-        val remain = circuitRemainingMs()
-        if (remain > 0) {
-            throw IOException("站点风控熔断中，暂停请求 " + (remain / 1000 + 1) + " 秒")
+        // 熔断只拦站点主域；图片/CDN 等其它 host 照常放行，避免熔断期间页面整片空白
+        var probing = false
+        if (isTargetHost) {
+            val remain = circuitRemainingMs()
+            if (remain > 0) {
+                throw IOException("站点风控冷却中，约 " + (remain / 1000 + 1) + " 秒后自动恢复")
+            }
+            // 冷却结束仍处于退避状态时，只放行一个探测请求，避免并发洪峰立刻再触发风控
+            if (consecutiveOpens.get() > 0) {
+                if (!probeGate.compareAndSet(false, true)) {
+                    throw IOException("风控冷却中，正在试探恢复站点连接")
+                }
+                probing = true
+            }
         }
 
         acquire(globalConcurrent, maxConcurrent)
@@ -191,11 +245,16 @@ object RateLimiter {
             throttle()
             val response: Response = chain.proceed(request)
             recordStats(response.code)
-            if (response.code == 403 || response.code == 429 || response.code == 503) {
-                reportBlocked("HTTP " + response.code)
+            if (isTargetHost) {
+                if (response.code == 403 || response.code == 429 || response.code == 503) {
+                    reportBlocked("HTTP " + response.code)
+                } else {
+                    onHealthyResponse()
+                }
             }
             return@Interceptor response
         } finally {
+            if (probing) probeGate.set(false)
             if (hostAcquired && hostCounter != null) hostCounter.decrementAndGet()
             globalConcurrent.decrementAndGet()
         }
