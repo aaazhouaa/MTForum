@@ -54,11 +54,13 @@ class HomeFragment : Fragment() {
 
         httpClient = HttpClient.getInstance()
 
-        // 搜索图标点击 -> 打开搜索页面
-        binding!!.ivSearch.setOnClickListener {
+        // 搜索条 / 搜索图标点击 -> 打开搜索页面
+        val openSearch = View.OnClickListener {
             val intent = Intent(requireContext(), SearchActivity::class.java)
             startActivity(intent)
         }
+        binding!!.ivSearch.setOnClickListener(openSearch)
+        binding!!.layoutSearchBar.setOnClickListener(openSearch)
         // 深浅色主题手动切换 (太阳/月亮)
         updateThemeToggleIcon()
         binding!!.ivThemeToggle.setOnClickListener {

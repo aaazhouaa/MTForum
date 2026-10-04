@@ -29,6 +29,7 @@ import android.text.style.ReplacementSpan
 import android.text.style.URLSpan
 import android.util.TypedValue
 import android.view.Gravity
+import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.ViewOutlineProvider
@@ -100,6 +101,7 @@ import com.solosu.mtforum.ui.widget.DialogHelper
 import com.solosu.mtforum.ui.widget.FrostedGlassHelper
 import com.solosu.mtforum.util.BBCodeUtil
 import com.solosu.mtforum.util.NavigationHelper
+import com.solosu.mtforum.util.RoundedImageDrawable
 import com.solosu.mtforum.util.UrlDrawable
 
 import org.jsoup.Jsoup
@@ -285,19 +287,64 @@ class ThreadDetailActivity : AppCompatActivity() {
         headerBinding = hb
 
         hb.btnViewHidden.setOnClickListener { viewHiddenContent() }
+        hb.layoutHiddenContent.setOnClickListener { viewHiddenContent() }
+        // 动态适配隐藏内容卡片的主题色（锁图标、圆底、去回复按钮）
+        applyHiddenCardTheme(hb)
+
         // 打赏/踢帖已移到顶栏图标（见 onCreate 的 binding.btnReward / binding.btnKick）
         hb.btnCollapseImages.setOnClickListener { toggleImageGallery() }
-        hb.btnOnlyOp.setOnClickListener {
+
+        // 图二分段药丸切换：楼主 / 正序 / 倒序
+        hb.btnSegmentOp.setOnClickListener {
             onlyOpReplies = !onlyOpReplies
             updateReplyFilterAndOrder()
         }
-        hb.btnReplyOrder.setOnClickListener {
-            repliesDescending = !repliesDescending
-            refreshPostDetail()
+        hb.btnSegmentAsc.setOnClickListener {
+            if (repliesDescending) {
+                repliesDescending = false
+                refreshPostDetail()
+            }
+        }
+        hb.btnSegmentDesc.setOnClickListener {
+            if (!repliesDescending) {
+                repliesDescending = true
+                refreshPostDetail()
+            }
         }
 
         // 正文由 bindData 负责渲染（含巨额 HTML），这里只保证绑定后的视觉状态正确
         applyHeaderStaticState()
+    }
+
+    private fun applyHiddenCardTheme(hb: ItemThreadDetailHeaderBinding) {
+        val themeColor = com.solosu.mtforum.util.ThemeManager.getThemeColor(this)
+        // 1. 去回复按钮：动态圆角渐变/纯色主题背景
+        val btnBg = GradientDrawable().apply {
+            cornerRadius = dpToPx(16).toFloat()
+            setColor(themeColor)
+        }
+        hb.btnViewHidden.background = btnBg
+        // 2. 锁头图标底衬：约 15% 透明度主题色圆底
+        val circleBg = GradientDrawable().apply {
+            shape = GradientDrawable.OVAL
+            val alphaColor = androidx.core.graphics.ColorUtils.setAlphaComponent(themeColor, 0x26)
+            setColor(alphaColor)
+        }
+        hb.layoutLockCircle.background = circleBg
+        // 3. 锁头图标：主题色着色
+        hb.ivHiddenLock.setColorFilter(themeColor)
+    }
+
+    private fun updateSegmentPill(tv: TextView, isSelected: Boolean) {
+        if (isSelected) {
+            tv.setBackgroundResource(R.drawable.bg_segment_pill_selected)
+            tv.setTextColor(getColor(R.color.text_primary))
+            tv.setTypeface(null, Typeface.BOLD)
+        } else {
+            tv.setBackgroundColor(android.graphics.Color.TRANSPARENT)
+            tv.setTextColor(getColor(R.color.text_secondary))
+            tv.setTypeface(null, Typeface.NORMAL)
+        }
     }
 
     /**
@@ -698,8 +745,15 @@ class ThreadDetailActivity : AppCompatActivity() {
                 displayHtml = placeholders[0]
                 hiddenNotice = placeholders[1]
                 headerBinding!!.layoutHiddenContent.visibility = View.VISIBLE
-                headerBinding!!.tvHiddenContentHint.visibility = View.VISIBLE
-                headerBinding!!.btnViewHidden.visibility = View.VISIBLE
+                headerBinding!!.layoutHiddenLockedRow.visibility = View.VISIBLE
+                if (httpClient.isLoggedIn()) {
+                    headerBinding!!.tvHiddenContentHint.text = "回复本帖后自动刷新解锁"
+                    headerBinding!!.btnViewHidden.text = "去回复"
+                } else {
+                    headerBinding!!.tvHiddenContentHint.text = "请先登录并回复查看"
+                    headerBinding!!.btnViewHidden.text = "去登录"
+                }
+                applyHiddenCardTheme(headerBinding!!)
                 headerBinding!!.tvHiddenContent.visibility = View.GONE
                 maybeAutoUnlock()
             } else {
@@ -770,9 +824,7 @@ class ThreadDetailActivity : AppCompatActivity() {
             val hb = headerBinding ?: return
             if (count > 0) {
                 hb.tvFoldedBadge.visibility = View.VISIBLE
-                val prefix = if (isExpanded) "▼" else "▶"
-                val stateText = if (isExpanded) "已展开" else "已折叠"
-                hb.tvFoldedBadge.text = "$prefix $stateText${count}条"
+                hb.tvFoldedBadge.text = if (isExpanded) "收起已折叠" else "已折叠 $count 条"
             } else {
                 hb.tvFoldedBadge.visibility = View.GONE
             }
@@ -852,12 +904,11 @@ class ThreadDetailActivity : AppCompatActivity() {
         } else {
             replyAdapter!!.setFooterState(ReplyAdapter.FooterState.END)
         }
-        val themeColor = com.solosu.mtforum.util.ThemeManager.getThemeColor(this)
+        // 图二分段药丸样式刷新：白底卡片选中，移除彩色文字
         headerBinding?.let {
-            it.btnOnlyOp.setText(if (onlyOpReplies) R.string.reply_all_users else R.string.reply_only_op)
-            it.btnOnlyOp.setTextColor(if (onlyOpReplies) themeColor else getColor(R.color.text_secondary))
-            it.btnReplyOrder.setText(if (repliesDescending) R.string.reply_order_desc else R.string.reply_order_asc)
-            it.btnReplyOrder.setTextColor(if (repliesDescending) themeColor else getColor(R.color.text_secondary))
+            updateSegmentPill(it.btnSegmentOp, onlyOpReplies)
+            updateSegmentPill(it.btnSegmentAsc, !repliesDescending)
+            updateSegmentPill(it.btnSegmentDesc, repliesDescending)
         }
         if (result.isEmpty()) {
             // 评论为空时 RecyclerView 仍要显示：正文头是它的第 0 项。
@@ -1334,7 +1385,7 @@ class ThreadDetailActivity : AppCompatActivity() {
 
     private fun updateFavoriteIcon() {
         val button = binding.btnFavorite
-        val res = if (isFavorited) R.drawable.forum_favorite_on else R.drawable.forum_favorite_off
+        val res = if (isFavorited) R.drawable.ic_favorite_filled else R.drawable.ic_favorite_outline
         button.setImageResource(res)
         if (isFavorited) {
             button.setColorFilter(0xFFF59E0B.toInt())
@@ -2041,13 +2092,13 @@ class ThreadDetailActivity : AppCompatActivity() {
             promptLogin()
             return
         }
-        headerBinding!!.tvHiddenContentHint.visibility = View.GONE
-        headerBinding!!.btnViewHidden.visibility = View.GONE
-        if (!TextUtils.isEmpty(detail.hiddenContentHtml)) {
-            renderHiddenContent(detail.hiddenContentHtml)
-        } else {
-            Toast.makeText(this, R.string.hidden_content_prompt, Toast.LENGTH_SHORT).show()
+        // 已登录情况下若未解锁直接呼出回复面板
+        if (TextUtils.isEmpty(detail.hiddenContentHtml) || AutoReplyEngine.isLockedHidden(detail.hiddenContentHtml)) {
+            showReplyBottomSheet(currentReplyTarget)
+            return
         }
+        headerBinding?.layoutHiddenLockedRow?.visibility = View.GONE
+        renderHiddenContent(detail.hiddenContentHtml)
     }
 
     /**
@@ -2509,21 +2560,53 @@ class ThreadDetailActivity : AppCompatActivity() {
 
     // ==================== 图片与附件 ====================
 
+    private fun sanitizeImageUrl(url: String?): String {
+        if (url.isNullOrBlank()) return ""
+        val unescaped = url.trim()
+            .replace("&amp;", "&")
+            .replace("&#38;", "&")
+            .replace("&quot;", "")
+            .replace("'", "")
+            .replace("\"", "")
+        return normalizeImageUrl(unescaped) ?: unescaped
+    }
+
+    private fun extractAidFromUrl(url: String): String {
+        val m = Pattern.compile("(?i)[?&]aid=([a-zA-Z0-9_-]+)").matcher(url)
+        return if (m.find()) m.group(1) ?: "" else ""
+    }
+
     private fun openImagePreview(url: String?) {
-        if (TextUtils.isEmpty(url)) {
+        val cleanTarget = sanitizeImageUrl(url)
+        if (TextUtils.isEmpty(cleanTarget)) {
             return
         }
         val intent = Intent(this, ImagePreviewActivity::class.java)
-        // 多图: 传整个图组+当前图位置,可左右翻页
-        val list = ArrayList(currentImageList)
-        if (list.isEmpty() || !list.contains(url)) {
-            list.add(url!!)
+        // 多图: 规范化全帖图片列表并去重，确保索引与 URL 精确对齐
+        val rawList = ArrayList(currentImageList)
+        val list = ArrayList<String>()
+        for (item in rawList) {
+            val s = sanitizeImageUrl(item)
+            if (s.isNotEmpty() && !list.contains(s)) {
+                list.add(s)
+            }
+        }
+        var targetIndex = list.indexOf(cleanTarget)
+        if (targetIndex < 0) {
+            val targetAid = extractAidFromUrl(cleanTarget)
+            if (targetAid.isNotEmpty()) {
+                targetIndex = list.indexOfFirst { extractAidFromUrl(it) == targetAid }
+            }
+        }
+        if (targetIndex < 0) {
+            list.add(cleanTarget)
+            targetIndex = list.size - 1
         }
         if (list.size > 1) {
             intent.putStringArrayListExtra("image_urls", ArrayList(list))
-            intent.putExtra("image_index", list.indexOf(url))
+            intent.putExtra("image_index", targetIndex)
         } else {
-            intent.putExtra("image_url", url)
+            intent.putExtra("image_url", cleanTarget)
         }
         try {
             startActivity(intent)
@@ -3708,7 +3791,7 @@ class ThreadDetailActivity : AppCompatActivity() {
     /** 内嵌图片 getter：表情小图固定/正文插图自适应屏幕宽度 + Glide 异步回填 */
     private fun createInlineImageGetter(textView: TextView): Html.ImageGetter {
         return Html.ImageGetter { source ->
-            val imgUrl = normalizeImageUrl(source) ?: source
+            val imgUrl = sanitizeImageUrl(source)
             val tv = textView
             val isSmiley = isSmileyOrIcon(imgUrl)
             if (isSmiley) {
@@ -3731,11 +3814,18 @@ class ThreadDetailActivity : AppCompatActivity() {
                     })
                 placeholder
             } else {
-                val availableWidth = (if (tv.width > 0) tv.width else resources.displayMetrics.widthPixels) - tv.paddingLeft - tv.paddingRight
-                val maxW = maxOf(dpToPx(200), availableWidth)
-                val defaultH = dpToPx(160)
+                // 正文配图：原实现按整屏可用宽度渲染，原图视觉过大；这里收窄到正文宽度的 90%
+                // 且不超过屏幕宽度的 78%，并限制最大高宽比，避免竖长图占满多屏。
+                val textWidth = if (tv.width > 0) tv.width - tv.paddingLeft - tv.paddingRight
+                else resources.displayMetrics.widthPixels
+                val maxW = maxOf(
+                    dpToPx(160),
+                    minOf((textWidth * 0.9f).toInt(), (resources.displayMetrics.widthPixels * 0.78f).toInt())
+                )
+                val maxH = (maxW * 1.25f).toInt()
+                val radius = dpToPx(10).toFloat()
                 val placeholder = UrlDrawable(tv, maxW)
-                placeholder.setBounds(0, 0, maxW, defaultH)
+                placeholder.setBounds(0, 0, maxW, dpToPx(120))
 
                 Glide.with(this)
                     .load(imgUrl)
@@ -3746,8 +3836,8 @@ class ThreadDetailActivity : AppCompatActivity() {
                         ) {
                             val srcW = resource.intrinsicWidth
                             val srcH = resource.intrinsicHeight
-                            val finalW: Int
-                            val finalH: Int
+                            var finalW: Int
+                            var finalH: Int
                             if (srcW > 0 && srcH > 0) {
                                 if (srcW >= maxW) {
                                     finalW = maxW
@@ -3759,13 +3849,19 @@ class ThreadDetailActivity : AppCompatActivity() {
                                     finalW = maxW
                                     finalH = (srcH.toLong() * maxW / srcW).toInt()
                                 }
+                                // 竖长图限高
+                                if (finalH > maxH) {
+                                    finalH = maxH
+                                    finalW = (srcW.toLong() * maxH / srcH).toInt().coerceAtMost(maxW)
+                                }
                             } else {
                                 finalW = maxW
-                                finalH = defaultH
+                                finalH = maxH
                             }
-                            resource.setBounds(0, 0, finalW, finalH)
+                            val rounded = RoundedImageDrawable(resource, radius)
+                            rounded.setBounds(0, 0, finalW, finalH)
                             placeholder.setBounds(0, 0, finalW, finalH)
-                            placeholder.setReal(resource, tv)
+                            placeholder.setReal(rounded, tv)
                         }
 
                         override fun onLoadCleared(ph: Drawable?) {}
@@ -4209,20 +4305,218 @@ class ThreadDetailActivity : AppCompatActivity() {
         }
     }
 
+    private fun groupContinuousImages(html: String): String {
+        if (TextUtils.isEmpty(html)) return ""
+        val imgPattern = Pattern.compile("(?i)<img\\b[^>]*src=[\"']([^\"']+)[\"'][^>]*>")
+        val m = imgPattern.matcher(html)
+        class ImgMatch(val src: String, val start: Int, val end: Int)
+        val matches = ArrayList<ImgMatch>()
+        while (m.find()) {
+            val raw = m.group(1) ?: continue
+            val src = sanitizeImageUrl(raw)
+            if (src.isNotEmpty() && !isSmileyOrIcon(src)) {
+                matches.add(ImgMatch(src, m.start(), m.end()))
+            }
+        }
+        if (matches.size < 2) return html
+
+        fun isContinuous(between: String): Boolean {
+            if (Pattern.compile("(?i)<(?:table|customquote|blockquote|pre|hr|a\\b)").matcher(between).find()) {
+                return false
+            }
+            if (Pattern.compile("(?i)<img\\b").matcher(between).find()) {
+                return false
+            }
+            val stripped = between.replace(Regex("<[^>]+>"), "")
+                .replace("&nbsp;", "")
+                .replace("&#160;", "")
+                .replace("&ensp;", "")
+                .replace("&emsp;", "")
+                .trim()
+            return stripped.isEmpty()
+        }
+
+        val groups = ArrayList<List<ImgMatch>>()
+        var currentGroup = ArrayList<ImgMatch>()
+        currentGroup.add(matches[0])
+
+        for (i in 1 until matches.size) {
+            val prev = currentGroup.last()
+            val curr = matches[i]
+            val between = html.substring(prev.end, curr.start)
+            if (isContinuous(between)) {
+                currentGroup.add(curr)
+            } else {
+                if (currentGroup.size >= 2) {
+                    groups.add(currentGroup)
+                }
+                currentGroup = ArrayList()
+                currentGroup.add(curr)
+            }
+        }
+        if (currentGroup.size >= 2) {
+            groups.add(currentGroup)
+        }
+        if (groups.isEmpty()) return html
+
+        var result = html
+        for (i in groups.indices.reversed()) {
+            val group = groups[i]
+            val urls = group.map { it.src }
+            val joined = urls.joinToString("|")
+            val replacement = "<div class=\"continuous-image-gallery\" data-images=\"$joined\"></div>"
+            val start = group.first().start
+            val end = group.last().end
+            result = result.substring(0, start) + replacement + result.substring(end)
+        }
+        return result
+    }
+
+    private fun parseGalleryUrls(galleryHtml: String): List<String> {
+        val m = Pattern.compile("(?i)data-images=[\"']([^\"']+)[\"']").matcher(galleryHtml)
+        if (m.find()) {
+            val raw = m.group(1) ?: ""
+            return raw.split("|").map { sanitizeImageUrl(it) }.filter { it.isNotBlank() }
+        }
+        return emptyList()
+    }
+
+    private fun createGridImageGallery(imageUrls: List<String>): View {
+        val count = imageUrls.size
+        // 确定网格列数：2张或4张时排成优雅对称的2列，其余（3张、5~9张及以上）排成3列九宫格
+        val spanCount = if (count == 2 || count == 4) 2 else 3
+
+        val displayMetrics = resources.displayMetrics
+        // 正文容器横向可用宽度（屏幕宽减去左右内边距约 32dp）
+        val screenW = displayMetrics.widthPixels
+        val horizontalPadding = dpToPx(32)
+        val gap = dpToPx(6)
+        val availableW = maxOf(dpToPx(240), screenW - horizontalPadding)
+
+        val cellWidth: Int
+        val cellHeight: Int
+        if (spanCount == 2) {
+            // 双列网格：两张并排，单张宽度约为 (可用宽度 - 间距) / 2
+            cellWidth = (availableW - gap) / 2
+            // 高度设计为 4:3 或 1:1，约 130~150dp，视觉极其紧凑舒服
+            cellHeight = (cellWidth * 0.85f).toInt()
+        } else {
+            // 三列网格：标准九宫格，单张正方形
+            cellWidth = (availableW - gap * 2) / 3
+            cellHeight = cellWidth
+        }
+
+        // 最多展示前 9 张（若大于 9 张，第 9 张覆盖 +N 蒙层）
+        val displayList = if (count > 9) imageUrls.take(9) else imageUrls
+        val overflowCount = count - 9
+
+        val rv = RecyclerView(this).apply {
+            val lp = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply {
+                topMargin = dpToPx(8)
+                bottomMargin = dpToPx(10)
+            }
+            layoutParams = lp
+            layoutManager = GridLayoutManager(this@ThreadDetailActivity, spanCount)
+            isNestedScrollingEnabled = false
+            overScrollMode = View.OVER_SCROLL_NEVER
+            setHasFixedSize(true)
+        }
+
+        class GridViewHolder(
+            val container: FrameLayout,
+            val iv: ImageView,
+            val tvMore: TextView
+        ) : RecyclerView.ViewHolder(container)
+
+        val adapter = object : RecyclerView.Adapter<GridViewHolder>() {
+            override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): GridViewHolder {
+                val frame = FrameLayout(parent.context).apply {
+                    val lp = RecyclerView.LayoutParams(cellWidth, cellHeight).apply {
+                        val margin = gap / 2
+                        setMargins(margin, margin, margin, margin)
+                    }
+                    layoutParams = lp
+                    setBackgroundResource(R.drawable.bg_post_image_rounded)
+                    outlineProvider = ViewOutlineProvider.BACKGROUND
+                    clipToOutline = true
+                    isClickable = true
+                    isFocusable = true
+                }
+
+                val iv = ImageView(parent.context).apply {
+                    layoutParams = FrameLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.MATCH_PARENT
+                    )
+                    scaleType = ImageView.ScaleType.CENTER_CROP
+                }
+                frame.addView(iv)
+
+                val tvMore = TextView(parent.context).apply {
+                    layoutParams = FrameLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.MATCH_PARENT
+                    )
+                    gravity = Gravity.CENTER
+                    setBackgroundColor(0x77000000.toInt())
+                    setTextColor(0xFFFFFFFF.toInt())
+                    textSize = 18f
+                    typeface = Typeface.DEFAULT_BOLD
+                    visibility = View.GONE
+                }
+                frame.addView(tvMore)
+
+                return GridViewHolder(frame, iv, tvMore)
+            }
+
+            override fun onBindViewHolder(holder: GridViewHolder, position: Int) {
+                val url = displayList[position]
+                Glide.with(this@ThreadDetailActivity)
+                    .load(url)
+                    .placeholder(ColorDrawable(getColor(R.color.background_secondary)))
+                    .error(ColorDrawable(getColor(R.color.divider)))
+                    .into(holder.iv)
+
+                if (overflowCount > 0 && position == 8) {
+                    holder.tvMore.visibility = View.VISIBLE
+                    holder.tvMore.text = "+$overflowCount"
+                } else {
+                    holder.tvMore.visibility = View.GONE
+                }
+
+                holder.container.setOnClickListener {
+                    openImagePreview(url)
+                }
+            }
+
+            override fun getItemCount(): Int = displayList.size
+        }
+
+        rv.adapter = adapter
+        return rv
+    }
+
     private fun renderContentSections(displayHtml: String, hiddenNotice: String?) {
         val hb = headerBinding ?: return
         val container = hb.llContentContainer
         val cleanedHtml = stripPostRedundantElements(displayHtml)
+        val processedHtml = groupContinuousImages(cleanedHtml)
 
-        if (!cleanedHtml.contains("<table", ignoreCase = true)) {
-            // 无表格：保留原单个 tvContent
+        val hasTable = processedHtml.contains("<table", ignoreCase = true)
+        val hasGallery = processedHtml.contains("continuous-image-gallery", ignoreCase = true)
+
+        if (!hasTable && !hasGallery) {
+            // 无表格且无连续图片组：保留原单个 tvContent
             for (i in container.childCount - 1 downTo 0) {
                 val child = container.getChildAt(i)
                 if (child !== hb.tvContent) container.removeViewAt(i)
             }
             hb.tvContent.visibility = View.VISIBLE
             hb.tvContent.text = safeFromHtml(
-                cleanedHtml,
+                processedHtml,
                 createInlineImageGetter(hb.tvContent),
                 BBCodeUtil.createTagHandler(this)
             )
@@ -4233,7 +4527,7 @@ class ThreadDetailActivity : AppCompatActivity() {
             return
         }
 
-        // 包含表格：分段渲染文本与原生 TableLayout
+        // 包含表格或连续图片组：分段渲染文本、原生 TableLayout 与横向图片画廊
         // 关键：保留 hb.tvContent 在视图树内（仅设为 GONE），绝不从父容器移除，杜绝 ViewBinding 抛出 Missing required view 崩溃
         for (i in container.childCount - 1 downTo 0) {
             val child = container.getChildAt(i)
@@ -4241,8 +4535,8 @@ class ThreadDetailActivity : AppCompatActivity() {
         }
         hb.tvContent.visibility = View.GONE
 
-        val p = Pattern.compile("(?is)(<table\\b.*?</table\\s*>)")
-        val m = p.matcher(cleanedHtml)
+        val p = Pattern.compile("(?is)(<table\\b.*?</table\\s*>|<div\\s+class=[\"']continuous-image-gallery[\"'][^>]*>.*?</div>)")
+        val m = p.matcher(processedHtml)
         var lastIdx = 0
 
         fun addTextChunk(htmlChunk: String) {
@@ -4256,11 +4550,15 @@ class ThreadDetailActivity : AppCompatActivity() {
             tv.textSize = 15f
             tv.setTextColor(getColor(R.color.text_primary))
             tv.setLineSpacing(dpToPx(6).toFloat(), 1.0f)
-            tv.text = safeFromHtml(
+            val spanned = safeFromHtml(
                 trimmed,
                 createInlineImageGetter(tv),
                 BBCodeUtil.createTagHandler(this)
             )
+            if (spanned.toString().trim().isEmpty()) {
+                return
+            }
+            tv.text = spanned
             if (!TextUtils.isEmpty(hiddenNotice)) {
                 applyHiddenNoticeHighlight(tv.text, hiddenNotice)
             }
@@ -4269,19 +4567,27 @@ class ThreadDetailActivity : AppCompatActivity() {
         }
 
         while (m.find()) {
-            val textBefore = cleanedHtml.substring(lastIdx, m.start())
+            val textBefore = processedHtml.substring(lastIdx, m.start())
             addTextChunk(textBefore)
 
-            val tableHtml = m.group(1) ?: ""
-            val tableCard = createTableLayoutView(tableHtml)
-            if (tableCard != null) {
-                container.addView(tableCard)
+            val matchedBlock = m.group(1) ?: ""
+            if (matchedBlock.startsWith("<table", ignoreCase = true)) {
+                val tableCard = createTableLayoutView(matchedBlock)
+                if (tableCard != null) {
+                    container.addView(tableCard)
+                }
+            } else if (matchedBlock.contains("continuous-image-gallery", ignoreCase = true)) {
+                val urls = parseGalleryUrls(matchedBlock)
+                if (urls.isNotEmpty()) {
+                    val galleryCard = createGridImageGallery(urls)
+                    container.addView(galleryCard)
+                }
             }
 
             lastIdx = m.end()
         }
 
-        val textAfter = cleanedHtml.substring(lastIdx)
+        val textAfter = processedHtml.substring(lastIdx)
         addTextChunk(textAfter)
     }
 

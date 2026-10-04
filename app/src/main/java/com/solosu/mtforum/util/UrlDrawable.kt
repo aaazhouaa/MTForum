@@ -2,7 +2,9 @@ package com.solosu.mtforum.util
 
 import android.graphics.Canvas
 import android.graphics.ColorFilter
+import android.graphics.Path
 import android.graphics.PixelFormat
+import android.graphics.RectF
 import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.Drawable
 import android.view.View
@@ -103,4 +105,45 @@ class UrlDrawable(targetView: View, sizePx: Int) : ColorDrawable(0x00000000) {
         val realLocal = real
         return if (realLocal != null) realLocal.getOpacity() else PixelFormat.TRANSPARENT
     }
+}
+
+/**
+ * 把内部 Drawable 裁剪成圆角矩形后再绘制。
+ * Html.ImageGetter 得到的是内联 ImageSpan，无法用 View 背景做圆角，只能在绘制层面裁剪。
+ */
+class RoundedImageDrawable(
+    private val content: Drawable,
+    private val radiusPx: Float
+) : Drawable() {
+
+    private val path = Path()
+    private val rect = RectF()
+
+    override fun draw(canvas: Canvas) {
+        val b = bounds
+        if (b.width() <= 0 || b.height() <= 0) return
+        rect.set(b)
+        path.reset()
+        path.addRoundRect(rect, radiusPx, radiusPx, Path.Direction.CW)
+        val save = canvas.save()
+        canvas.clipPath(path)
+        content.bounds = b
+        content.draw(canvas)
+        canvas.restoreToCount(save)
+    }
+
+    override fun setAlpha(alpha: Int) {
+        content.alpha = alpha
+    }
+
+    override fun setColorFilter(colorFilter: ColorFilter?) {
+        content.colorFilter = colorFilter
+    }
+
+    @Deprecated("Deprecated in Java")
+    override fun getOpacity(): Int = PixelFormat.TRANSLUCENT
+
+    override fun getIntrinsicWidth(): Int = content.intrinsicWidth
+
+    override fun getIntrinsicHeight(): Int = content.intrinsicHeight
 }

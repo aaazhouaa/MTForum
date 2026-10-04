@@ -600,9 +600,10 @@ class ReplyAdapter(rawReplies: List<ReplyItem>?) :
                     )
                     imageView.adjustViewBounds = true
                     imageView.scaleType = ImageView.ScaleType.FIT_CENTER
-                    imageView.setBackgroundColor(itemView.context.getColor(R.color.background_secondary))
+                    imageView.setBackgroundResource(R.drawable.bg_post_image_rounded)
+                    imageView.clipToOutline = true
                     imageView.maxWidth = maxImgWidth
-                    imageView.maxHeight = (maxImgWidth * 1.5f).toInt()
+                    imageView.maxHeight = (maxImgWidth * 1.2f).toInt()
                     imageView.isClickable = true
                     imageView.isFocusable = true
                     setImageClick(itemView.context, imageView, imgUrl)
@@ -945,7 +946,8 @@ class ReplyAdapter(rawReplies: List<ReplyItem>?) :
                 )
                 imageView.adjustViewBounds = true
                 imageView.scaleType = ImageView.ScaleType.FIT_CENTER
-                imageView.setBackgroundColor(context.getColor(R.color.background_secondary))
+                imageView.setBackgroundResource(R.drawable.bg_post_image_rounded)
+                imageView.clipToOutline = true
                 imageView.maxWidth = maxImgWidth
                 imageView.maxHeight = (maxImgWidth * 1.2f).toInt()
                 // ★ 添加点击预览
@@ -966,13 +968,13 @@ class ReplyAdapter(rawReplies: List<ReplyItem>?) :
          */
         private fun getMaxImageWidth(context: Context): Int {
             val screenWidth = Resources.getSystem().displayMetrics.widthPixels
-            val maxDp = 360
+            val maxDp = 340
             val maxPx = TypedValue.applyDimension(
                 TypedValue.COMPLEX_UNIT_DIP, maxDp.toFloat(),
                 context.resources.displayMetrics
             ).toInt()
-            val width80 = (screenWidth * 0.8f).toInt()
-            return Math.min(width80, maxPx)
+            val width78 = (screenWidth * 0.78f).toInt()
+            return Math.min(width78, maxPx)
         }
 
         // ==================== 内联图片渲染（表情等） ====================

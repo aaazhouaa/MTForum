@@ -215,7 +215,7 @@
         </FrameLayout>
     </androidx.cardview.widget.CardView>
     <!-- 正文内容的结束线：只划住图片，不含其后的打赏/好评/赞过行 -->
-    <!-- ========== 隐藏内容区域 ========== -->
+    <!-- ========== 隐藏内容区域（极简现代锁态卡片） ========== -->
     <LinearLayout
         android:id="@+id/layout_hidden_content"
         android:layout_width="match_parent"
@@ -224,32 +224,84 @@
         android:layout_marginStart="16dp"
         android:layout_marginEnd="16dp"
         android:layout_marginTop="12dp"
-        android:background="@drawable/bg_hidden_content_card"
-        android:padding="14dp"
+        android:background="@drawable/bg_hidden_lock_card"
+        android:padding="12dp"
         android:visibility="gone">
-        <TextView
-            android:id="@+id/tv_hidden_content_hint"
+
+        <LinearLayout
+            android:id="@+id/layout_hidden_locked_row"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="@string/hidden_content_prompt"
-            android:textSize="13sp"
-            android:textColor="@color/warning" />
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btn_view_hidden"
-            style="@style/Widget.MaterialComponents.Button.TextButton"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:text="@string/view_hidden_content"
-            android:textColor="?attr/colorPrimary" />
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <!-- 锁图标圆底 -->
+            <FrameLayout
+                android:id="@+id/layout_lock_circle"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:background="@drawable/bg_lock_icon_circle">
+                <ImageView
+                    android:id="@+id/iv_hidden_lock"
+                    android:layout_width="18dp"
+                    android:layout_height="18dp"
+                    android:layout_gravity="center"
+                    android:src="@drawable/ic_lock_outline"
+                    android:contentDescription="隐藏内容锁" />
+            </FrameLayout>
+
+            <!-- 文案区 -->
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical"
+                android:layout_marginStart="12dp"
+                android:layout_marginEnd="8dp">
+
+                <TextView
+                    android:id="@+id/tv_hidden_content_title"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="包含隐藏内容"
+                    android:textSize="13.5sp"
+                    android:textColor="@color/text_primary"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/tv_hidden_content_hint"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="回复本帖后自动刷新解锁"
+                    android:textSize="11.5sp"
+                    android:textColor="@color/text_secondary" />
+            </LinearLayout>
+
+            <!-- 操作胶囊按钮 -->
+            <TextView
+                android:id="@+id/btn_view_hidden"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:background="@drawable/bg_unlock_action_btn"
+                android:paddingStart="12dp"
+                android:paddingEnd="12dp"
+                android:paddingTop="6dp"
+                android:paddingBottom="6dp"
+                android:text="去回复"
+                android:textColor="@color/text_white"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
         <TextView
             android:id="@+id/tv_hidden_content"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
-            android:textSize="15sp"
+            android:textSize="14.5sp"
             android:textColor="@color/text_primary"
-            android:lineSpacingExtra="6dp"
+            android:lineSpacingExtra="5dp"
             android:visibility="gone" />
     </LinearLayout>
     <!-- ========== 评论标题栏 ========== -->
@@ -261,65 +313,96 @@
         android:layout_marginStart="16dp"
         android:layout_marginEnd="16dp"
         android:layout_marginTop="12dp">
+
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="@string/all_replies"
-            android:textSize="16sp"
+            android:textSize="15.5sp"
             android:textColor="@color/text_primary"
             android:textStyle="bold" />
+
         <TextView
             android:id="@+id/tv_reply_count"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginStart="6dp"
+            android:layout_marginStart="4dp"
             android:textSize="13sp"
             android:textColor="@color/text_secondary"
             android:visibility="gone" />
+
         <TextView
             android:id="@+id/tv_folded_badge"
             android:layout_width="wrap_content"
-            android:layout_height="24dp"
+            android:layout_height="22dp"
             android:layout_marginStart="8dp"
             android:background="@drawable/bg_folded_badge"
             android:gravity="center"
-            android:paddingStart="8dp"
-            android:paddingEnd="8dp"
+            android:paddingStart="7dp"
+            android:paddingEnd="7dp"
             android:textSize="11sp"
             android:textColor="@color/text_secondary"
             android:visibility="gone"
             android:clickable="true"
             android:focusable="true" />
+
         <Space
             android:layout_width="0dp"
             android:layout_height="1dp"
             android:layout_weight="1" />
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btn_only_op"
-            style="@style/Widget.MaterialComponents.Button.TextButton"
+
+        <!-- 图二分段药丸选择器：浅灰底轨，包含「楼主」「正序」「倒序」 -->
+        <LinearLayout
+            android:id="@+id/layout_reply_segments"
             android:layout_width="wrap_content"
-            android:layout_height="34dp"
-            android:minWidth="0dp"
-            android:minHeight="0dp"
-            android:paddingStart="6dp"
-            android:paddingEnd="6dp"
-            android:text="@string/reply_only_op"
-            android:textSize="12sp"
-            android:textColor="@color/text_secondary"
-            android:textAllCaps="false" />
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btn_reply_order"
-            style="@style/Widget.MaterialComponents.Button.TextButton"
-            android:layout_width="wrap_content"
-            android:layout_height="34dp"
-            android:minWidth="0dp"
-            android:minHeight="0dp"
-            android:paddingStart="6dp"
-            android:paddingEnd="0dp"
-            android:text="@string/reply_order_desc"
-            android:textSize="12sp"
-            android:textColor="?attr/colorPrimary"
-            android:textAllCaps="false" />
+            android:layout_height="28dp"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:background="@drawable/bg_segment_track"
+            android:padding="2dp">
+
+            <!-- 楼主 -->
+            <TextView
+                android:id="@+id/btn_segment_op"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:gravity="center"
+                android:paddingStart="9dp"
+                android:paddingEnd="9dp"
+                android:text="楼主"
+                android:textSize="12sp"
+                android:textColor="@color/text_secondary"
+                android:clickable="true"
+                android:focusable="true" />
+
+            <!-- 正序 -->
+            <TextView
+                android:id="@+id/btn_segment_asc"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:gravity="center"
+                android:paddingStart="9dp"
+                android:paddingEnd="9dp"
+                android:text="正序"
+                android:textSize="12sp"
+                android:textColor="@color/text_secondary"
+                android:clickable="true"
+                android:focusable="true" />
+
+            <!-- 倒序 -->
+            <TextView
+                android:id="@+id/btn_segment_desc"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:gravity="center"
+                android:paddingStart="9dp"
+                android:paddingEnd="9dp"
+                android:text="倒序"
+                android:textSize="12sp"
+                android:textColor="@color/text_secondary"
+                android:clickable="true"
+                android:focusable="true" />
+        </LinearLayout>
     </LinearLayout>
 
     <!-- 空回复提示（无评论时显示） -->

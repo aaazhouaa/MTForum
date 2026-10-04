@@ -27,21 +27,21 @@
                  先写的靠最右。分享要固定在最右，所以它必须是第一个。 -->
             <ImageButton
                 android:id="@+id/btn_share"
-                android:layout_width="48dp"
+                android:layout_width="40dp"
                 android:layout_height="?attr/actionBarSize"
                 android:layout_gravity="end"
                 android:minWidth="0dp"
-                android:src="@drawable/forum_share"
+                android:src="@drawable/ic_share_outline"
                 android:scaleType="fitCenter"
                 android:background="?attr/selectableItemBackgroundBorderless"
                 android:contentDescription="@string/action_share"
-                app:tint="@color/text_primary"
-                android:padding="12dp" />
+                app:tint="@color/icon_secondary"
+                android:padding="10dp" />
 
-            <!-- 打赏图标（线框镂空带¥符号，大小减1，纯图标无数字） -->
+            <!-- 打赏图标（线框镂空带¥符号，纯图标无数字） -->
             <ImageButton
                 android:id="@+id/btn_reward"
-                android:layout_width="48dp"
+                android:layout_width="40dp"
                 android:layout_height="?attr/actionBarSize"
                 android:layout_gravity="end"
                 android:minWidth="0dp"
@@ -49,12 +49,12 @@
                 android:scaleType="fitCenter"
                 android:background="?attr/selectableItemBackgroundBorderless"
                 android:contentDescription="@string/reward_title"
-                app:tint="@color/text_primary"
-                android:padding="13dp" />
+                app:tint="@color/icon_secondary"
+                android:padding="10dp" />
 
             <ImageButton
                 android:id="@+id/btn_kick"
-                android:layout_width="48dp"
+                android:layout_width="40dp"
                 android:layout_height="?attr/actionBarSize"
                 android:layout_gravity="end"
                 android:minWidth="0dp"
@@ -62,8 +62,8 @@
                 android:scaleType="fitCenter"
                 android:background="?attr/selectableItemBackgroundBorderless"
                 android:contentDescription="@string/kick_title"
-                app:tint="@color/text_primary"
-                android:padding="12dp" />
+                app:tint="@color/icon_secondary"
+                android:padding="10dp" />
         </com.google.android.material.appbar.MaterialToolbar>
 
         <ProgressBar
@@ -157,10 +157,10 @@
 
                 <ImageButton
                     android:id="@+id/btn_comments"
-                    android:layout_width="22dp"
-                    android:layout_height="22dp"
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
                     android:minWidth="0dp"
-                    android:src="@drawable/forum_comment"
+                    android:src="@drawable/ic_comment_outline"
                     android:scaleType="fitCenter"
                     android:background="@android:color/transparent"
                     android:contentDescription="查看评论"
@@ -192,10 +192,10 @@
 
                 <ImageButton
                     android:id="@+id/btn_like"
-                    android:layout_width="22dp"
-                    android:layout_height="22dp"
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
                     android:minWidth="0dp"
-                    android:src="@drawable/forum_like_off"
+                    android:src="@drawable/ic_like_outline"
                     android:scaleType="fitCenter"
                     android:background="@android:color/transparent"
                     android:contentDescription="@string/action_like" />
@@ -226,10 +226,10 @@
 
                 <ImageButton
                     android:id="@+id/btn_favorite"
-                    android:layout_width="22dp"
-                    android:layout_height="22dp"
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
                     android:minWidth="0dp"
-                    android:src="@drawable/forum_favorite_off"
+                    android:src="@drawable/ic_favorite_outline"
                     android:scaleType="fitCenter"
                     android:background="@android:color/transparent"
                     android:contentDescription="@string/action_favorite" />
@@ -260,14 +260,14 @@
 
                 <ImageButton
                     android:id="@+id/btn_pick_image_inline"
-                    android:layout_width="22dp"
-                    android:layout_height="22dp"
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
                     android:minWidth="0dp"
-                    android:src="@drawable/ic_image"
+                    android:src="@drawable/ic_gallery_outline"
                     android:scaleType="fitCenter"
                     android:background="@android:color/transparent"
                     android:contentDescription="选择图片"
-                    app:tint="@color/text_secondary" />
+                    app:tint="@color/icon_secondary" />
             </LinearLayout>
 
             <!-- 发送按钮(暂时注释)

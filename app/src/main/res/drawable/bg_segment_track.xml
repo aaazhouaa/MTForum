@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 现代极简折叠微徽标背景：柔和中性浅灰圆角，无粗糙描边 -->
+<!-- 图二分段药丸外层轨道背景：浅灰圆角底框 -->
 <shape xmlns:android="http://schemas.android.com/apk/res/android"
     android:shape="rectangle">
-    <corners android:radius="11dp" />
     <solid android:color="@color/background_secondary" />
+    <corners android:radius="14dp" />
 </shape>
