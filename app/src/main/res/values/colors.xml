@@ -80,9 +80,8 @@
     <color name="gold">#F59E0B</color>
     <color name="gold_deep">#D97706</color>
 
-    <!-- AI 科技青 (Teal: 极简通透未来感) -->
+    <!-- 科技青 (Teal: 极简通透未来感) -->
     <color name="accent_ai">#0D9488</color>
-    <color name="accent_ai_fill">#140D9488</color>
 
     <!-- 置顶帖胶囊 (现代中性质感胶囊，搭配动态主题色文字) -->
     <color name="sticky_card_bg">#F1F5F9</color>

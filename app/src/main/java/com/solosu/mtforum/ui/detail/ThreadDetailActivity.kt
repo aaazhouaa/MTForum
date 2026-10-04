@@ -79,9 +79,6 @@ import com.google.android.material.shape.ShapeAppearanceModel
 import com.google.android.material.textfield.TextInputEditText
 
 import com.solosu.mtforum.R
-import com.solosu.mtforum.ai.AiConfigManager
-import com.solosu.mtforum.ai.AiLog
-import com.solosu.mtforum.ai.AutoReplyEngine
 import com.solosu.mtforum.databinding.ItemThreadDetailHeaderBinding
 import com.solosu.mtforum.databinding.ThreadDetailActivityBinding
 import com.solosu.mtforum.model.PostDetail
@@ -164,13 +161,6 @@ class ThreadDetailActivity : AppCompatActivity() {
     private val imageUploadPendingQueue: MutableList<Uri> = ArrayList()
     private val pendingImageUris: MutableList<Uri> = ArrayList()
     private val uploadedAidMap: MutableMap<Uri, String> = HashMap()
-
-    /* build61: 待解锁页面快照(加载线程写,渲染后读一次即清) */
-    private var pendingUnlockHtml: String? = null
-
-    /** 已自动解锁过的 tid，避免同一页面反复触发 */
-    private val autoUnlockTried: MutableSet<String> = HashSet()
-    private var autoUnlocking = false
 
     /** 当前帖全部图片(正文+附件+隐藏区,按 bindData 收集顺序) */
     private var currentImageList: MutableList<String> = ArrayList()
@@ -493,16 +483,12 @@ class ThreadDetailActivity : AppCompatActivity() {
                 val detail = ForumParser.parseThreadDetail(html)
                 fetchRepliesUpTo(detail, 20)
                 refreshServerActionState(detail)
-                // build61: 进帖触发解锁——只记录页面,渲染后在后台线程执行(不阻塞首屏)
-                pendingUnlockHtml = html
                 if (!TextUtils.isEmpty(detail.authorUid)) {
                     detail.isFollowed = FollowStateManager.resolve(this, detail.authorUid, detail.isFollowed)
                 }
                 runOnUiThread {
                     if (isFinishing || isDestroyed) return@runOnUiThread
                     bindData(detail, true)
-                    // build61: 渲染完成后,后台线程执行解锁检测→回帖→成功再刷新
-                    runUnlockInBackground(detail)
                 }
             } catch (e: Exception) {
                 runOnUiThread {
@@ -514,30 +500,6 @@ class ThreadDetailActivity : AppCompatActivity() {
                 }
             }
         }.start()
-    }
-
-    /** build61: 渲染后异步解锁——16 秒节流在后台线程里等,不卡首屏 */
-    private fun runUnlockInBackground(detail: PostDetail?) {
-        if (detail == null || !detail.hasHiddenContent) return
-        // 进帖自动解锁开关：此前只有 maybeAutoUnlock 检查它，而真正干活的这条链路不检查，
-        // 导致用户在设置里关掉开关后，进帖依旧会自动回帖解锁。
-        if (!AiConfigManager.isUnlockOnView(this)) {
-            AiLog.i("auto-unlock", "跳过：进帖自动解锁开关关闭")
-            return
-        }
-        val pageHtml = pendingUnlockHtml
-        pendingUnlockHtml = null
-        if (TextUtils.isEmpty(pageHtml)) return
-        java.lang.Thread({
-            val ok = AutoReplyEngine.tryUnlockOnOpen(this, detail, pageHtml)
-            if (ok) {
-                runOnUiThread {
-                    if (isFinishing || isDestroyed) return@runOnUiThread
-                    Toast.makeText(this, "已自动回帖解锁，正在刷新…", Toast.LENGTH_SHORT).show()
-                    refreshPostDetail()
-                }
-            }
-        }, "unlock-on-open").start()
     }
 
     private fun getReplyOrderUrl(): String {
@@ -560,8 +522,6 @@ class ThreadDetailActivity : AppCompatActivity() {
                 val detail = ForumParser.parseThreadDetail(html)
                 fetchRepliesUpTo(detail, 20)
                 refreshServerActionState(detail)
-                // build61: 下拉刷新链同样只记录页面,渲染后异步解锁(同加载链)
-                pendingUnlockHtml = html
                 if (!TextUtils.isEmpty(detail.authorUid)) {
                     detail.isFollowed = FollowStateManager.resolve(this, detail.authorUid, detail.isFollowed)
                 }
@@ -569,8 +529,6 @@ class ThreadDetailActivity : AppCompatActivity() {
                     if (isFinishing || isDestroyed) return@runOnUiThread
                     binding.swipeRefresh.isRefreshing = false
                     applyServerActionState(detail)
-                    // build61: 渲染完成后,后台线程执行解锁检测(同加载链)
-                    runUnlockInBackground(detail)
                     likeCount = maxOf(0, detail.likeCount)
                     updateLikeIcon()
                     updateFavoriteIcon()
@@ -706,7 +664,7 @@ class ThreadDetailActivity : AppCompatActivity() {
 
             val unlocked = postDetail.hasHiddenContent && httpClient.isLoggedIn()
                     && !TextUtils.isEmpty(postDetail.hiddenContentHtml)
-                    && !AutoReplyEngine.isLockedHidden(postDetail.hiddenContentHtml)
+                    && !isHiddenContentLocked(postDetail.hiddenContentHtml)
 
             val displayHtml: String
             if (unlocked) {
@@ -755,7 +713,6 @@ class ThreadDetailActivity : AppCompatActivity() {
                 }
                 applyHiddenCardTheme(headerBinding!!)
                 headerBinding!!.tvHiddenContent.visibility = View.GONE
-                maybeAutoUnlock()
             } else {
                 displayHtml = fullHtml
                 headerBinding!!.layoutHiddenContent.visibility = View.GONE
@@ -2093,7 +2050,7 @@ class ThreadDetailActivity : AppCompatActivity() {
             return
         }
         // 已登录情况下若未解锁直接呼出回复面板
-        if (TextUtils.isEmpty(detail.hiddenContentHtml) || AutoReplyEngine.isLockedHidden(detail.hiddenContentHtml)) {
+        if (TextUtils.isEmpty(detail.hiddenContentHtml) || isHiddenContentLocked(detail.hiddenContentHtml)) {
             showReplyBottomSheet(currentReplyTarget)
             return
         }
@@ -2101,66 +2058,14 @@ class ThreadDetailActivity : AppCompatActivity() {
         renderHiddenContent(detail.hiddenContentHtml)
     }
 
-    /**
-     * 进入帖子发现是「回复可见」时，后台自动回复一次以解锁，成功后刷新隐藏内容区。
-     * 受 AiConfigManager.isUnlockOnView 开关控制，且同一帖子只尝试一次。
-     */
-    private fun maybeAutoUnlock() {
-        if (postDetail == null) {
-            AiLog.i("auto-unlock", "跳过：详情未就绪")
-            return
-        }
-        val tid = this.tid
-        if (!AiConfigManager.isUnlockOnView(this)) {
-            AiLog.i("auto-unlock", "跳过：进帖自动解锁开关关闭 tid=$tid")
-            return
-        }
-        if (TextUtils.isEmpty(tid)) {
-            AiLog.i("auto-unlock", "跳过：tid 为空")
-            return
-        }
-        if (autoUnlocking) {
-            AiLog.i("auto-unlock", "跳过：本轮正在解锁中 tid=$tid")
-            return
-        }
-        if (autoUnlockTried.contains(tid)) {
-            AiLog.i("auto-unlock", "跳过：本页已尝试过 tid=$tid")
-            return
-        }
-        if (!httpClient.isLoggedIn()) {
-            httpClient.syncFromCookieManager()
-            if (!httpClient.isLoggedIn()) {
-                AiLog.i("auto-unlock", "跳过：未登录 tid=$tid")
-                return
-            }
-        }
-        // 注意：进帖自动解锁是用户明确开启的动作，不能再被「演练模式」拦掉，
-        // 否则会出现「开关明明开着、却一直不解锁」的错觉。
-        if (AiConfigManager.isDryRun(this)) {
-            AiLog.i("auto-unlock", "提示：演练模式开着，但进帖解锁不受它影响，继续执行 tid=$tid")
-        }
-        autoUnlocking = true
-        autoUnlockTried.add(tid!!)
-        AiLog.i("auto-unlock", "→ 进入帖子发现隐藏内容，尝试自动回复解锁 tid=$tid")
-
-        java.lang.Thread({
-            var ok = false
-            try {
-                ok = AutoReplyEngine.unlockSingleThread(this, tid)
-            } catch (e: Exception) {
-                android.util.Log.w("ThreadDetail", "auto unlock failed", e)
-                AiLog.e("auto-unlock", "解锁异常 tid=$tid $e")
-            }
-            val success = ok
-            runOnUiThread {
-                autoUnlocking = false
-                AiLog.i("auto-unlock", "本轮结束 tid=$tid 成功=$success")
-                if (success) {
-                    Toast.makeText(this, "已自动回复并解锁隐藏内容", Toast.LENGTH_SHORT).show()
-                    refreshPostDetail()
-                }
-            }
-        }, "auto-unlock").start()
+    /** 隐藏内容是否仍被「回复可见」门控锁住（空内容视为锁定） */
+    private fun isHiddenContentLocked(hiddenHtml: String?): Boolean {
+        if (TextUtils.isEmpty(hiddenHtml)) return true
+        val t = hiddenHtml!!.replace(Regex("<[^>]+>"), " ")
+        return t.contains("如果您要查看") || t.contains("隐藏内容请")
+                || t.contains("查看本帖隐藏内容请")
+                || t.contains("请回复")
+                || t.contains("回复可见") || t.contains("需要回复")
     }
 
     /**

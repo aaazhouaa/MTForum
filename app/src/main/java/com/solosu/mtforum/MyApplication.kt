@@ -2,8 +2,7 @@ package com.solosu.mtforum
 
 import android.app.Application
 
-import com.solosu.mtforum.ai.AiLog
-import com.solosu.mtforum.ai.AutoReplyScheduler
+import com.solosu.mtforum.util.AiLog
 import com.solosu.mtforum.network.HttpClient
 import com.solosu.mtforum.util.CrashHandler
 
@@ -44,15 +43,10 @@ class MyApplication : Application() {
 
         // 运行日志落盘，App 被杀后仍可回看
         AiLog.attach(this)
-        // 一次性迁移：v1.2 起关闭旧的「演练模式」默认值，避免自动回复一直只生成不发送
-        com.solosu.mtforum.ai.AiConfigManager.migrateDefaults(this)
-        // 启动标记：同时验证日志已开始镜像到公共 Download
-        AiLog.i("app", "应用已启动，运行日志开始记录（含进帖自动解锁）")
+        // 启动标记：记录本次启动
+        AiLog.i("app", "应用已启动，运行日志开始记录")
 
         // 初始化全局崩溃日志收集
         CrashHandler.getInstance().init(this)
-
-        // 启动自动回复调度（开关未打开时调度器会空转，不会发请求）
-        AutoReplyScheduler.start(this)
     }
 }

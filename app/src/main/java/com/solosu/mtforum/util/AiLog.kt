@@ -1,4 +1,4 @@
-package com.solosu.mtforum.ai
+package com.solosu.mtforum.util
 
 import android.content.ContentResolver
 import android.content.ContentUris
@@ -24,7 +24,7 @@ import java.util.concurrent.Executors
 
 /**
  * 内存运行日志。
- * 自动回复 / 签到 / AI 调用的结果都往这里塞一份，侧边栏「运行日志」里查看。
+ * 网络请求（WAF / 限流）、签到等结果都往这里塞一份，侧边栏「运行日志」里查看。
  * 同时把日志追加写到外部文件，App 被杀后仍可回看，便于排查静默失败。
  */
 object AiLog {
@@ -138,7 +138,7 @@ object AiLog {
 
     /**
      * 是否把运行日志镜像到 /sdcard/Android/media/<pkg>/。
-     * 默认关闭：该目录对其它应用可读，而日志含 AI 请求/响应全文。
+     * 默认关闭：该目录对其它应用可读，而日志含请求/响应细节。
      */
     private const val MEDIA_MIRROR_ENABLED = false
 

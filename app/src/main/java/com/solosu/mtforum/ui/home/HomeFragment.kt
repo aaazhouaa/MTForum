@@ -26,7 +26,6 @@ import com.solosu.mtforum.network.RateLimiter
 import com.solosu.mtforum.util.NavigationHelper
 import com.solosu.mtforum.ui.space.UserProfileActivity
 import com.solosu.mtforum.ui.search.SearchActivity
-import com.solosu.mtforum.ai.AiChatActivity
 import com.solosu.mtforum.ui.widget.FrostedGlassDrawable
 import com.solosu.mtforum.ui.widget.NavBarAutoHideHelper
 
@@ -189,7 +188,7 @@ class HomeFragment : Fragment() {
                 if (list.isEmpty()) return@Thread
 
                 val topThreads = java.util.ArrayList(list)
-                requireActivity().runOnUiThread {
+                activity?.runOnUiThread {
                     if (!isAdded() || binding == null || threadAdapter == null) return@runOnUiThread
 
                     val density = requireContext().resources.displayMetrics.density
@@ -361,7 +360,7 @@ class HomeFragment : Fragment() {
                         }
                     }
                 }
-                requireActivity().runOnUiThread {
+                activity?.runOnUiThread {
                     if (!isAdded) return@runOnUiThread
                     if (threads != null && !threads.isEmpty()) {
                         // 只要服务器返回了帖子就继续允许翻页加载下一页，仅当返回空列表时判定无更多
@@ -390,7 +389,7 @@ class HomeFragment : Fragment() {
                 }
             } catch (e: Exception) {
                 if (!isAdded) return@Thread
-                requireActivity().runOnUiThread {
+                activity?.runOnUiThread {
                     if (!isAdded) return@runOnUiThread
                     isFetchingNetwork = false
                     binding?.swipeRefresh?.isRefreshing = false

@@ -630,48 +630,6 @@
                             android:contentDescription="前往" />
                     </LinearLayout>
 
-                    <View
-                        android:layout_width="match_parent"
-                        android:layout_height="0.5dp"
-                        android:layout_marginStart="66dp"
-                        android:background="@color/divider" />
-
-                    <!-- 设置 -->
-                    <LinearLayout
-                        android:id="@+id/layout_settings"
-                        android:layout_width="match_parent"
-                        android:layout_height="52dp"
-                        android:background="?attr/selectableItemBackground"
-                        android:clickable="true"
-                        android:focusable="true"
-                        android:gravity="center_vertical"
-                        android:orientation="horizontal"
-                        android:paddingHorizontal="16dp">
-                        <ImageView
-                            android:id="@+id/iv_emoji_settings"
-                            android:layout_width="36dp"
-                            android:layout_height="36dp"
-                            android:background="@drawable/menu_icon_bg"
-                            android:padding="8dp"
-                            android:src="@drawable/ic_gear"
-                            app:tint="?attr/colorPrimary"
-                            android:contentDescription="设置"
-                            android:scaleType="fitCenter" />
-                        <TextView
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_marginStart="14dp"
-                            android:layout_weight="1"
-                            android:text="@string/settings"
-                            android:textColor="@color/text_primary"
-                            android:textSize="15sp" />
-                        <ImageView
-                            android:layout_width="16dp"
-                            android:layout_height="16dp"
-                            android:src="@drawable/ic_arrow_right"
-                            app:tint="@color/text_hint"
-                            android:contentDescription="前往" />
-                    </LinearLayout>
                 </LinearLayout>
             </androidx.cardview.widget.CardView>
 

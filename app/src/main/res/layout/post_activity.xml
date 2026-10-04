@@ -565,64 +565,6 @@
                 android:layout_height="0dp"
                 android:layout_weight="1" />
 
-            <!-- AI 润色优化胶囊 -->
-            <LinearLayout
-                android:id="@+id/btn_ai_optimize"
-                android:layout_width="wrap_content"
-                android:layout_height="32dp"
-                android:layout_marginEnd="6dp"
-                android:background="@drawable/bg_ai_pill"
-                android:clickable="true"
-                android:focusable="true"
-                android:gravity="center"
-                android:orientation="horizontal">
-
-                <ImageView
-                    android:layout_width="14dp"
-                    android:layout_height="14dp"
-                    android:layout_marginEnd="3dp"
-                    android:src="@drawable/ic_ai_spark"
-                    app:tint="@color/accent_ai"
-                    android:contentDescription="优化" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="优化"
-                    android:textColor="@color/accent_ai"
-                    android:textSize="12sp"
-                    android:textStyle="bold" />
-            </LinearLayout>
-
-            <!-- AI 扩写发帖胶囊 -->
-            <LinearLayout
-                android:id="@+id/btn_ai_post"
-                android:layout_width="wrap_content"
-                android:layout_height="32dp"
-                android:layout_marginEnd="10dp"
-                android:background="@drawable/bg_ai_pill"
-                android:clickable="true"
-                android:focusable="true"
-                android:gravity="center"
-                android:orientation="horizontal">
-
-                <ImageView
-                    android:layout_width="14dp"
-                    android:layout_height="14dp"
-                    android:layout_marginEnd="3dp"
-                    android:src="@drawable/ic_ai"
-                    app:tint="@color/accent_ai"
-                    android:contentDescription="AI发帖" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="AI发帖"
-                    android:textColor="@color/accent_ai"
-                    android:textSize="12sp"
-                    android:textStyle="bold" />
-            </LinearLayout>
-
             <!-- 发布主按钮 -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btn_publish"

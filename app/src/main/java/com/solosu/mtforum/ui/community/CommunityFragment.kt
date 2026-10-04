@@ -124,7 +124,7 @@ class CommunityFragment : Fragment() {
                 val html = httpClient.get(ForumParser.getForumlistMobileUrl())
                 val data = ForumParser.parseCommunityPage(html)
 
-                requireActivity().runOnUiThread {
+                activity?.runOnUiThread {
                     if (binding == null) return@runOnUiThread
 
                     // 0. 提取 formhash
@@ -182,7 +182,7 @@ class CommunityFragment : Fragment() {
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
-                requireActivity().runOnUiThread {
+                activity?.runOnUiThread {
                     if (binding != null) {
                         binding!!.tvSignInStatus.setText(R.string.network_error)
                     }
@@ -217,7 +217,7 @@ class CommunityFragment : Fragment() {
                         if (st[2] > 0) f.todayPosts = Math.min(st[2], Int.MAX_VALUE.toLong()).toInt()
                     }
                     val snapshot = ArrayList<ForumCategory.Forum>(forums)
-                    requireActivity().runOnUiThread {
+                    activity?.runOnUiThread {
                         if (binding != null && forumGridAdapter != null) {
                             forumGridAdapter.setForumList(snapshot)
                         }
@@ -272,7 +272,7 @@ class CommunityFragment : Fragment() {
                 params["formhash"] = currentFormhash!!
                 val result = httpClient.post(signUrl, params)
 
-                requireActivity().runOnUiThread {
+                activity?.runOnUiThread {
                     if (binding == null) return@runOnUiThread
 
                     // 提取纯文本消息
@@ -298,7 +298,7 @@ class CommunityFragment : Fragment() {
                     }
                 }
             } catch (e: Exception) {
-                requireActivity().runOnUiThread {
+                activity?.runOnUiThread {
                     if (binding == null) return@runOnUiThread
                     Toast.makeText(requireContext(), "签到失败: " + e.message, Toast.LENGTH_SHORT).show()
                     binding!!.btnSignIn.isEnabled = true
@@ -359,7 +359,7 @@ class CommunityFragment : Fragment() {
         fun refreshSignIn() {
             val instance = currentInstance ?: return
             if (instance.binding == null) return
-            instance.requireActivity().runOnUiThread {
+            instance.activity?.runOnUiThread {
                 if (instance.binding == null) return@runOnUiThread
                 if (UserSessionManager.getInstance().isSignedInToday(instance.requireContext())) {
                     instance.showAlreadySignedIn()

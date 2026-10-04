@@ -26,7 +26,6 @@ import com.solosu.mtforum.ui.space.SpaceThreadListActivity
 import com.solosu.mtforum.ui.space.FriendListActivity
 import com.solosu.mtforum.ui.space.CreditDetailActivity
 import com.solosu.mtforum.ui.space.EditProfileActivity
-import com.solosu.mtforum.ui.space.SettingsActivity
 import com.solosu.mtforum.ui.BlacklistActivity
 import com.solosu.mtforum.session.AccountManager
 
@@ -34,7 +33,7 @@ import com.solosu.mtforum.session.AccountManager
  * 个人中心 Fragment（全新 UI）
  * 展示用户完整资料信息：头像、用户名、UID、等级、用户组、
  * 帖子/回复/好友/粉丝统计、积分/金币/在线时长、注册信息、
- * 功能菜单（我的帖子、收藏、好友、积分详情、编辑资料、设置）
+ * 功能菜单（我的帖子、收藏、好友、积分详情、编辑资料、小黑屋）
  */
 class ProfileFragment : Fragment() {
 
@@ -63,7 +62,6 @@ class ProfileFragment : Fragment() {
         applyFrostedGlassToIcon(binding!!.ivEmojiCredits)
         applyFrostedGlassToIcon(binding!!.ivEmojiEdit)
         applyFrostedGlassToIcon(binding!!.ivEmojiBlacklist)
-        applyFrostedGlassToIcon(binding!!.ivEmojiSettings)
 
         httpClient = HttpClient.getInstance()
 
@@ -133,11 +131,6 @@ class ProfileFragment : Fragment() {
 
         binding!!.layoutBlacklist.setOnClickListener {
             val intent = Intent(requireContext(), BlacklistActivity::class.java)
-            startActivity(intent)
-        }
-
-        binding!!.layoutSettings.setOnClickListener {
-            val intent = Intent(requireContext(), SettingsActivity::class.java)
             startActivity(intent)
         }
 
@@ -238,7 +231,7 @@ class ProfileFragment : Fragment() {
                 if (ForumParser.isLoginPage(html)) {
                     // Cookie 已过期/无效，清除所有 Cookie 并跳转登录
                     if (!isAdded) return@Thread
-                    requireActivity().runOnUiThread {
+                    activity?.runOnUiThread {
                         if (!isAdded) return@runOnUiThread
                         httpClient.clearCookies(requireContext())
                         UserSessionManager.getInstance().clearLoginInfo(requireContext())
@@ -263,7 +256,7 @@ class ProfileFragment : Fragment() {
                     val altHtml = httpClient.get(altUrl)
                     if (!isAdded) return@Thread
                     if (ForumParser.isLoginPage(altHtml)) {
-                        requireActivity().runOnUiThread {
+                        activity?.runOnUiThread {
                             if (!isAdded) return@runOnUiThread
                             httpClient.clearCookies(requireContext())
                             UserSessionManager.getInstance().clearLoginInfo(requireContext())
@@ -280,7 +273,7 @@ class ProfileFragment : Fragment() {
 
                 if (!isAdded) return@Thread
                 val finalProfile = profile
-                requireActivity().runOnUiThread {
+                activity?.runOnUiThread {
                     if (!isAdded) return@runOnUiThread
                     if (finalProfile != null && finalProfile.username != null) {
                         displayProfile(finalProfile)
@@ -293,7 +286,7 @@ class ProfileFragment : Fragment() {
                 }
             } catch (e: Exception) {
                 if (!isAdded) return@Thread
-                requireActivity().runOnUiThread {
+                activity?.runOnUiThread {
                     if (!isAdded) return@runOnUiThread
                     com.solosu.mtforum.util.ToastUtil.makeText(
                         requireContext(),

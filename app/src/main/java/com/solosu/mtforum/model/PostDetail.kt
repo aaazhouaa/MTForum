@@ -9,7 +9,7 @@ package com.solosu.mtforum.model
  *    `favoritedStateKnown` 中，以 is 开头的属性 Kotlin 会自动生成 isXxx()，
  *    其余需 @get:JvmName 固定方法名以匹配既有 Java 调用点。
  *  - List 属性保持可空：既有代码多处按 `getReplies() == null` 判断
- *    （如 AutoReplyEngine / ForumTools），改成非空默认空列表会改变语义。
+ *    （如帖子回复相关逻辑），改成非空默认空列表会改变语义。
  */
 class PostDetail {
     var tid: String? = null

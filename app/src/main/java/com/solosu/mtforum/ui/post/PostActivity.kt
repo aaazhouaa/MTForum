@@ -59,8 +59,6 @@ class PostActivity : AppCompatActivity() {
     private lateinit var etContent: TextInputEditText
     private lateinit var cbAnonymous: CheckBox
     private lateinit var btnPublish: MaterialButton
-    private var btnAiOptimize: View? = null
-    private var btnAiPost: View? = null
 
     // 五大功能按钮 + 图片按钮
     private lateinit var btnSmiley: View
@@ -139,8 +137,6 @@ class PostActivity : AppCompatActivity() {
         etContent = findViewById(R.id.et_content)
         cbAnonymous = findViewById(R.id.cb_anonymous)
         btnPublish = findViewById(R.id.btn_publish)
-        btnAiOptimize = findViewById(R.id.btn_ai_optimize)
-        btnAiPost = findViewById(R.id.btn_ai_post)
 
         // 五大功能按钮
         btnSmiley = findViewById(R.id.btn_smiley)
@@ -1273,8 +1269,6 @@ class PostActivity : AppCompatActivity() {
 
     private fun setupPublishButton() {
         btnPublish.setOnClickListener { attemptPost() }
-        if (btnAiOptimize != null) btnAiOptimize!!.setOnClickListener { aiOptimizeContent() }
-        if (btnAiPost != null) btnAiPost!!.setOnClickListener { aiAutoPost() }
     }
 
     private fun attemptPost() {
@@ -1442,10 +1436,8 @@ class PostActivity : AppCompatActivity() {
         }
         if (btnPublish != null) btnPublish.text = "保存修改"
         if (tvTitleCount != null) tvTitleCount.visibility = View.GONE
-        // 编辑模式:不给改版块,AI 按钮也用不上
+        // 编辑模式:不给改版块
         if (llCircleSelector != null) llCircleSelector.visibility = View.GONE
-        if (btnAiOptimize != null) btnAiOptimize!!.visibility = View.GONE
-        if (btnAiPost != null) btnAiPost!!.visibility = View.GONE
     }
 
     private fun isEditMode(): Boolean {
@@ -1555,144 +1547,8 @@ class PostActivity : AppCompatActivity() {
         btnPublish.setText(R.string.post_publish)
     }
 
-    // ==================== build70: AI 发帖 ====================
-
-    /** 「优化」: 用 AI 把当前标题+正文改写得更规范易读 */
-    private fun aiOptimizeContent() {
-        if (!com.solosu.mtforum.ai.AiConfigManager.isConfigured(this)) {
-            showError("请先在 AI 配置中填写接口地址与 API Key")
-            return
-        }
-        val title = if (etTitle.text == null) "" else etTitle.text.toString().trim()
-        val content = if (etContent.text == null) "" else etContent.text.toString().trim()
-        if (title.isEmpty() && content.isEmpty()) {
-            showError("请先输入标题或正文")
-            return
-        }
-        setAiButtonsBusy(true, "优化中…")
-        Thread({
-            var res: String? = null
-            try {
-                val sys = "你是论坛发帖优化助手。基于用户给出的标题与正文，在不改变原意、不编造事实的前提下，优化语句使其更通顺、层次更清晰；" +
-                        "可适当补充排版(分段)。输出格式严格如下三行标签：\n" +
-                        "【标题】优化后的标题(仅一行)\n【正文】优化后的正文\n" +
-                        "不要输出除标签外的任何解释。"
-                val u = StringBuilder()
-                u.append("原标题：").append(title).append("\n\n原正文：\n").append(content)
-                res = com.solosu.mtforum.ai.AiClient.simpleChat(this, sys, u.toString())
-            } catch (e: Exception) {
-                res = null
-            }
-            val out = res
-            runOnUiThread {
-                setAiButtonsBusy(false, null)
-                if (TextUtils.isEmpty(out)) {
-                    showError("AI 优化失败，请检查 AI 配置或网络")
-                    return@runOnUiThread
-                }
-                val nt = extractLabeled(out!!, "标题")
-                var nb = extractLabeled(out, "正文")
-                if (TextUtils.isEmpty(nt) && TextUtils.isEmpty(nb)) {
-                    // 模型没按标签输出: 整体作为正文
-                    nb = com.solosu.mtforum.ai.AiSummarizeActivity.extractText(out)
-                }
-                if (!TextUtils.isEmpty(nt)) etTitle.setText(nt)
-                if (!TextUtils.isEmpty(nb)) etContent.setText(nb)
-                Toast.makeText(this@PostActivity, "已优化", Toast.LENGTH_SHORT).show()
-            }
-        }, "ai-optimize").start()
-    }
-
-    /** 「AI发帖」: 2. AI 生成标题+正文 → 3. 自动提交 */
-    private fun aiAutoPost() {
-        if (selectedFid == null) {
-            showError("请先选择版块")
-            return
-        }
-        if (!com.solosu.mtforum.ai.AiConfigManager.isConfigured(this)) {
-            showError("请先在 AI 配置中填写接口地址与 API Key")
-            return
-        }
-        val title = if (etTitle.text == null) "" else etTitle.text.toString().trim()
-        val content = if (etContent.text == null) "" else etContent.text.toString().trim()
-        if (title.isEmpty() && content.isEmpty()) {
-            showError("请先输入主题或要点，AI 将据此生成帖子")
-            return
-        }
-        setAiButtonsBusy(true, "AI 生成中…")
-        Thread({
-            var res: String? = null
-            try {
-                val sys = "你是 MT 论坛(技术向)的发帖助手。根据用户给出的主题或要点，生成一篇可直接发布的帖子。要求：" +
-                        "1. 标题 <=30 字，概括主题，不要加【】等括号标签；" +
-                        "2. 正文用中文、分段、条理清晰，技术内容可用编号步骤；" +
-                        "3. 允许结合你自己的知识补充，但不得编造与主题无关的信息；" +
-                        "4. 不要使用 Markdown 记号(如 # 、 * 、 ` )；" +
-                        (if (TextUtils.isEmpty(selectedForumName)) "" else ("当前版块：" + selectedForumName + "。")) +
-                        "输出格式严格：\n【标题】一行标题\n【正文】帖子正文\n不要输出除标签外的任何解释。"
-                val u = StringBuilder()
-                if (!title.isEmpty()) u.append("主题/标题：").append(title).append("\n")
-                if (!content.isEmpty()) u.append("要点/正文：\n").append(content)
-                res = com.solosu.mtforum.ai.AiClient.simpleChat(this, sys, u.toString())
-            } catch (e: Exception) {
-                res = null
-            }
-            val out = res
-            runOnUiThread {
-                setAiButtonsBusy(false, null)
-                if (TextUtils.isEmpty(out)) {
-                    showError("AI 生成失败，请检查 AI 配置或网络")
-                    return@runOnUiThread
-                }
-                var nt = extractLabeled(out!!, "标题")
-                var nb = extractLabeled(out, "正文")
-                if (TextUtils.isEmpty(nb)) nb = com.solosu.mtforum.ai.AiSummarizeActivity.extractText(out)
-                if (TextUtils.isEmpty(nt)) nt = "分享"
-                etTitle.setText(nt)
-                etContent.setText(nb)
-                Toast.makeText(this@PostActivity, "已生成，正在发布…", Toast.LENGTH_SHORT).show()
-                // 立即自动提交
-                if (!btnPublish.isEnabled) return@runOnUiThread
-                attemptPost()
-            }
-        }, "ai-autopost").start()
-    }
-
-    private fun setAiButtonsBusy(busy: Boolean, label: String?) {
-        if (btnAiOptimize != null) btnAiOptimize!!.isEnabled = !busy
-        if (btnAiPost != null) {
-            btnAiPost!!.isEnabled = !busy
-            val tv = (btnAiPost as? android.view.ViewGroup)?.let { vg ->
-                var found: TextView? = null
-                for (i in 0 until vg.childCount) {
-                    val c = vg.getChildAt(i)
-                    if (c is TextView) {
-                        found = c
-                        break
-                    }
-                }
-                found
-            }
-            tv?.text = if (busy && label != null) label else "AI发帖"
-        }
-        if (btnPublish != null) btnPublish.isEnabled = !busy
-    }
-
-    /** 从形如「【标题】xxx【正文】yyy」的输出里取某标签后的内容 */
-    private fun extractLabeled(ai: String?, label: String): String {
-        if (ai == null) return ""
-        val m = Pattern
-            .compile("【" + Pattern.quote(label) + "】\\s*([\\s\\S]*?)(?=【|$)")
-            .matcher(ai)
-        if (m.find()) return m.group(1).trim()
-        return ""
-    }
-
     companion object {
         private const val REQUEST_FILE_PICK = 1001
         private const val REQUEST_IMAGE_PICK = 1002
-
-        /** 帖子内容最大注入长度(字符) */
-        private const val AI_POST_CONTENT_MAX = 6000
     }
 }

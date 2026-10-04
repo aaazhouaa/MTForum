@@ -1,6 +1,6 @@
 package com.solosu.mtforum.network
 
-import com.solosu.mtforum.ai.AiLog
+import com.solosu.mtforum.util.AiLog
 
 import java.io.IOException
 import java.util.ArrayDeque

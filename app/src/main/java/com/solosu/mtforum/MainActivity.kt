@@ -22,10 +22,7 @@ import androidx.drawerlayout.widget.DrawerLayout
 import androidx.viewpager2.widget.ViewPager2
 
 import com.google.android.material.switchmaterial.SwitchMaterial
-import com.solosu.mtforum.ai.AiChatActivity
-import com.solosu.mtforum.ai.AiConfigManager
-import com.solosu.mtforum.ai.AiLog
-import com.solosu.mtforum.ai.AutoReplyScheduler
+import com.solosu.mtforum.util.AiLog
 import com.solosu.mtforum.databinding.ActivityMainBinding
 import com.solosu.mtforum.network.ForumParser
 import com.solosu.mtforum.network.HttpClient
@@ -33,7 +30,6 @@ import com.solosu.mtforum.network.NoticeBadgeManager
 import com.solosu.mtforum.network.RateLimiter
 import com.solosu.mtforum.ui.MainPagerAdapter
 import com.solosu.mtforum.ui.post.PostActivity
-import com.solosu.mtforum.session.AutoSignInManager
 import com.solosu.mtforum.session.UserSessionManager
 import com.solosu.mtforum.ui.widget.FrostedGlassDrawable
 
@@ -133,9 +129,6 @@ class MainActivity : AppCompatActivity() {
 
     private var drawerLayout: DrawerLayout? = null
     private var drawerPanel: View? = null
-    private var swSignIn: SwitchMaterial? = null
-    private var swUnlock: SwitchMaterial? = null
-    private var swDryRun: SwitchMaterial? = null
     private var swAutoHideNav: SwitchMaterial? = null
     private var tvDrawerName: TextView? = null
     private var tvDrawerSubtitle: TextView? = null
@@ -173,9 +166,6 @@ class MainActivity : AppCompatActivity() {
         })
 
         drawerPanel = findViewById(R.id.drawer_panel)
-        swSignIn = findViewById(R.id.drawer_switch_sign_in)
-        swUnlock = findViewById(R.id.drawer_switch_unlock)
-        swDryRun = findViewById(R.id.drawer_switch_dry_run)
         swAutoHideNav = findViewById(R.id.drawer_switch_auto_hide_nav)
         tvDrawerName = findViewById(R.id.drawer_username)
         tvDrawerSubtitle = findViewById(R.id.drawer_subtitle)
@@ -192,66 +182,17 @@ class MainActivity : AppCompatActivity() {
             openBtn.setOnClickListener { drawerLayout!!.openDrawer(drawerPanel!!) }
         }
 
-        bindSwitchRow(R.id.drawer_sign_in_row, swSignIn)
-
-        // 自动签到开关：复用既有 AutoSignInManager
-        if (swSignIn != null) {
-            swSignIn!!.isChecked = AutoSignInManager.isEnabled(this)
-            swSignIn!!.setOnCheckedChangeListener { v, checked ->
-                AutoSignInManager.setEnabled(this, checked)
-                AiLog.i("drawer", "自动签到 " + (if (checked) "开启" else "关闭"))
-                if (checked) {
-                    doSignInNow()
-                }
-            }
-        }
-
-        // 自动解锁隐藏内容：一键控制「解锁模式 + 进帖自动解锁」
-        bindSwitchRow(R.id.drawer_unlock_row, swUnlock)
-        if (swUnlock != null) {
-            swUnlock!!.isChecked = AiConfigManager.isUnlockMode(this)
-            updateUnlockDesc()
-            swUnlock!!.setOnCheckedChangeListener { v, checked ->
-                AiConfigManager.setUnlockMode(this, checked)
-                AiConfigManager.setUnlockOnView(this, checked)
-                updateUnlockDesc()
-                AiLog.i("drawer", "自动解锁隐藏内容 " + (if (checked) "开启" else "关闭"))
-                Toast.makeText(
-                    this, if (checked)
-                        "已开启：进含「回复可见」的帖子会自动回帖解锁"
-                    else
-                        "已关闭自动解锁", Toast.LENGTH_SHORT
-                ).show()
-            }
-        }
-
-        // 演练模式：自动回复只生成不发送（不影响进帖解锁）
-        bindSwitchRow(R.id.drawer_dry_run_row, swDryRun)
-        if (swDryRun != null) {
-            swDryRun!!.isChecked = AiConfigManager.isDryRun(this)
-            swDryRun!!.setOnCheckedChangeListener { v, checked ->
-                AiConfigManager.setDryRun(this, checked)
-                AiLog.i("drawer", "演练模式 " + (if (checked) "开启" else "关闭"))
-                Toast.makeText(
-                    this, if (checked)
-                        "演练模式：自动回复只生成不发送"
-                    else
-                        "已关闭演练模式，自动回复将真实发送", Toast.LENGTH_SHORT
-                ).show()
-            }
-        }
-
         // build72: 底部栏滚动自动隐藏开关
         bindSwitchRow(R.id.drawer_auto_hide_nav_row, swAutoHideNav)
         if (swAutoHideNav != null) {
-            autoHideNavEnabled = AiConfigManager.isAutoHideNav(this)
+            autoHideNavEnabled = isAutoHideNavEnabled()
             swAutoHideNav!!.isChecked = autoHideNavEnabled
             if (!autoHideNavEnabled) {
                 setBottomNavVisible(true)
             }
             swAutoHideNav!!.setOnCheckedChangeListener { v, checked ->
                 autoHideNavEnabled = checked
-                AiConfigManager.setAutoHideNav(this, checked)
+                setAutoHideNavEnabled(checked)
                 if (checked) {
                     setBottomNavVisible(true)
                     Toast.makeText(this, "已开启：刷帖时底部栏自动隐藏", Toast.LENGTH_SHORT).show()
@@ -261,14 +202,6 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }
-
-        // 解锁回复内容自定义：点击弹对话框编辑模板
-        val unlockTextRow = findViewById<View>(R.id.drawer_unlock_text_row)
-        if (unlockTextRow != null) {
-            updateUnlockTextDesc()
-            unlockTextRow.setOnClickListener { showUnlockTextDialog() }
-        }
-
 
 
         // 人机验证
@@ -300,7 +233,46 @@ class MainActivity : AppCompatActivity() {
             logView.setOnClickListener { showRunLog() }
         }
 
+        // 设置
+        val settingsView = findViewById<View>(R.id.drawer_settings)
+        if (settingsView != null) {
+            settingsView.setOnClickListener {
+                closeDrawerThen { startActivity(Intent(this, com.solosu.mtforum.ui.space.SettingsActivity::class.java)) }
+            }
+        }
+
+        // 主题设置
+        val themeView = findViewById<View>(R.id.drawer_theme_setting)
+        if (themeView != null) {
+            updateDrawerThemeDesc()
+            themeView.setOnClickListener {
+                com.solosu.mtforum.util.ThemeManager.showColorPickerDialog(this) { updateDrawerThemeDesc() }
+            }
+        }
+
         refreshDrawerHeader()
+    }
+
+    /** 主题设置副标题：显示当前主色调 */
+    private fun updateDrawerThemeDesc() {
+        val desc = findViewById<TextView>(R.id.drawer_theme_desc) ?: return
+        val cur = com.solosu.mtforum.util.ThemeManager.getCurrentThemeColor(this)
+        desc.text = "当前色彩：" + cur.name
+    }
+
+    /** 侧边栏条目点击：若抽屉开着先关闭再执行，避免目标页与抽屉叠加 */
+    private fun closeDrawerThen(action: () -> Unit) {
+        if (drawerLayout != null && drawerPanel != null && drawerLayout!!.isDrawerOpen(drawerPanel!!)) {
+            drawerLayout!!.addDrawerListener(object : DrawerLayout.SimpleDrawerListener() {
+                override fun onDrawerClosed(drawerView: View) {
+                    drawerLayout?.removeDrawerListener(this)
+                    action()
+                }
+            })
+            drawerLayout!!.closeDrawer(drawerPanel!!)
+        } else {
+            action()
+        }
     }
 
     private fun updateDrawerWafDesc() {
@@ -320,57 +292,15 @@ class MainActivity : AppCompatActivity() {
         row.setOnClickListener { sw.isChecked = !sw.isChecked }
     }
 
-    /** 侧边栏「自动解锁」副标题：按当前模式显示正在干什么 */
-    private fun updateUnlockDesc() {
-        val desc = findViewById<TextView>(R.id.drawer_unlock_desc)
-        if (desc == null) return
-        desc.text = if (AiConfigManager.isUnlockMode(this))
-            "进帖遇「回复可见」自动回帖解锁"
-        else
-            "已关闭，不自动解锁"
+    /** 底部栏滚动自动隐藏开关的读取/保存 */
+    private fun isAutoHideNavEnabled(): Boolean =
+        getSharedPreferences("mtforum_ai_config", MODE_PRIVATE)
+            .getBoolean("auto_hide_nav", false)
+
+    private fun setAutoHideNavEnabled(v: Boolean) {
+        getSharedPreferences("mtforum_ai_config", MODE_PRIVATE)
+            .edit().putBoolean("auto_hide_nav", v).apply()
     }
-
-    /** 侧边栏「解锁回复内容」副标题：显示当前是自定义还是默认模板 */
-    private fun updateUnlockTextDesc() {
-        val desc = findViewById<TextView>(R.id.drawer_unlock_text_desc)
-        if (desc == null) return
-        val custom = AiConfigManager.getUnlockReplyTemplate(this)
-        desc.text = if (android.text.TextUtils.isEmpty(custom))
-            "默认模板（点击自定义）"
-        else
-            "自定义：" + (if (custom.length > 20) custom.substring(0, 20) + "…" else custom)
-    }
-
-    /** 弹出对话框编辑解锁回复模板，{title} 会被替换为帖子标题关键词 */
-    private fun showUnlockTextDialog() {
-        val et = android.widget.EditText(this)
-        et.setText(AiConfigManager.getUnlockReplyTemplate(this))
-        et.setHint("例如：感谢分享「{title}」，正需要这个！")
-        et.setMinLines(2)
-        et.gravity = android.view.Gravity.TOP or android.view.Gravity.START
-        val pad = (16 * resources.displayMetrics.density).toInt()
-        et.setPadding(pad, pad, pad, pad)
-
-        androidx.appcompat.app.AlertDialog.Builder(this)
-            .setTitle("解锁回复内容")
-            .setMessage("自定义自动解锁时发送的回复。\n留空则用内置模板池随机选一条。\n用 {title} 插入帖子标题关键词。")
-            .setView(et)
-            .setPositiveButton("保存") { d, w ->
-                val v = et.text.toString().trim()
-                AiConfigManager.setUnlockReplyTemplate(this, v)
-                updateUnlockTextDesc()
-                AiLog.i("drawer", "解锁回复模板已更新：" + (if (v.isEmpty()) "（恢复默认）" else v))
-                Toast.makeText(
-                    this,
-                    if (v.isEmpty()) "已恢复默认模板" else "已保存自定义回复",
-                    Toast.LENGTH_SHORT
-                ).show()
-            }
-            .setNegativeButton("取消", null)
-            .show()
-    }
-
-
 
     private fun openOwnProfile() {
         val session = UserSessionManager.getInstance()
@@ -431,21 +361,6 @@ class MainActivity : AppCompatActivity() {
                     .into(ivDrawerAvatar!!)
             }
         }
-    }
-
-    /** 立即签到一次（无论开关状态） */
-    private fun doSignInNow() {
-        drawerLayout!!.closeDrawer(drawerPanel!!)
-        AutoSignInManager.checkAndSignIn(this, object : AutoSignInManager.Callback {
-            override fun onFinished(success: Boolean, performed: Boolean, message: String) {
-                if (isFinishing() || isDestroyed()) return
-                AiLog.i("sign-in", "success=" + success + " performed=" + performed + " " + message)
-                Toast.makeText(this@MainActivity, if (message == null) "签到完成" else message, Toast.LENGTH_SHORT).show()
-                if (success) {
-                    com.solosu.mtforum.ui.community.CommunityFragment.refreshSignIn()
-                }
-            }
-        })
     }
 
     /** 弹出运行日志 */
@@ -877,19 +792,6 @@ class MainActivity : AppCompatActivity() {
 
     override fun onStart() {
         super.onStart()
-        AutoSignInManager.checkAndSignIn(this, object : AutoSignInManager.Callback {
-            override fun onFinished(success: Boolean, performed: Boolean, message: String) {
-                if (success || "今日已签到" == message) {
-                    // 通知社区页刷新签到按钮状态
-                    com.solosu.mtforum.ui.community.CommunityFragment.refreshSignIn()
-                }
-                if (performed && success && !isFinishing()) {
-                    Toast.makeText(this@MainActivity, "自动签到成功", Toast.LENGTH_SHORT).show()
-                } else if (!performed && !isFinishing() && "请先登录" == message) {
-                    // 未登录时静默等待,不弹 Toast 打扰用户
-                }
-            }
-        })
     }
 
     override fun onResume() {
@@ -903,9 +805,10 @@ class MainActivity : AppCompatActivity() {
                 refreshMessageBadge()
             }
         }
-        // 登录状态 / AI 配置可能已变化，刷新侧边栏头部
+        // 登录状态可能已变化，刷新侧边栏头部
         refreshDrawerHeader()
         updateDrawerWafDesc()
+        updateDrawerThemeDesc()
         // 本地 JS 挑战求解失配时提示用户手动通过人机验证（节流，不反复弹窗）
         maybePromptWafIfNeeded()
         val themeColor = com.solosu.mtforum.util.ThemeManager.getThemeColor(this)

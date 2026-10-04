@@ -79,9 +79,8 @@
     <color name="gold">#FBBF24</color>
     <color name="gold_deep">#F59E0B</color>
 
-    <!-- AI 科技青 (暗色夜间模式) -->
+    <!-- 科技青 (暗色夜间模式) -->
     <color name="accent_ai">#2DD4BF</color>
-    <color name="accent_ai_fill">#242DD4BF</color>
 
     <!-- 置顶帖胶囊 (现代暗色中性质感胶囊，搭配动态主题色文字) -->
     <color name="sticky_card_bg">#34383E</color>

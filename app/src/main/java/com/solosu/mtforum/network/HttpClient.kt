@@ -26,7 +26,7 @@ import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
 import okhttp3.RequestBody.Companion.asRequestBody
 
-import com.solosu.mtforum.ai.AiLog
+import com.solosu.mtforum.util.AiLog
 
 import java.util.ArrayList
 import java.util.HashMap
