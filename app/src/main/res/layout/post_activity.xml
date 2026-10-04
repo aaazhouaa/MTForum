@@ -16,272 +16,218 @@
         app:contentInsetEnd="0dp"
         app:contentInsetStart="0dp">
 
-        <LinearLayout
+        <RelativeLayout
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:gravity="center_vertical"
-            android:orientation="horizontal">
+            android:paddingHorizontal="8dp">
 
+            <!-- 取消按钮 -->
             <TextView
                 android:id="@+id/tv_cancel"
                 android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
+                android:layout_height="match_parent"
+                android:layout_alignParentStart="true"
+                android:layout_centerVertical="true"
                 android:clickable="true"
                 android:focusable="true"
-                android:paddingHorizontal="16dp"
-                android:paddingVertical="12dp"
+                android:background="@drawable/bg_post_tool_btn"
+                android:gravity="center"
+                android:paddingHorizontal="10dp"
                 android:text="@string/action_cancel"
-                android:textColor="@color/text_primary"
-                android:textSize="16sp" />
+                android:textColor="@color/text_secondary"
+                android:textSize="15sp" />
 
-            <View
-                android:layout_width="0dp"
-                android:layout_height="0dp"
-                android:layout_weight="1" />
-
+            <!-- 居中标题 -->
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:paddingHorizontal="16dp"
-                android:paddingVertical="12dp"
+                android:layout_centerInParent="true"
                 android:text="@string/title_post"
                 android:textColor="@color/text_primary"
                 android:textSize="16sp"
                 android:textStyle="bold" />
-            <TextView
+
+            <!-- 草稿箱入口 -->
+            <LinearLayout
                 android:id="@+id/tv_drafts"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:layout_alignParentEnd="true"
+                android:layout_centerVertical="true"
+                android:background="@drawable/bg_post_draft_chip"
                 android:clickable="true"
                 android:focusable="true"
-                android:paddingHorizontal="16dp"
-                android:paddingVertical="12dp"
-                android:text="草稿箱"
-                android:textColor="@color/text_primary"
-                android:textSize="16sp" />
-        </LinearLayout>
+                android:gravity="center"
+                android:orientation="horizontal">
+
+                <ImageView
+                    android:layout_width="14dp"
+                    android:layout_height="14dp"
+                    android:layout_marginEnd="4dp"
+                    android:src="@drawable/ic_history"
+                    app:tint="@color/text_secondary"
+                    android:contentDescription="草稿箱" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="草稿箱"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="12sp" />
+            </LinearLayout>
+        </RelativeLayout>
     </androidx.appcompat.widget.Toolbar>
 
-    <!-- 主内容区域 -->
+    <!-- 主布局：主滚动区 + 浮动子面板 + 底部快捷工具栏 + 底部操作栏 -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:layout_marginTop="49dp"
+        android:layout_marginTop="48dp"
+        android:background="@color/top_bar"
         android:orientation="vertical">
 
+        <!-- 顶部分割线 -->
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="@color/divider" />
+
+        <!-- 滚动输入内容区 -->
         <ScrollView
             android:layout_width="match_parent"
             android:layout_height="0dp"
             android:layout_weight="1"
-            android:fillViewport="true">
+            android:fillViewport="true"
+            android:scrollbars="vertical">
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
-                android:paddingBottom="4dp">
+                android:paddingBottom="16dp">
 
-                <!-- 标题输入 -->
+                <!-- 标题输入区域 -->
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="vertical"
                     android:paddingHorizontal="16dp"
-                    android:paddingTop="12dp"
-                    android:paddingBottom="4dp">
+                    android:paddingTop="12dp">
 
                     <com.google.android.material.textfield.TextInputEditText
                         android:id="@+id/et_title"
                         android:layout_width="match_parent"
-                        android:layout_height="48dp"
+                        android:layout_height="wrap_content"
+                        android:background="@null"
                         android:hint="@string/post_title_hint"
                         android:inputType="text"
                         android:maxLength="80"
+                        android:padding="0dp"
                         android:textColor="@color/text_primary"
                         android:textColorHint="@color/text_hint"
-                        android:textSize="18sp" />
+                        android:textSize="18sp"
+                        android:textStyle="bold" />
 
                     <TextView
                         android:id="@+id/tv_title_count"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_gravity="end"
+                        android:layout_marginTop="4dp"
                         android:text="0/80"
                         android:textColor="@color/text_hint"
-                        android:textSize="12sp" />
+                        android:textSize="11sp" />
                 </LinearLayout>
 
-                <View
-                    android:layout_width="match_parent"
-                    android:layout_height="8dp"
-                    android:background="@color/background" />
-
-                <!-- 版块必选 -->
+                <!-- 版块选择 Chip (现代胶囊) -->
                 <LinearLayout
-                    android:id="@+id/ll_circle_selector"
                     android:layout_width="match_parent"
-                    android:layout_height="48dp"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal"
-                    android:paddingHorizontal="16dp">
+                    android:layout_height="wrap_content"
+                    android:paddingHorizontal="16dp"
+                    android:paddingTop="4dp"
+                    android:paddingBottom="8dp">
 
-                    <TextView
-                        android:id="@+id/tv_circle_label"
+                    <LinearLayout
+                        android:id="@+id/ll_circle_selector"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="@string/post_circle_required"
-                        android:textColor="@color/text_primary"
-                        android:textSize="15sp" />
+                        android:background="@drawable/bg_post_forum_chip"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
 
-                    <View
-                        android:layout_width="0dp"
-                        android:layout_height="0dp"
-                        android:layout_weight="1" />
+                        <ImageView
+                            android:layout_width="16dp"
+                            android:layout_height="16dp"
+                            android:layout_marginEnd="6dp"
+                            android:src="@drawable/ic_post_topic"
+                            android:contentDescription="版块" />
 
-                    <TextView
-                        android:id="@+id/tv_selected_forum"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginEnd="8dp"
-                        android:textColor="@color/text_secondary"
-                        android:textSize="14sp"
-                        android:visibility="gone" />
+                        <TextView
+                            android:id="@+id/tv_circle_label"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/post_circle_required"
+                            android:textColor="@color/text_primary"
+                            android:textSize="13sp" />
 
-                    <ImageView
-                        android:layout_width="24dp"
-                        android:layout_height="24dp"
-                        android:src="@drawable/ic_add"
-                        android:contentDescription="添加"
-                        app:tint="@color/text_secondary" />
+                        <TextView
+                            android:id="@+id/tv_selected_forum"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="4dp"
+                            android:textColor="?attr/colorPrimary"
+                            android:textSize="13sp"
+                            android:textStyle="bold"
+                            android:visibility="gone" />
+
+                        <ImageView
+                            android:layout_width="14dp"
+                            android:layout_height="14dp"
+                            android:layout_marginStart="4dp"
+                            android:src="@drawable/ic_arrow_right"
+                            app:tint="@color/text_hint"
+                            android:contentDescription="选择版块" />
+                    </LinearLayout>
                 </LinearLayout>
 
+                <!-- 细微内容分割线 -->
                 <View
                     android:layout_width="match_parent"
-                    android:layout_height="1dp"
+                    android:layout_height="0.8dp"
+                    android:layout_marginHorizontal="16dp"
                     android:background="@color/divider" />
 
-                <!-- 正文编辑 -->
+                <!-- 正文编辑输入框 -->
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/et_content"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:minHeight="200dp"
+                    android:background="@null"
                     android:gravity="top"
                     android:hint="@string/post_content_hint"
                     android:inputType="textMultiLine"
-                    android:minHeight="160dp"
+                    android:lineSpacingExtra="4dp"
                     android:paddingHorizontal="16dp"
-                    android:paddingVertical="12dp"
+                    android:paddingTop="12dp"
+                    android:paddingBottom="12dp"
+                    android:scrollbars="vertical"
                     android:textColor="@color/text_primary"
                     android:textColorHint="@color/text_hint"
                     android:textSize="15sp" />
 
-                <!-- 高级选项区域 -->
+                <!-- 已选图片网格预览区 -->
                 <LinearLayout
-                    android:id="@+id/ll_advanced_options"
+                    android:id="@+id/ll_image_preview"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="vertical"
-                    android:visibility="gone">
-
-                    <View
-                        android:layout_width="match_parent"
-                        android:layout_height="8dp"
-                        android:background="@color/background" />
-
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:paddingHorizontal="16dp"
-                        android:paddingTop="8dp"
-                        android:text="基本属性"
-                        android:textColor="@color/text_primary"
-                        android:textSize="13sp"
-                        android:textStyle="bold" />
-
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="horizontal"
-                        android:paddingHorizontal="16dp"
-                        android:paddingTop="8dp">
-
-                        <CheckBox
-                            android:id="@+id/cb_hidden_replies"
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:text="回帖仅作者可见"
-                            android:textColor="@color/text_primary"
-                            android:textSize="13sp" />
-
-                        <CheckBox
-                            android:id="@+id/cb_reverse_order"
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:text="回帖倒序排列"
-                            android:textColor="@color/text_primary"
-                            android:textSize="13sp" />
-                    </LinearLayout>
-
-                    <CheckBox
-                        android:id="@+id/cb_usesig"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginHorizontal="16dp"
-                        android:checked="true"
-                        android:text="使用个人签名"
-                        android:textColor="@color/text_primary"
-                        android:textSize="13sp" />
-
-                    <View
-                        android:layout_width="match_parent"
-                        android:layout_height="8dp"
-                        android:background="@color/background" />
-
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:paddingHorizontal="16dp"
-                        android:paddingTop="4dp"
-                        android:text="文本特性"
-                        android:textColor="@color/text_primary"
-                        android:textSize="13sp"
-                        android:textStyle="bold" />
-
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="horizontal"
-                        android:paddingHorizontal="16dp"
-                        android:paddingTop="4dp">
-
-                        <CheckBox
-                            android:id="@+id/cb_smiley_off"
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:text="禁用表情转换"
-                            android:textColor="@color/text_primary"
-                            android:textSize="13sp" />
-
-                        <CheckBox
-                            android:id="@+id/cb_bbcode_off"
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:text="禁用编辑器代码"
-                            android:textColor="@color/text_primary"
-                            android:textSize="13sp" />
-                    </LinearLayout>
-
-                    <View
-                        android:layout_width="match_parent"
-                        android:layout_height="8dp"
-                        android:background="@color/background" />
-                </LinearLayout>
+                    android:paddingHorizontal="16dp"
+                    android:paddingTop="4dp"
+                    android:visibility="gone" />
 
                 <!-- 附件列表 -->
                 <LinearLayout
@@ -290,33 +236,123 @@
                     android:layout_height="wrap_content"
                     android:orientation="vertical"
                     android:paddingHorizontal="16dp"
+                    android:paddingTop="4dp"
                     android:visibility="gone" />
 
-                <!-- 图片预览区域 -->
+                <!-- 高级设置展开卡片 -->
                 <LinearLayout
-                    android:id="@+id/ll_image_preview"
+                    android:id="@+id/ll_advanced_options"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:layout_marginHorizontal="16dp"
+                    android:layout_marginTop="12dp"
+                    android:background="@drawable/bg_post_panel"
                     android:orientation="vertical"
-                    android:paddingHorizontal="16dp"
-                    android:paddingTop="8dp"
-                    android:visibility="gone" />
+                    android:padding="14dp"
+                    android:visibility="gone">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="互动与权限"
+                        android:textColor="@color/text_primary"
+                        android:textSize="13sp"
+                        android:textStyle="bold" />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:orientation="horizontal">
+
+                        <CheckBox
+                            android:id="@+id/cb_hidden_replies"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="回帖仅作者可见"
+                            android:textColor="@color/text_secondary"
+                            android:textSize="13sp" />
+
+                        <CheckBox
+                            android:id="@+id/cb_reverse_order"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="回帖倒序排列"
+                            android:textColor="@color/text_secondary"
+                            android:textSize="13sp" />
+                    </LinearLayout>
+
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="1dp"
+                        android:layout_marginVertical="10dp"
+                        android:background="@color/divider" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="格式与偏好"
+                        android:textColor="@color/text_primary"
+                        android:textSize="13sp"
+                        android:textStyle="bold" />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:orientation="horizontal">
+
+                        <CheckBox
+                            android:id="@+id/cb_usesig"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:checked="true"
+                            android:text="使用个人签名"
+                            android:textColor="@color/text_secondary"
+                            android:textSize="13sp" />
+
+                        <CheckBox
+                            android:id="@+id/cb_smiley_off"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="禁用表情转换"
+                            android:textColor="@color/text_secondary"
+                            android:textSize="13sp" />
+                    </LinearLayout>
+
+                    <CheckBox
+                        android:id="@+id/cb_bbcode_off"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:text="禁用编辑器代码 (纯文本)"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="13sp" />
+                </LinearLayout>
+
             </LinearLayout>
         </ScrollView>
 
-        <!-- 表情面板 -->
+        <!-- 表情面板 (底部抽屉网格) -->
         <LinearLayout
             android:id="@+id/ll_smiley_panel"
             android:layout_width="match_parent"
-            android:layout_height="120dp"
-            android:background="@color/background"
+            android:layout_height="130dp"
+            android:background="@drawable/bg_post_panel"
+            android:layout_marginHorizontal="12dp"
+            android:layout_marginBottom="8dp"
             android:orientation="vertical"
+            android:padding="8dp"
             android:visibility="gone">
 
             <HorizontalScrollView
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
-                android:paddingVertical="4dp">
+                android:scrollbars="none">
 
                 <LinearLayout
                     android:id="@+id/ll_smiley_container"
@@ -324,214 +360,281 @@
                     android:layout_height="match_parent"
                     android:gravity="center_vertical"
                     android:orientation="horizontal"
-                    android:paddingHorizontal="8dp" />
+                    android:paddingHorizontal="6dp" />
             </HorizontalScrollView>
         </LinearLayout>
 
-        <!-- @朋友面板 -->
+        <!-- @朋友面板 (气泡卡片) -->
         <LinearLayout
             android:id="@+id/ll_at_panel"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:background="@color/background"
-            android:gravity="center"
-            android:orientation="vertical"
-            android:padding="16dp"
+            android:layout_marginHorizontal="12dp"
+            android:layout_marginBottom="8dp"
+            android:background="@drawable/bg_post_panel"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:padding="10dp"
             android:visibility="gone">
 
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="输入@+用户名"
-                android:textColor="@color/text_hint"
-                android:textSize="14sp" />
+            <ImageView
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:layout_marginStart="4dp"
+                android:layout_marginEnd="8dp"
+                android:src="@drawable/ic_post_at"
+                app:tint="@color/text_secondary"
+                android:contentDescription="@朋友" />
 
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/et_at_username"
-                android:layout_width="match_parent"
-                android:layout_height="40dp"
-                android:hint="输入用户名..."
+                android:layout_width="0dp"
+                android:layout_height="38dp"
+                android:layout_weight="1"
+                android:background="@drawable/bg_spinner_border"
+                android:hint="输入MT论坛用户名..."
                 android:inputType="text"
-                android:layout_marginTop="8dp"
                 android:paddingHorizontal="12dp"
+                android:paddingVertical="0dp"
                 android:textColor="@color/text_primary"
-                android:textSize="14sp" />
+                android:textColorHint="@color/text_hint"
+                android:textSize="13sp" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btn_at_insert"
                 android:layout_width="wrap_content"
                 android:layout_height="36dp"
-                android:layout_marginTop="8dp"
+                android:layout_marginStart="8dp"
                 app:backgroundTint="?attr/colorPrimary"
                 app:cornerRadius="18dp"
                 android:gravity="center"
-                android:paddingHorizontal="20dp"
+                android:paddingHorizontal="16dp"
                 android:text="插入"
                 android:textColor="@color/white"
                 android:textSize="13sp" />
         </LinearLayout>
 
-        <!-- 底部工具栏（五大功能按钮） -->
+        <!-- 底部快捷工具栏（图标化现代工具条） -->
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="0.8dp"
+            android:background="@color/divider" />
+
         <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="40dp"
-            android:background="@color/background"
+            android:layout_height="44dp"
+            android:background="@color/top_bar"
             android:gravity="center_vertical"
             android:orientation="horizontal"
             android:paddingHorizontal="8dp">
 
-            <TextView
-                android:id="@+id/btn_smiley"
-                android:layout_width="0dp"
-                android:layout_height="40dp"
-                android:layout_weight="1"
-                android:clickable="true"
-                android:focusable="true"
-                android:gravity="center"
-                android:paddingHorizontal="4dp"
-                android:text="📝 图标"
-                android:textColor="@color/text_primary"
-                android:textSize="12sp" />
-
-            <TextView
-                android:id="@+id/btn_at"
-                android:layout_width="0dp"
-                android:layout_height="40dp"
-                android:layout_weight="1"
-                android:clickable="true"
-                android:focusable="true"
-                android:gravity="center"
-                android:paddingHorizontal="4dp"
-                android:text="@朋友"
-                android:textColor="@color/text_primary"
-                android:textSize="12sp" />
-
-            <TextView
-                android:id="@+id/btn_insert"
-                android:layout_width="0dp"
-                android:layout_height="40dp"
-                android:layout_weight="1"
-                android:clickable="true"
-                android:focusable="true"
-                android:gravity="center"
-                android:paddingHorizontal="4dp"
-                android:text="插入"
-                android:textColor="@color/text_primary"
-                android:textSize="12sp" />
-
-            <TextView
+            <!-- 1. 图片 -->
+            <FrameLayout
                 android:id="@+id/btn_image"
                 android:layout_width="0dp"
-                android:layout_height="40dp"
+                android:layout_height="match_parent"
                 android:layout_weight="1"
                 android:clickable="true"
                 android:focusable="true"
-                android:gravity="center"
-                android:paddingHorizontal="4dp"
-                android:text="🖼 图片"
-                android:textColor="@color/text_primary"
-                android:textSize="12sp" />
+                android:background="@drawable/bg_post_tool_btn">
+                <ImageView
+                    android:layout_width="22dp"
+                    android:layout_height="22dp"
+                    android:layout_gravity="center"
+                    android:src="@drawable/ic_image"
+                    app:tint="@color/text_secondary"
+                    android:contentDescription="图片" />
+            </FrameLayout>
 
-            <TextView
+            <!-- 2. @ 好友 -->
+            <FrameLayout
+                android:id="@+id/btn_at"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:clickable="true"
+                android:focusable="true"
+                android:background="@drawable/bg_post_tool_btn">
+                <ImageView
+                    android:layout_width="22dp"
+                    android:layout_height="22dp"
+                    android:layout_gravity="center"
+                    android:src="@drawable/ic_post_at"
+                    app:tint="@color/text_secondary"
+                    android:contentDescription="@好友" />
+            </FrameLayout>
+
+            <!-- 3. 插入代码/引用/隐藏 -->
+            <FrameLayout
+                android:id="@+id/btn_insert"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:clickable="true"
+                android:focusable="true"
+                android:background="@drawable/bg_post_tool_btn">
+                <ImageView
+                    android:layout_width="22dp"
+                    android:layout_height="22dp"
+                    android:layout_gravity="center"
+                    android:src="@drawable/ic_post_code"
+                    app:tint="@color/text_secondary"
+                    android:contentDescription="插入内容" />
+            </FrameLayout>
+
+            <!-- 4. 表情快捷 -->
+            <FrameLayout
+                android:id="@+id/btn_smiley"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:clickable="true"
+                android:focusable="true"
+                android:background="@drawable/bg_post_tool_btn">
+                <ImageView
+                    android:layout_width="22dp"
+                    android:layout_height="22dp"
+                    android:layout_gravity="center"
+                    android:src="@drawable/ic_smile"
+                    app:tint="@color/text_secondary"
+                    android:contentDescription="表情" />
+            </FrameLayout>
+
+            <!-- 5. 文件附件 -->
+            <FrameLayout
                 android:id="@+id/btn_attach"
                 android:layout_width="0dp"
-                android:layout_height="40dp"
+                android:layout_height="match_parent"
                 android:layout_weight="1"
                 android:clickable="true"
                 android:focusable="true"
-                android:gravity="center"
-                android:paddingHorizontal="4dp"
-                android:text="📎 文件"
-                android:textColor="@color/text_primary"
-                android:textSize="12sp" />
+                android:background="@drawable/bg_post_tool_btn">
+                <ImageView
+                    android:layout_width="22dp"
+                    android:layout_height="22dp"
+                    android:layout_gravity="center"
+                    android:src="@drawable/ic_post_attach"
+                    app:tint="@color/text_secondary"
+                    android:contentDescription="附件" />
+            </FrameLayout>
 
-            <TextView
+            <!-- 6. 高级设置 -->
+            <FrameLayout
                 android:id="@+id/btn_advanced"
                 android:layout_width="0dp"
-                android:layout_height="40dp"
+                android:layout_height="match_parent"
                 android:layout_weight="1"
                 android:clickable="true"
                 android:focusable="true"
-                android:gravity="center"
-                android:paddingHorizontal="4dp"
-                android:text="⚙ 高级"
-                android:textColor="@color/text_primary"
-                android:textSize="12sp" />
+                android:background="@drawable/bg_post_tool_btn">
+                <ImageView
+                    android:layout_width="22dp"
+                    android:layout_height="22dp"
+                    android:layout_gravity="center"
+                    android:src="@drawable/ic_gear"
+                    app:tint="@color/text_secondary"
+                    android:contentDescription="高级设置" />
+            </FrameLayout>
         </LinearLayout>
 
         <View
             android:layout_width="match_parent"
-            android:layout_height="1dp"
+            android:layout_height="0.8dp"
             android:background="@color/divider" />
 
         <!-- 底部操作栏 -->
         <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="48dp"
-            android:background="@color/background"
+            android:layout_height="52dp"
+            android:background="@color/top_bar"
             android:gravity="center_vertical"
             android:orientation="horizontal"
             android:paddingHorizontal="12dp">
 
+            <!-- 匿名勾选 -->
             <CheckBox
                 android:id="@+id/cb_anonymous"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="匿名"
-                android:textColor="@color/text_primary"
-                android:textSize="14sp" />
+                android:textColor="@color/text_secondary"
+                android:textSize="13sp" />
 
             <View
                 android:layout_width="0dp"
                 android:layout_height="0dp"
                 android:layout_weight="1" />
 
-            <TextView
-                android:id="@+id/tv_error"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:gravity="center"
-                android:textColor="@color/error"
-                android:textSize="13sp"
-                android:visibility="gone" />
-
-            <!-- build70: AI 内容优化 -->
-            <com.google.android.material.button.MaterialButton
+            <!-- AI 润色优化胶囊 -->
+            <LinearLayout
                 android:id="@+id/btn_ai_optimize"
                 android:layout_width="wrap_content"
-                android:layout_height="36dp"
+                android:layout_height="32dp"
                 android:layout_marginEnd="6dp"
-                android:backgroundTint="@color/accent_ai"
-                android:paddingHorizontal="12dp"
-                android:text="优化"
-                android:textColor="@color/white"
-                android:textSize="12sp"
-                app:cornerRadius="18dp" />
+                android:background="@drawable/bg_ai_pill"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center"
+                android:orientation="horizontal">
 
-            <!-- build70: AI 自动发帖 -->
-            <com.google.android.material.button.MaterialButton
+                <ImageView
+                    android:layout_width="14dp"
+                    android:layout_height="14dp"
+                    android:layout_marginEnd="3dp"
+                    android:src="@drawable/ic_ai_spark"
+                    app:tint="@color/accent_ai"
+                    android:contentDescription="优化" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="优化"
+                    android:textColor="@color/accent_ai"
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
+            <!-- AI 扩写发帖胶囊 -->
+            <LinearLayout
                 android:id="@+id/btn_ai_post"
                 android:layout_width="wrap_content"
-                android:layout_height="36dp"
-                android:layout_marginEnd="6dp"
-                app:backgroundTint="?attr/colorPrimary"
-                android:paddingHorizontal="12dp"
-                android:text="AI发帖"
-                android:textColor="@color/white"
-                android:textSize="12sp"
-                app:cornerRadius="18dp" />
+                android:layout_height="32dp"
+                android:layout_marginEnd="10dp"
+                android:background="@drawable/bg_ai_pill"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center"
+                android:orientation="horizontal">
 
+                <ImageView
+                    android:layout_width="14dp"
+                    android:layout_height="14dp"
+                    android:layout_marginEnd="3dp"
+                    android:src="@drawable/ic_ai"
+                    app:tint="@color/accent_ai"
+                    android:contentDescription="AI发帖" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="AI发帖"
+                    android:textColor="@color/accent_ai"
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
+            <!-- 发布主按钮 -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btn_publish"
                 android:layout_width="wrap_content"
-                android:layout_height="40dp"
+                android:layout_height="38dp"
                 app:backgroundTint="?attr/colorPrimary"
-                android:paddingHorizontal="24dp"
+                app:cornerRadius="19dp"
+                android:paddingHorizontal="20dp"
                 android:text="@string/post_publish"
                 android:textColor="@color/white"
                 android:textSize="14sp"
-                app:cornerRadius="20dp" />
+                android:textStyle="bold" />
         </LinearLayout>
     </LinearLayout>
 

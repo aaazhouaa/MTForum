@@ -164,25 +164,25 @@
             android:textSize="13sp"
             android:visibility="gone" />
 
-        <!-- 单图封面:非首页页面使用,保持其它页面现有显示方式 -->
+        <!-- 单图封面: 1张图时使用，恢复原先大图尺寸（190dp），并带有描边边框 -->
         <ImageView
-        android:contentDescription="图标"
             android:id="@+id/iv_thumbnail"
             android:layout_width="match_parent"
-            android:layout_height="160dp"
+            android:layout_height="190dp"
             android:layout_marginTop="10dp"
             android:background="@drawable/thread_image_bg"
+            android:foreground="@drawable/bg_thread_image_border"
             android:scaleType="centerCrop"
+            android:contentDescription="单图配图"
             android:visibility="gone" />
 
-        <!-- 首页多图区域:最多显示四张图片 -->
-        <GridLayout
+        <!-- 多图区域: 支持双图并排、三图并排、四图网格、多图右上角标等 -->
+        <LinearLayout
             android:id="@+id/ll_thread_images"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="10dp"
-            android:columnCount="2"
-            android:rowCount="2"
+            android:orientation="vertical"
             android:visibility="gone" />
 
 

@@ -2609,7 +2609,7 @@ object ForumParser {
             val fullUrl = resolveAttachmentUrl(src)
             if (isPostImageUrl(fullUrl) && !imageUrls.contains(fullUrl)) {
                 imageUrls.add(fullUrl!!)
-                if (imageUrls.size >= 4) break
+                if (imageUrls.size >= 9) break
             }
         }
 
@@ -2625,7 +2625,7 @@ object ForumParser {
                 val fullUrl = resolveAttachmentUrl(src)
                 if (isPostImageUrl(fullUrl) && !imageUrls.contains(fullUrl)) {
                     imageUrls.add(fullUrl!!)
-                    if (imageUrls.size >= 4) break
+                    if (imageUrls.size >= 9) break
                 }
             }
         }

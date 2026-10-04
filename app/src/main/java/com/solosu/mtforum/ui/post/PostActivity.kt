@@ -10,6 +10,7 @@ import android.text.TextWatcher
 import android.view.Gravity
 import android.view.View
 import android.widget.CheckBox
+import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -53,25 +54,25 @@ class PostActivity : AppCompatActivity() {
     private lateinit var etTitle: TextInputEditText
     private lateinit var tvTitleCount: TextView
     private lateinit var llCircleSelector: LinearLayout
+    private lateinit var tvCircleLabel: TextView
     private lateinit var tvSelectedForum: TextView
     private lateinit var etContent: TextInputEditText
     private lateinit var cbAnonymous: CheckBox
     private lateinit var btnPublish: MaterialButton
-    private var btnAiOptimize: MaterialButton? = null
-    private var btnAiPost: MaterialButton? = null
-    private lateinit var tvError: TextView
+    private var btnAiOptimize: View? = null
+    private var btnAiPost: View? = null
 
     // 五大功能按钮 + 图片按钮
-    private lateinit var btnSmiley: TextView
-    private lateinit var btnAt: TextView
-    private lateinit var btnInsert: TextView
-    private lateinit var btnImage: TextView
-    private lateinit var btnAttach: TextView
-    private lateinit var btnAdvanced: TextView
+    private lateinit var btnSmiley: View
+    private lateinit var btnAt: View
+    private lateinit var btnInsert: View
+    private lateinit var btnImage: View
+    private lateinit var btnAttach: View
+    private lateinit var btnAdvanced: View
     private lateinit var llSmileyPanel: LinearLayout
     private lateinit var llAtPanel: LinearLayout
     private lateinit var etAtUsername: TextInputEditText
-    private lateinit var btnAtInsert: TextView
+    private lateinit var btnAtInsert: View
     private lateinit var llAdvancedOptions: LinearLayout
     private lateinit var llAttachList: LinearLayout
     private lateinit var llImagePreview: LinearLayout
@@ -127,19 +128,19 @@ class PostActivity : AppCompatActivity() {
     private fun initViews() {
         tvCancel = findViewById(R.id.tv_cancel)
         tvCancel.setOnClickListener { finish() }
-        val tvDrafts = findViewById<TextView>(R.id.tv_drafts)
+        val tvDrafts = findViewById<View>(R.id.tv_drafts)
         if (tvDrafts != null) tvDrafts.setOnClickListener { showDraftsDialog() }
 
         etTitle = findViewById(R.id.et_title)
         tvTitleCount = findViewById(R.id.tv_title_count)
         llCircleSelector = findViewById(R.id.ll_circle_selector)
+        tvCircleLabel = findViewById(R.id.tv_circle_label)
         tvSelectedForum = findViewById(R.id.tv_selected_forum)
         etContent = findViewById(R.id.et_content)
         cbAnonymous = findViewById(R.id.cb_anonymous)
         btnPublish = findViewById(R.id.btn_publish)
         btnAiOptimize = findViewById(R.id.btn_ai_optimize)
         btnAiPost = findViewById(R.id.btn_ai_post)
-        tvError = findViewById(R.id.tv_error)
 
         // 五大功能按钮
         btnSmiley = findViewById(R.id.btn_smiley)
@@ -178,13 +179,20 @@ class PostActivity : AppCompatActivity() {
     // ==================== 五大功能 ====================
 
     private fun setupToolbarButtons() {
-        // 1. 表情
-        btnSmiley.setOnClickListener { toggleSmileyPanel() }
+        // 1. 图片上传
+        btnImage.setOnClickListener {
+            hideAllPanels()
+            pickImage()
+        }
 
         // 2. @朋友
         btnAt.setOnClickListener {
+            val visible = llAtPanel.visibility == View.VISIBLE
             hideAllPanels()
-            llAtPanel.visibility = View.VISIBLE
+            llAtPanel.visibility = if (visible) View.GONE else View.VISIBLE
+            if (!visible) {
+                etAtUsername.requestFocus()
+            }
         }
         btnAtInsert.setOnClickListener {
             val name = if (etAtUsername.text != null)
@@ -193,30 +201,39 @@ class PostActivity : AppCompatActivity() {
                 Toast.makeText(this, "请输入用户名", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
-            insertIntoContent("@ $name ")
+            insertIntoContent("@$name ")
             llAtPanel.visibility = View.GONE
             etAtUsername.setText("")
             Toast.makeText(this, "已插入 @$name", Toast.LENGTH_SHORT).show()
         }
 
-        // 3. 插入（引用/代码/Free/Hide）
-        btnInsert.setOnClickListener { showInsertDialog() }
-
-        // 4. 🖼 图片上传（从相册选图，与网页端对齐）
-        btnImage.setOnClickListener {
+        // 3. 插入代码/引用/隐藏
+        btnInsert.setOnClickListener {
             hideAllPanels()
-            pickImage()
+            showInsertDialog()
         }
+
+        // 4. 表情
+        btnSmiley.setOnClickListener { toggleSmileyPanel() }
 
         // 5. 文件附件
-        btnAttach.setOnClickListener { pickFile() }
-
-        // 5. 高级
-        btnAdvanced.setOnClickListener {
+        btnAttach.setOnClickListener {
             hideAllPanels()
-            llAdvancedOptions.visibility =
-                if (llAdvancedOptions.visibility == View.VISIBLE) View.GONE else View.VISIBLE
+            pickFile()
         }
+
+        // 6. 高级设置
+        btnAdvanced.setOnClickListener {
+            val visible = llAdvancedOptions.visibility == View.VISIBLE
+            hideAllPanels()
+            llAdvancedOptions.visibility = if (visible) View.GONE else View.VISIBLE
+        }
+
+        // 点击正文时自动收起快捷面板
+        etContent.setOnFocusChangeListener { _, hasFocus ->
+            if (hasFocus) hideAllPanels()
+        }
+        etContent.setOnClickListener { hideAllPanels() }
     }
 
     // ---- 表情功能 ----
@@ -286,22 +303,54 @@ class PostActivity : AppCompatActivity() {
     // ---- 插入功能 ----
     private fun showInsertDialog() {
         hideAllPanels()
-        val items = arrayOf("引用", "代码", "免费信息", "隐藏内容")
+        val items = arrayOf(
+            "引用 (Quote) · 引用他人观点或来源",
+            "代码块 (Code) · 保持程序代码缩进与排版",
+            "隐藏内容 (Hide) · 回复后可见此内容",
+            "免费信息 (Free) · 免费阅读公开区域"
+        )
         val builder = AlertDialog.Builder(this)
-        builder.setTitle("插入内容")
+        builder.setTitle("插入特定排版内容")
         builder.setItems(items) { dialog, which ->
             var bbcode = ""
+            var name = ""
             when (which) {
-                0 -> bbcode = "\n[quote]请输入引用内容[/quote]\n"   // 引用
-                1 -> bbcode = "\n[code]请输入代码[/code]\n"          // 代码
-                2 -> bbcode = "\n[free]请输入免费内容[/free]\n"      // 免费信息
-                3 -> bbcode = "\n[hide]请输入隐藏内容[/hide]\n"      // 隐藏内容
+                0 -> {
+                    bbcode = "\n[quote]请输入引用内容[/quote]\n"
+                    name = "引用"
+                }
+                1 -> {
+                    bbcode = "\n[code]请输入代码[/code]\n"
+                    name = "代码块"
+                }
+                2 -> {
+                    bbcode = "\n[hide]请输入回复后可见的隐藏内容[/hide]\n"
+                    name = "隐藏内容"
+                }
+                3 -> {
+                    bbcode = "\n[free]请输入免费公开内容[/free]\n"
+                    name = "免费信息"
+                }
             }
             insertIntoContent(bbcode)
-            Toast.makeText(this, "已插入" + items[which], Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "已插入 $name 代码块", Toast.LENGTH_SHORT).show()
         }
         val alertDialog: android.app.Dialog = builder.show()
         DialogHelper.applyToAlertDialog(alertDialog, this)
+    }
+
+    private fun updateSelectedForumUI() {
+        if (!TextUtils.isEmpty(selectedForumName)) {
+            tvCircleLabel.visibility = View.GONE
+            tvSelectedForum.text = "# " + selectedForumName
+            tvSelectedForum.visibility = View.VISIBLE
+            llCircleSelector.setBackgroundResource(R.drawable.bg_post_forum_chip_selected)
+        } else {
+            tvCircleLabel.visibility = View.VISIBLE
+            tvCircleLabel.text = getString(R.string.post_circle_required)
+            tvSelectedForum.visibility = View.GONE
+            llCircleSelector.setBackgroundResource(R.drawable.bg_post_forum_chip)
+        }
     }
 
     // ---- 🖼 图片上传功能（与网页端对齐：支持多选、预览、上传） ----
@@ -392,7 +441,6 @@ class PostActivity : AppCompatActivity() {
     private fun updateImagePreview() {
         if (llImagePreview == null) return
         llImagePreview.removeAllViews()
-        // 筛选出图片类型的附件
         val images = ArrayList<AttachFile>()
         for (af in attachFiles) {
             if (af.name != null && af.name!!.matches(Regex("(?i).*\\.(jpg|jpeg|png|gif|bmp|webp)$"))) {
@@ -405,54 +453,131 @@ class PostActivity : AppCompatActivity() {
         }
         llImagePreview.visibility = View.VISIBLE
 
-        var row: LinearLayout? = null
-        val colCount = 4
-        val density = resources.displayMetrics.density.toInt()
-        val imgSize = (75 * density)
+        val colCount = 3
+        val density = resources.displayMetrics.density
+        val gap = Math.round(6 * density)
+        val imgHeight = Math.round(96 * density)
 
-        for (i in images.indices) {
-            if (i % colCount == 0) {
-                row = LinearLayout(this)
-                row.layoutParams = LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT
-                )
-                row.orientation = LinearLayout.HORIZONTAL
-                row.setPadding(0, 0, 0, (4 * density))
-                llImagePreview.addView(row)
-            }
+        val previewUrls = ArrayList<String>()
+        for (af in images) {
+            val p = if (!TextUtils.isEmpty(af.path)) af.path!! else (af.url ?: "")
+            previewUrls.add(p)
+        }
 
-            val af = images[i]
-            val iv = ImageView(this)
-            val lp = LinearLayout.LayoutParams(imgSize, imgSize)
-            lp.setMargins(0, 0, (4 * density), 0)
-            if (row != null) {
-                if (i % colCount < colCount - 1) lp.weight = 1f
-                iv.layoutParams = lp
-                iv.scaleType = ImageView.ScaleType.CENTER_CROP
-                iv.setBackgroundColor(getColor(R.color.background_secondary))
+        val totalItems = images.size + (if (images.size < 9) 1 else 0)
+        val rowCount = (totalItems + colCount - 1) / colCount
 
-                Glide.with(this)
-                    .load(af.path)
-                    .placeholder(android.graphics.drawable.ColorDrawable(getColor(R.color.background_secondary)))
-                    .error(android.graphics.drawable.ColorDrawable(getColor(R.color.divider)))
-                    .into(iv)
+        for (r in 0 until rowCount) {
+            val row = LinearLayout(this)
+            row.orientation = LinearLayout.HORIZONTAL
+            val rowLp = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                imgHeight
+            )
+            rowLp.topMargin = if (r == 0) 0 else gap
+            row.layoutParams = rowLp
 
-                // 点击查看大图
-                iv.setOnClickListener {
-                    // 简单预览：Toast提示点击删除
-                    Toast.makeText(this@PostActivity, "点击移除图片", Toast.LENGTH_SHORT).show()
+            for (c in 0 until colCount) {
+                val index = r * colCount + c
+                if (index < images.size) {
+                    val af = images[index]
+                    val fl = FrameLayout(this)
+                    val flLp = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f)
+                    if (c > 0) flLp.leftMargin = gap / 2
+                    if (c < colCount - 1) flLp.rightMargin = gap / 2
+                    fl.layoutParams = flLp
+
+                    val iv = ImageView(this)
+                    iv.layoutParams = FrameLayout.LayoutParams(
+                        FrameLayout.LayoutParams.MATCH_PARENT,
+                        FrameLayout.LayoutParams.MATCH_PARENT
+                    )
+                    iv.scaleType = ImageView.ScaleType.CENTER_CROP
+                    iv.setBackgroundResource(R.drawable.thread_image_bg)
+                    iv.clipToOutline = true
+
+                    Glide.with(this)
+                        .load(af.path)
+                        .placeholder(R.drawable.ic_image_placeholder)
+                        .error(R.drawable.ic_image_error)
+                        .transform(com.bumptech.glide.load.resource.bitmap.CenterCrop(), com.bumptech.glide.load.resource.bitmap.RoundedCorners(Math.round(8 * density)))
+                        .into(iv)
+
+                    val pos = index
+                    iv.setOnClickListener {
+                        val intent = Intent(this, com.solosu.mtforum.ui.detail.ImagePreviewActivity::class.java)
+                        intent.putStringArrayListExtra("image_urls", previewUrls)
+                        intent.putExtra("image_index", pos)
+                        startActivity(intent)
+                    }
+                    fl.addView(iv)
+
+                    val delBtn = ImageView(this)
+                    val delSize = Math.round(22 * density)
+                    val delLp = FrameLayout.LayoutParams(delSize, delSize, Gravity.TOP or Gravity.END)
+                    delLp.topMargin = Math.round(4 * density)
+                    delLp.rightMargin = Math.round(4 * density)
+                    delBtn.layoutParams = delLp
+                    delBtn.setBackgroundResource(R.drawable.bg_image_remove_btn)
+                    delBtn.setImageResource(R.drawable.ic_cross)
+                    val p4 = Math.round(5 * density)
+                    delBtn.setPadding(p4, p4, p4, p4)
+                    androidx.core.widget.ImageViewCompat.setImageTintList(delBtn, android.content.res.ColorStateList.valueOf(0xFFFFFFFF.toInt()))
+                    delBtn.setOnClickListener {
+                        attachFiles.remove(af)
+                        updateAttachList()
+                        updateImagePreview()
+                    }
+                    fl.addView(delBtn)
+
+                    row.addView(fl)
+                } else if (index == images.size && images.size < 9) {
+                    val fl = FrameLayout(this)
+                    val flLp = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f)
+                    if (c > 0) flLp.leftMargin = gap / 2
+                    if (c < colCount - 1) flLp.rightMargin = gap / 2
+                    fl.layoutParams = flLp
+                    fl.setBackgroundResource(R.drawable.bg_image_add_placeholder)
+                    fl.isClickable = true
+                    fl.isFocusable = true
+
+                    val centerLayout = LinearLayout(this)
+                    centerLayout.orientation = LinearLayout.VERTICAL
+                    centerLayout.gravity = Gravity.CENTER
+                    centerLayout.layoutParams = FrameLayout.LayoutParams(
+                        FrameLayout.LayoutParams.MATCH_PARENT,
+                        FrameLayout.LayoutParams.MATCH_PARENT
+                    )
+
+                    val addIv = ImageView(this)
+                    val addIvSize = Math.round(22 * density)
+                    addIv.layoutParams = LinearLayout.LayoutParams(addIvSize, addIvSize)
+                    addIv.setImageResource(R.drawable.ic_add)
+                    androidx.core.widget.ImageViewCompat.setImageTintList(addIv, android.content.res.ColorStateList.valueOf(0xFF94A3B8.toInt()))
+                    centerLayout.addView(addIv)
+
+                    val addTv = TextView(this)
+                    addTv.text = "添加图片"
+                    addTv.textSize = 10f
+                    addTv.setTextColor(0xFF94A3B8.toInt())
+                    val tvLp = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+                    tvLp.topMargin = Math.round(2 * density)
+                    addTv.layoutParams = tvLp
+                    centerLayout.addView(addTv)
+
+                    fl.addView(centerLayout)
+                    fl.setOnClickListener { pickImage() }
+                    row.addView(fl)
+                } else {
+                    val dummy = View(this)
+                    val dummyLp = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f)
+                    if (c > 0) dummyLp.leftMargin = gap / 2
+                    if (c < colCount - 1) dummyLp.rightMargin = gap / 2
+                    dummy.layoutParams = dummyLp
+                    row.addView(dummy)
                 }
-                // 长按删除
-                iv.setOnLongClickListener {
-                    attachFiles.remove(af)
-                    updateAttachList()
-                    updateImagePreview()
-                    true
-                }
-
-                row.addView(iv)
             }
+            llImagePreview.addView(row)
         }
     }
 
@@ -681,49 +806,66 @@ class PostActivity : AppCompatActivity() {
 
     private fun updateAttachList() {
         llAttachList.removeAllViews()
-        if (attachFiles.isEmpty()) {
+        val nonImageFiles = ArrayList<AttachFile>()
+        for (af in attachFiles) {
+            val isImage = af.name != null && af.name!!.matches(Regex("(?i).*\\.(jpg|jpeg|png|gif|bmp|webp)$"))
+            if (!isImage) {
+                nonImageFiles.add(af)
+            }
+        }
+        if (nonImageFiles.isEmpty()) {
             llAttachList.visibility = View.GONE
             return
         }
         llAttachList.visibility = View.VISIBLE
-        for (i in attachFiles.indices) {
-            val af = attachFiles[i]
-            val isImage = af.name!!.matches(Regex("(?i).*\\.(jpg|jpeg|png|gif|bmp|webp)$"))
-            if (isImage) {
-                // 图片附件：显示缩略图预览
-                val iv = ImageView(this)
-                val size = (120 * resources.displayMetrics.density).toInt()
-                val lp = LinearLayout.LayoutParams(size, size)
-                lp.setMargins(8, 8, 8, 8)
-                iv.layoutParams = lp
-                iv.scaleType = ImageView.ScaleType.CENTER_CROP
-                iv.setBackgroundColor(getColor(R.color.background_secondary))
-                Glide.with(this)
-                    .load(af.path)
-                    .placeholder(android.graphics.drawable.ColorDrawable(getColor(R.color.background_secondary)))
-                    .error(android.graphics.drawable.ColorDrawable(getColor(R.color.divider)))
-                    .into(iv)
-                // 点击删除
-                val idx = i
-                iv.setOnClickListener {
-                    attachFiles.removeAt(idx)
-                    updateAttachList()
-                }
-                llAttachList.addView(iv)
-            } else {
-                // 非图片附件：显示文件名
-                val tv = TextView(this)
-                tv.text = "📎 " + af.name
-                tv.setPadding(8, 8, 8, 8)
-                tv.setTextSize(13f)
-                tv.setCompoundDrawablesWithIntrinsicBounds(0, 0, android.R.drawable.ic_menu_delete, 0)
-                val idx = i
-                tv.setOnClickListener {
-                    attachFiles.removeAt(idx)
-                    updateAttachList()
-                }
-                llAttachList.addView(tv)
+        val density = resources.displayMetrics.density
+
+        for (i in nonImageFiles.indices) {
+            val af = nonImageFiles[i]
+            val card = LinearLayout(this)
+            card.orientation = LinearLayout.HORIZONTAL
+            card.gravity = Gravity.CENTER_VERTICAL
+            val cardLp = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                Math.round(44 * density)
+            )
+            cardLp.topMargin = Math.round(6 * density)
+            card.layoutParams = cardLp
+            card.setBackgroundResource(R.drawable.bg_post_panel)
+            card.setPadding(Math.round(12 * density), 0, Math.round(12 * density), 0)
+
+            val iconIv = ImageView(this)
+            val iconSize = Math.round(18 * density)
+            iconIv.layoutParams = LinearLayout.LayoutParams(iconSize, iconSize)
+            iconIv.setImageResource(R.drawable.ic_post_attach)
+            androidx.core.widget.ImageViewCompat.setImageTintList(iconIv, android.content.res.ColorStateList.valueOf(0xFF64748B.toInt()))
+            card.addView(iconIv)
+
+            val tv = TextView(this)
+            val tvLp = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+            tvLp.leftMargin = Math.round(8 * density)
+            tvLp.rightMargin = Math.round(8 * density)
+            tv.layoutParams = tvLp
+            tv.text = af.name ?: "未知文件"
+            tv.setTextColor(0xFF0F172A.toInt())
+            tv.textSize = 13f
+            tv.maxLines = 1
+            tv.ellipsize = TextUtils.TruncateAt.MIDDLE
+            card.addView(tv)
+
+            val delBtn = ImageView(this)
+            val delSize = Math.round(20 * density)
+            delBtn.layoutParams = LinearLayout.LayoutParams(delSize, delSize)
+            delBtn.setImageResource(R.drawable.ic_cross)
+            delBtn.setPadding(Math.round(2 * density), Math.round(2 * density), Math.round(2 * density), Math.round(2 * density))
+            androidx.core.widget.ImageViewCompat.setImageTintList(delBtn, android.content.res.ColorStateList.valueOf(0xFFEF4444.toInt()))
+            delBtn.setOnClickListener {
+                attachFiles.remove(af)
+                updateAttachList()
             }
+            card.addView(delBtn)
+
+            llAttachList.addView(card)
         }
     }
 
@@ -791,83 +933,140 @@ class PostActivity : AppCompatActivity() {
     }
 
     private fun buildForumPickerDialog(categories: MutableList<ForumCategory>?) {
-        val allForums = ArrayList<ForumCategory.Forum>()
-        val groupNames = ArrayList<String>()
-        val groupRanges = ArrayList<IntArray>()
-
-        if (categories != null) {
-            for (category in categories) {
-                if (category.forums == null || category.forums!!.isEmpty()) continue
-                val start = allForums.size
-                allForums.addAll(category.forums!!)
-                val end = allForums.size - 1
-                groupNames.add(category.name ?: "")
-                groupRanges.add(intArrayOf(start, end))
-            }
-        }
-        if (allForums.isEmpty()) {
+        if (categories == null || categories.isEmpty()) {
             Toast.makeText(this, "暂无可用版块", Toast.LENGTH_SHORT).show()
             return
         }
 
-        val totalItems = allForums.size + groupNames.size
-        val displayItems = arrayOfNulls<String>(totalItems)
-        val isHeader = BooleanArray(totalItems)
-        val forumIndex = IntArray(totalItems)
+        val bottomSheet = com.google.android.material.bottomsheet.BottomSheetDialog(this)
+        val sheetView = layoutInflater.inflate(R.layout.dialog_forum_picker_sheet, null)
+        bottomSheet.setContentView(sheetView)
 
-        var pos = 0
-        for (g in groupNames.indices) {
-            displayItems[pos] = "╲╱ " + groupNames[g]
-            isHeader[pos] = true
-            forumIndex[pos] = -1
-            pos++
-            val range = groupRanges[g]
-            for (i in range[0]..range[1]) {
-                displayItems[pos] = "  " + allForums[i].name
-                isHeader[pos] = false
-                forumIndex[pos] = i
-                pos++
-            }
+        bottomSheet.setOnShowListener {
+            val d = it as? com.google.android.material.bottomsheet.BottomSheetDialog
+            val sheet = d?.findViewById<View>(com.google.android.material.R.id.design_bottom_sheet)
+            sheet?.background = android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT)
         }
 
-        val builder = AlertDialog.Builder(this)
-        builder.setTitle("选择版块")
-        builder.setAdapter(
-            object : android.widget.ArrayAdapter<String>(
-                this,
-                android.R.layout.simple_list_item_1, displayItems
-            ) {
-                override fun isEnabled(position: Int): Boolean {
-                    return !isHeader[position]
+        val container = sheetView.findViewById<LinearLayout>(R.id.ll_forum_groups)
+        container?.removeAllViews()
+
+        val density = resources.displayMetrics.density
+        val colCount = 3
+        val gap = Math.round(8 * density)
+        val chipHeight = Math.round(40 * density)
+
+        for (category in categories) {
+            val forums = category.forums
+            if (forums == null || forums.isEmpty()) continue
+
+            // 分组标题条
+            val headerLayout = LinearLayout(this)
+            headerLayout.orientation = LinearLayout.HORIZONTAL
+            headerLayout.gravity = Gravity.CENTER_VERTICAL
+            val headerLp = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+            headerLp.topMargin = Math.round(14 * density)
+            headerLp.bottomMargin = Math.round(8 * density)
+            headerLayout.layoutParams = headerLp
+
+            // 主题色微竖条
+            val bar = View(this)
+            val barLp = LinearLayout.LayoutParams(Math.round(3 * density), Math.round(14 * density))
+            barLp.rightMargin = Math.round(6 * density)
+            bar.layoutParams = barLp
+            bar.setBackgroundColor(getColor(R.color.primary))
+            headerLayout.addView(bar)
+
+            // 分区名
+            val tvCategory = TextView(this)
+            tvCategory.text = category.name ?: "论坛专区"
+            tvCategory.textSize = 13.5f
+            tvCategory.setTextColor(getColor(R.color.text_primary))
+            tvCategory.typeface = android.graphics.Typeface.DEFAULT_BOLD
+            headerLayout.addView(tvCategory)
+
+            // 数量
+            val tvCount = TextView(this)
+            val countLp = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+            countLp.leftMargin = Math.round(6 * density)
+            tvCount.layoutParams = countLp
+            tvCount.text = "${forums.size}个版块"
+            tvCount.textSize = 11f
+            tvCount.setTextColor(getColor(R.color.text_hint))
+            headerLayout.addView(tvCount)
+
+            container?.addView(headerLayout)
+
+            // 3列网格
+            val rowCount = (forums.size + colCount - 1) / colCount
+            for (r in 0 until rowCount) {
+                val row = LinearLayout(this)
+                row.orientation = LinearLayout.HORIZONTAL
+                val rowLp = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    chipHeight
+                )
+                rowLp.topMargin = if (r == 0) 0 else gap
+                row.layoutParams = rowLp
+
+                for (c in 0 until colCount) {
+                    val index = r * colCount + c
+                    if (index < forums.size) {
+                        val forum = forums[index]
+                        val isSelected = (selectedFid != null && selectedFid == forum.fid)
+
+                        val chip = TextView(this)
+                        val chipLp = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f)
+                        if (c > 0) chipLp.leftMargin = gap / 2
+                        if (c < colCount - 1) chipLp.rightMargin = gap / 2
+                        chip.layoutParams = chipLp
+                        chip.gravity = Gravity.CENTER
+                        chip.text = forum.name ?: ""
+                        chip.textSize = 13f
+                        chip.maxLines = 1
+                        chip.ellipsize = TextUtils.TruncateAt.END
+                        chip.setPadding(Math.round(4 * density), 0, Math.round(4 * density), 0)
+
+                        if (isSelected) {
+                            chip.setBackgroundResource(R.drawable.bg_post_forum_chip_selected)
+                            chip.setTextColor(getColor(R.color.primary))
+                            chip.typeface = android.graphics.Typeface.DEFAULT_BOLD
+                        } else {
+                            chip.setBackgroundResource(R.drawable.bg_post_forum_chip)
+                            chip.setTextColor(getColor(R.color.text_primary))
+                        }
+
+                        chip.isClickable = true
+                        chip.isFocusable = true
+                        chip.setOnClickListener {
+                            selectForum(forum)
+                            bottomSheet.dismiss()
+                        }
+                        row.addView(chip)
+                    } else {
+                        val dummy = View(this)
+                        val dummyLp = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f)
+                        if (c > 0) dummyLp.leftMargin = gap / 2
+                        if (c < colCount - 1) dummyLp.rightMargin = gap / 2
+                        dummy.layoutParams = dummyLp
+                        row.addView(dummy)
+                    }
                 }
-            }
-        ) { dialog, which ->
-            val idx = forumIndex[which]
-            if (idx >= 0) {
-                selectForum(allForums[idx])
+                container?.addView(row)
             }
         }
 
-        val dialog = builder.create()
-        dialog.show()
-        DialogHelper.applyToAlertDialog(dialog, this)
-        if (dialog.listView != null) {
-            dialog.listView!!.setOnItemClickListener { parent, view, position, id ->
-                if (isHeader[position]) return@setOnItemClickListener
-                val idx = forumIndex[position]
-                if (idx >= 0) {
-                    selectForum(allForums[idx])
-                    dialog.dismiss()
-                }
-            }
-        }
+        bottomSheet.show()
+        DialogHelper.applyToBottomSheet(bottomSheet, sheetView, this)
     }
 
     private fun selectForum(forum: ForumCategory.Forum) {
         selectedFid = forum.fid
         selectedForumName = forum.name
-        tvSelectedForum.text = selectedForumName
-        tvSelectedForum.visibility = View.VISIBLE
+        updateSelectedForumUI()
         // 切换圈子后重新加载formhash
         loadFormhashAndUserInfo()
     }
@@ -964,7 +1163,7 @@ class PostActivity : AppCompatActivity() {
         if (e.fid != null && !e.fid!!.isEmpty()) {
             selectedFid = e.fid
             selectedForumName = e.forumName ?: ""
-            tvSelectedForum.text = if (selectedForumName!!.isEmpty()) "已选版块 " + e.fid else selectedForumName
+            updateSelectedForumUI()
         }
         cbAnonymous.isChecked = e.anonymous
         Toast.makeText(this, "已恢复上次草稿", Toast.LENGTH_SHORT).show()
@@ -1010,7 +1209,7 @@ class PostActivity : AppCompatActivity() {
         if (e.fid != null && !e.fid!!.isEmpty()) {
             selectedFid = e.fid
             selectedForumName = e.forumName ?: ""
-            tvSelectedForum.text = if (selectedForumName!!.isEmpty()) "已选版块 " + e.fid else selectedForumName
+            updateSelectedForumUI()
         }
         cbAnonymous.isChecked = e.anonymous
         Toast.makeText(this, "草稿已载入", Toast.LENGTH_SHORT).show()
@@ -1024,8 +1223,8 @@ class PostActivity : AppCompatActivity() {
         }
         val items = arrayOfNulls<String>(l.size)
         for (i in l.indices) items[i] = draftLabel(l[i])
-        AlertDialog.Builder(this)
-            .setTitle("草稿箱(" + l.size + ") · 点条目载入")
+        val dialog = AlertDialog.Builder(this)
+            .setTitle("草稿箱 (" + l.size + "条) · 点条目载入")
             .setItems(items) { d, which -> loadDraftToEditor(l[which]) }
             .setNeutralButton("删单条") { d, w -> showDraftDeleteDialog() }
             .setNegativeButton("清空") { d, w ->
@@ -1033,7 +1232,9 @@ class PostActivity : AppCompatActivity() {
                 draftId = 0
                 Toast.makeText(this@PostActivity, "草稿箱已清空", Toast.LENGTH_SHORT).show()
             }
-            .show()
+            .create()
+        dialog.show()
+        DialogHelper.applyToAlertDialog(dialog, this)
     }
 
     private fun showDraftDeleteDialog() {
@@ -1044,16 +1245,18 @@ class PostActivity : AppCompatActivity() {
         }
         val items = arrayOfNulls<String>(l.size)
         for (i in l.indices) items[i] = draftLabel(l[i])
-        AlertDialog.Builder(this)
-            .setTitle("点要删除的草稿")
+        val dialog = AlertDialog.Builder(this)
+            .setTitle("选择要删除的草稿")
             .setItems(items) { d, which ->
                 val e = l[which]
                 DraftManager.delete(this@PostActivity, e.id)
                 if (e.id == draftId) draftId = 0
-                Toast.makeText(this@PostActivity, "已删除", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this@PostActivity, "已删除该条草稿", Toast.LENGTH_SHORT).show()
             }
-            .setNegativeButton("返回", null)
-            .show()
+            .setNegativeButton("取消", null)
+            .create()
+        dialog.show()
+        DialogHelper.applyToAlertDialog(dialog, this)
     }
 
     private fun setupPublishButton() {
@@ -1065,7 +1268,6 @@ class PostActivity : AppCompatActivity() {
     private fun attemptPost() {
         // build73: 编辑模式走 action=edit,与发新帖完全分开
         if (isEditMode()) {
-            tvError.visibility = View.GONE
             btnPublish.isEnabled = false
             btnPublish.text = "保存中..."
             Thread {
@@ -1082,7 +1284,6 @@ class PostActivity : AppCompatActivity() {
             }.start()
             return
         }
-        tvError.visibility = View.GONE
 
         val title = if (etTitle.text != null) etTitle.text.toString().trim() else ""
         val content = if (etContent.text != null)
@@ -1214,7 +1415,7 @@ class PostActivity : AppCompatActivity() {
         val fname = it.getStringExtra("edit_forum_name")
         if (!TextUtils.isEmpty(fname)) {
             selectedForumName = fname
-            if (tvSelectedForum != null) tvSelectedForum.text = fname
+            updateSelectedForumUI()
         }
         val fid = it.getStringExtra("edit_fid")
         if (!TextUtils.isEmpty(fid)) {
@@ -1334,8 +1535,7 @@ class PostActivity : AppCompatActivity() {
     }
 
     private fun showError(msg: String) {
-        tvError.text = msg
-        tvError.visibility = View.VISIBLE
+        Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
     }
 
     private fun resetPublishButton() {
@@ -1448,9 +1648,22 @@ class PostActivity : AppCompatActivity() {
 
     private fun setAiButtonsBusy(busy: Boolean, label: String?) {
         if (btnAiOptimize != null) btnAiOptimize!!.isEnabled = !busy
-        if (btnAiPost != null) btnAiPost!!.isEnabled = !busy
+        if (btnAiPost != null) {
+            btnAiPost!!.isEnabled = !busy
+            val tv = (btnAiPost as? android.view.ViewGroup)?.let { vg ->
+                var found: TextView? = null
+                for (i in 0 until vg.childCount) {
+                    val c = vg.getChildAt(i)
+                    if (c is TextView) {
+                        found = c
+                        break
+                    }
+                }
+                found
+            }
+            tv?.text = if (busy && label != null) label else "AI发帖"
+        }
         if (btnPublish != null) btnPublish.isEnabled = !busy
-        if (btnAiPost != null) btnAiPost!!.text = if (busy && label != null) label else "AI发帖"
     }
 
     /** 从形如「【标题】xxx【正文】yyy」的输出里取某标签后的内容 */

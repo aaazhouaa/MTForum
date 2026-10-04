@@ -3,23 +3,27 @@ package com.solosu.mtforum.adapter
 import android.content.Context
 import android.content.Intent
 import android.text.TextUtils
+import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.GridLayout
+import android.widget.FrameLayout
 import android.widget.ImageView
+import android.widget.LinearLayout
 import android.widget.TextView
 import com.solosu.mtforum.util.ToastUtil as Toast
 import androidx.annotation.NonNull
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
+import com.bumptech.glide.load.resource.bitmap.CenterCrop
+import com.bumptech.glide.load.resource.bitmap.RoundedCorners
 import com.solosu.mtforum.R
 import com.solosu.mtforum.model.Thread
 import com.solosu.mtforum.session.FollowStateManager
+import com.solosu.mtforum.ui.detail.ImagePreviewActivity
 import com.solosu.mtforum.ui.space.UserProfileActivity
 import com.solosu.mtforum.ui.widget.FrostedGlassDrawable
 import java.util.ArrayList
-import java.util.List
 
 /**
  * 帖子列表 RecyclerView Adapter
@@ -269,51 +273,8 @@ class ThreadAdapter(private val context: Context) : RecyclerView.Adapter<ThreadA
         } else {
             holder.ivAvatar!!.setImageResource(R.drawable.ic_account)
         }
-        // 帖子封面图：所有页面统一使用最多四张图片的2列网格样式；没有图片列表时回退到单图封面
-        holder.ivThumbnail!!.setVisibility(View.GONE)
-        holder.llThreadImages!!.setVisibility(View.GONE)
-        holder.llThreadImages!!.removeAllViews()
-        Glide.with(context).clear(holder.ivThumbnail!!)
-
-        val imageUrls = thread.imageUrls
-        if (imageUrls != null && !imageUrls.isEmpty()) {
-            val count = Math.min(4, imageUrls.size)
-            holder.llThreadImages!!.setVisibility(View.VISIBLE)
-            for (i in 0 until count) {
-                val imageView = ImageView(context)
-                val gap = dp(3)
-                val itemHeight = dp(104)
-                val params = GridLayout.LayoutParams()
-                params.width = 0
-                params.height = itemHeight
-                params.columnSpec = GridLayout.spec(i % 2, 1f)
-                params.rowSpec = GridLayout.spec(i / 2)
-                params.setMargins(if (i % 2 == 0) 0 else gap, if (i / 2 == 0) 0 else gap,
-                        if (i % 2 == 1) 0 else gap, if (i / 2 == 1) 0 else gap)
-                imageView.setLayoutParams(params)
-                imageView.setScaleType(ImageView.ScaleType.CENTER_CROP)
-                imageView.setBackgroundResource(R.drawable.thread_image_bg)
-                imageView.setClipToOutline(true)
-                Glide.with(context)
-                        .load(imageUrls[i])
-                        .placeholder(R.drawable.ic_image_placeholder)
-                        .error(R.drawable.ic_image_error)
-                        .centerCrop()
-                        .into(imageView)
-                holder.llThreadImages!!.addView(imageView)
-            }
-        } else {
-            val thumbnailUrl = thread.thumbnailUrl
-            if (thumbnailUrl != null && !thumbnailUrl.isEmpty()) {
-                holder.ivThumbnail!!.setVisibility(View.VISIBLE)
-                Glide.with(context)
-                        .load(thumbnailUrl)
-                        .placeholder(R.drawable.ic_image_placeholder)
-                        .error(R.drawable.ic_image_error)
-                        .centerCrop()
-                        .into(holder.ivThumbnail!!)
-            }
-        }
+        // 帖子配图展示：对标酷安排版（单图大卡片、双图并排、三图修长并排、四图网格、多图悬浮角标，并支持点击大图预览）
+        bindThreadImages(holder, thread)
 
 
         holder.ivAvatar!!.setOnClickListener { v ->
@@ -403,7 +364,7 @@ class ThreadAdapter(private val context: Context) : RecyclerView.Adapter<ThreadA
         var cardView: View?
         var ivAvatar: ImageView?
         var ivThumbnail: ImageView?
-        var llThreadImages: GridLayout?
+        var llThreadImages: ViewGroup?
         var btnFollow: TextView?
         var tvTitle: TextView?
         var tvAuthor: TextView?
@@ -421,7 +382,7 @@ class ThreadAdapter(private val context: Context) : RecyclerView.Adapter<ThreadA
             cardView = itemView.findViewById<View>(R.id.thread_card)
             ivAvatar = itemView.findViewById<ImageView>(R.id.iv_avatar)
             ivThumbnail = itemView.findViewById<ImageView>(R.id.iv_thumbnail)
-            llThreadImages = itemView.findViewById<GridLayout>(R.id.ll_thread_images)
+            llThreadImages = itemView.findViewById(R.id.ll_thread_images)
             btnFollow = itemView.findViewById<TextView>(R.id.btn_thread_follow)
             tvTitle = itemView.findViewById<TextView>(R.id.tv_title)
             tvAuthor = itemView.findViewById<TextView>(R.id.tv_author)
@@ -471,6 +432,202 @@ class ThreadAdapter(private val context: Context) : RecyclerView.Adapter<ThreadA
 
     private fun dp(value: Int): Int {
         return Math.round(value * context.getResources().getDisplayMetrics().density)
+    }
+
+    private fun bindThreadImages(holder: ViewHolder, thread: Thread) {
+        holder.ivThumbnail?.visibility = View.GONE
+        holder.llThreadImages?.visibility = View.GONE
+        holder.llThreadImages?.removeAllViews()
+        holder.ivThumbnail?.let { Glide.with(context).clear(it) }
+
+        val rawList = thread.imageUrls
+        val list = if (rawList != null && rawList.isNotEmpty()) {
+            rawList
+        } else if (!TextUtils.isEmpty(thread.thumbnailUrl)) {
+            listOf(thread.thumbnailUrl!!)
+        } else {
+            emptyList()
+        }
+
+        if (list.isEmpty()) return
+
+        val totalCount = list.size
+
+        if (totalCount == 1) {
+            // 单图展示：恢复大图尺寸（高度 190dp），圆角 10dp，并带有清晰精致边框
+            val singleIv = holder.ivThumbnail ?: return
+            singleIv.visibility = View.VISIBLE
+            val lp = singleIv.layoutParams
+            lp.height = dp(190)
+            singleIv.layoutParams = lp
+            singleIv.clipToOutline = true
+            singleIv.foreground = androidx.core.content.ContextCompat.getDrawable(context, R.drawable.bg_thread_image_border)
+
+            Glide.with(context)
+                .load(list[0])
+                .placeholder(R.drawable.ic_image_placeholder)
+                .error(R.drawable.ic_image_error)
+                .transform(CenterCrop(), RoundedCorners(dp(10)))
+                .into(singleIv)
+
+            singleIv.setOnClickListener {
+                openImagePreview(list, 0)
+            }
+            return
+        }
+
+        // 多图展示：放入 llThreadImages 容器
+        val container = holder.llThreadImages as? LinearLayout ?: return
+        container.visibility = View.VISIBLE
+
+        when (totalCount) {
+            2 -> {
+                // 双图并排：等宽 2 列，高度 140dp，间距 6dp
+                val row = createHorizontalRow(dp(140))
+                val gap = dp(6)
+                for (i in 0 until 2) {
+                    val iv = createGridImageView(dp(8))
+                    val lp = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f)
+                    if (i == 0) lp.rightMargin = gap / 2 else lp.leftMargin = gap / 2
+                    iv.layoutParams = lp
+                    loadIntoImageView(iv, list[i], dp(8))
+                    val pos = i
+                    iv.setOnClickListener { openImagePreview(list, pos) }
+                    row.addView(iv)
+                }
+                container.addView(row)
+            }
+            3 -> {
+                // 三图并排：等宽 3 列，高度 115dp，间距 5dp
+                val row = createHorizontalRow(dp(115))
+                val gap = dp(5)
+                for (i in 0 until 3) {
+                    val iv = createGridImageView(dp(8))
+                    val lp = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f)
+                    if (i > 0) lp.leftMargin = gap / 2
+                    if (i < 2) lp.rightMargin = gap / 2
+                    iv.layoutParams = lp
+                    loadIntoImageView(iv, list[i], dp(8))
+                    val pos = i
+                    iv.setOnClickListener { openImagePreview(list, pos) }
+                    row.addView(iv)
+                }
+                container.addView(row)
+            }
+            4 -> {
+                // 四图：2x2 网格，每行高度 110dp，行间距与列间距 5dp
+                val gap = dp(5)
+                for (rowIdx in 0 until 2) {
+                    val row = createHorizontalRow(dp(110))
+                    if (rowIdx > 0) {
+                        val rowLp = row.layoutParams as LinearLayout.LayoutParams
+                        rowLp.topMargin = gap
+                        row.layoutParams = rowLp
+                    }
+                    for (colIdx in 0 until 2) {
+                        val i = rowIdx * 2 + colIdx
+                        val iv = createGridImageView(dp(8))
+                        val lp = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f)
+                        if (colIdx == 0) lp.rightMargin = gap / 2 else lp.leftMargin = gap / 2
+                        iv.layoutParams = lp
+                        loadIntoImageView(iv, list[i], dp(8))
+                        val pos = i
+                        iv.setOnClickListener { openImagePreview(list, pos) }
+                        row.addView(iv)
+                    }
+                    container.addView(row)
+                }
+            }
+            else -> {
+                // 5 张及以上（如酷安图二）：首行展示前 3 张，并在第 3 张图右上角展示悬浮胶囊角标（例如「5图」）
+                val row = createHorizontalRow(dp(115))
+                val gap = dp(5)
+                for (i in 0 until 3) {
+                    val lp = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f)
+                    if (i > 0) lp.leftMargin = gap / 2
+                    if (i < 2) lp.rightMargin = gap / 2
+
+                    val pos = i
+                    if (i == 2) {
+                        // 第 3 个位置：包一个 FrameLayout 放角标
+                        val fl = FrameLayout(context)
+                        fl.layoutParams = lp
+                        val iv = createGridImageView(dp(8))
+                        iv.layoutParams = FrameLayout.LayoutParams(
+                            FrameLayout.LayoutParams.MATCH_PARENT,
+                            FrameLayout.LayoutParams.MATCH_PARENT
+                        )
+                        loadIntoImageView(iv, list[i], dp(8))
+                        fl.addView(iv)
+
+                        // 胶囊角标
+                        val badge = TextView(context)
+                        badge.text = "${totalCount}图"
+                        badge.textSize = 10f
+                        badge.setTextColor(0xFFFFFFFF.toInt())
+                        badge.typeface = android.graphics.Typeface.DEFAULT_BOLD
+                        badge.setBackgroundResource(R.drawable.bg_image_count_badge)
+                        val badgeLp = FrameLayout.LayoutParams(
+                            FrameLayout.LayoutParams.WRAP_CONTENT,
+                            FrameLayout.LayoutParams.WRAP_CONTENT,
+                            Gravity.TOP or Gravity.END
+                        )
+                        badgeLp.topMargin = dp(4)
+                        badgeLp.rightMargin = dp(4)
+                        badge.layoutParams = badgeLp
+                        fl.addView(badge)
+
+                        fl.setOnClickListener { openImagePreview(list, pos) }
+                        row.addView(fl)
+                    } else {
+                        val iv = createGridImageView(dp(8))
+                        iv.layoutParams = lp
+                        loadIntoImageView(iv, list[i], dp(8))
+                        iv.setOnClickListener { openImagePreview(list, pos) }
+                        row.addView(iv)
+                    }
+                }
+                container.addView(row)
+            }
+        }
+    }
+
+    private fun createHorizontalRow(heightPx: Int): LinearLayout {
+        val row = LinearLayout(context)
+        row.orientation = LinearLayout.HORIZONTAL
+        row.layoutParams = LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            heightPx
+        )
+        return row
+    }
+
+    private fun createGridImageView(radiusDp: Int): ImageView {
+        val iv = ImageView(context)
+        iv.scaleType = ImageView.ScaleType.CENTER_CROP
+        iv.setBackgroundResource(R.drawable.thread_image_bg)
+        iv.foreground = androidx.core.content.ContextCompat.getDrawable(context, R.drawable.bg_thread_grid_border)
+        iv.clipToOutline = true
+        return iv
+    }
+
+    private fun loadIntoImageView(iv: ImageView, url: String, radiusDp: Int) {
+        Glide.with(context)
+            .load(url)
+            .placeholder(R.drawable.ic_image_placeholder)
+            .error(R.drawable.ic_image_error)
+            .transform(CenterCrop(), RoundedCorners(radiusDp))
+            .into(iv)
+    }
+
+    private fun openImagePreview(urls: List<String>, index: Int) {
+        val intent = Intent(context, ImagePreviewActivity::class.java)
+        intent.putStringArrayListExtra("image_urls", ArrayList(urls))
+        intent.putExtra("image_index", index)
+        if (context !is android.app.Activity) {
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        context.startActivity(intent)
     }
 
     private fun formatCount(count: Int): String {
