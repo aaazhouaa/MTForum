@@ -3466,7 +3466,7 @@ class ThreadDetailActivity : AppCompatActivity() {
         val text = Regex("(?s)<[^>]+>").replace(response!!.trim(), "").trim()
         if (text.isEmpty()) return null
         if (text.uppercase(Locale.ROOT).startsWith("DISCUZUPLOAD|")) {
-            val parts = text.split("\\|".toRegex(), -1).toTypedArray()
+            val parts = text.split("\\|".toRegex()).toTypedArray()
             val statusIndex = if (parts.size >= 8) 2 else 1
             val aidIndex = statusIndex + 1
             if (parts.size > aidIndex
@@ -3505,7 +3505,7 @@ class ThreadDetailActivity : AppCompatActivity() {
         }
         val text = Regex("(?s)<[^>]+>").replace(raw, " ").trim()
         if (text.uppercase(Locale.ROOT).startsWith("DISCUZUPLOAD|")) {
-            val parts = text.split("\\|".toRegex(), -1).toTypedArray()
+            val parts = text.split("\\|".toRegex()).toTypedArray()
             val statusIndex = if (parts.size >= 8) 2 else 1
             val status = if (parts.size > statusIndex) parts[statusIndex].trim().toIntOrNull() else null
             if (status != null && status != 0) return uploadStatusReason(status)

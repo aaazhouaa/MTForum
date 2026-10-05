@@ -1169,7 +1169,7 @@ class PostActivity : AppCompatActivity() {
             runOnUiThread { Toast.makeText(this@PostActivity, "附件上传失败，请稍后重试", Toast.LENGTH_SHORT).show() }
             return null
         }
-        val parts = text.split("\\|".toRegex(), -1).toTypedArray()
+        val parts = text.split("\\|".toRegex()).toTypedArray()
         val statusIndex = if (parts.size >= 8) 2 else 1
         val aidIndex = statusIndex + 1
         if (parts.size <= aidIndex) return null
