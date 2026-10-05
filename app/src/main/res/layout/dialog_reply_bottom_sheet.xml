@@ -228,8 +228,10 @@
             android:layout_height="wrap_content"
             android:padding="24dp"
             android:gravity="center"
+            android:clickable="true"
+            android:focusable="true"
             android:text="表情加载中…"
-            android:textColor="@color/text_hint"
+            android:textColor="@color/text_secondary"
             android:textSize="12sp"
             android:visibility="gone" />
 

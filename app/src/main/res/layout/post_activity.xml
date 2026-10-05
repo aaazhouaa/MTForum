@@ -87,6 +87,48 @@
         android:background="@color/top_bar"
         android:orientation="vertical">
 
+        <!-- 发表帖子 / 发投票 分段切换 -->
+        <LinearLayout
+            android:id="@+id/ll_post_mode_tabs"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@color/top_bar"
+            android:gravity="center"
+            android:orientation="horizontal"
+            android:paddingVertical="8dp">
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="30dp"
+                android:background="@drawable/bg_segment_track"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:padding="2dp">
+
+                <TextView
+                    android:id="@+id/btn_tab_post"
+                    android:layout_width="wrap_content"
+                    android:layout_height="match_parent"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center"
+                    android:paddingHorizontal="22dp"
+                    android:text="发表帖子"
+                    android:textSize="13sp" />
+
+                <TextView
+                    android:id="@+id/btn_tab_poll"
+                    android:layout_width="wrap_content"
+                    android:layout_height="match_parent"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center"
+                    android:paddingHorizontal="22dp"
+                    android:text="发投票"
+                    android:textSize="13sp" />
+            </LinearLayout>
+        </LinearLayout>
+
         <!-- 顶部分割线 -->
         <View
             android:layout_width="match_parent"
@@ -199,6 +241,190 @@
                     android:layout_height="0.8dp"
                     android:layout_marginHorizontal="16dp"
                     android:background="@color/divider" />
+
+                <!-- 投票设置（仅发投票模式可见） -->
+                <LinearLayout
+                    android:id="@+id/ll_poll_section"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:paddingHorizontal="16dp"
+                    android:paddingTop="10dp"
+                    android:visibility="gone">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="最多可填写 20 个选项"
+                            android:textColor="@color/text_hint"
+                            android:textSize="12sp" />
+
+                        <CheckBox
+                            android:id="@+id/cb_poll_single_box"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="单框模式"
+                            android:textColor="@color/text_secondary"
+                            android:textSize="13sp" />
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:id="@+id/ll_poll_options"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical" />
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/et_poll_options_multiline"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:background="@drawable/bg_edittext_border"
+                        android:gravity="top"
+                        android:hint="每行一个选项"
+                        android:inputType="textMultiLine"
+                        android:minLines="4"
+                        android:padding="12dp"
+                        android:textColor="@color/text_primary"
+                        android:textColorHint="@color/text_hint"
+                        android:textSize="14sp"
+                        android:visibility="gone" />
+
+                    <TextView
+                        android:id="@+id/btn_poll_add_option"
+                        android:layout_width="wrap_content"
+                        android:layout_height="36dp"
+                        android:layout_marginTop="2dp"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:gravity="center_vertical"
+                        android:text="+ 增加一项"
+                        android:textColor="?attr/colorPrimary"
+                        android:textSize="13sp" />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="44dp"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="最多可选"
+                            android:textColor="@color/text_secondary"
+                            android:textSize="14sp" />
+
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/et_poll_maxchoices"
+                            android:layout_width="56dp"
+                            android:layout_height="36dp"
+                            android:layout_marginStart="10dp"
+                            android:background="@drawable/bg_edittext_border"
+                            android:gravity="center"
+                            android:inputType="number"
+                            android:maxLength="2"
+                            android:padding="0dp"
+                            android:text="1"
+                            android:textColor="@color/text_primary"
+                            android:textSize="14sp" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="8dp"
+                            android:text="项"
+                            android:textColor="@color/text_secondary"
+                            android:textSize="14sp" />
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="44dp"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="记票天数"
+                            android:textColor="@color/text_secondary"
+                            android:textSize="14sp" />
+
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/et_poll_expiration"
+                            android:layout_width="56dp"
+                            android:layout_height="36dp"
+                            android:layout_marginStart="10dp"
+                            android:background="@drawable/bg_edittext_border"
+                            android:gravity="center"
+                            android:hint="不限"
+                            android:inputType="number"
+                            android:maxLength="3"
+                            android:padding="0dp"
+                            android:textColor="@color/text_primary"
+                            android:textColorHint="@color/text_hint"
+                            android:textSize="14sp" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="8dp"
+                            android:text="天"
+                            android:textColor="@color/text_secondary"
+                            android:textSize="14sp" />
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="48dp"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="投票后结果可见"
+                            android:textColor="@color/text_secondary"
+                            android:textSize="14sp" />
+
+                        <com.google.android.material.switchmaterial.SwitchMaterial
+                            android:id="@+id/sw_poll_visible"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            app:thumbTint="@color/switch_thumb_tint"
+                            app:trackTint="@color/switch_track_tint" />
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="48dp"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="公开投票参与人"
+                            android:textColor="@color/text_secondary"
+                            android:textSize="14sp" />
+
+                        <com.google.android.material.switchmaterial.SwitchMaterial
+                            android:id="@+id/sw_poll_overt"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            app:thumbTint="@color/switch_thumb_tint"
+                            app:trackTint="@color/switch_track_tint" />
+                    </LinearLayout>
+                </LinearLayout>
 
                 <!-- 正文编辑输入框 -->
                 <com.google.android.material.textfield.TextInputEditText
@@ -337,31 +563,36 @@
             </LinearLayout>
         </ScrollView>
 
-        <!-- 表情面板 (底部抽屉网格) -->
+        <!-- 表情面板：网格 + 分类文字页签 -->
         <LinearLayout
             android:id="@+id/ll_smiley_panel"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:background="@drawable/bg_post_panel"
             android:layout_marginHorizontal="12dp"
             android:layout_marginBottom="8dp"
+            android:background="@drawable/bg_post_panel"
             android:orientation="vertical"
-            android:padding="8dp"
+            android:padding="6dp"
             android:visibility="gone">
 
-            <HorizontalScrollView
+            <TextView
+                android:id="@+id/tv_smiley_empty"
                 android:layout_width="match_parent"
-                android:layout_height="64dp"
-                android:scrollbars="none">
+                android:layout_height="wrap_content"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center"
+                android:padding="24dp"
+                android:text="表情加载中…"
+                android:textColor="@color/text_secondary"
+                android:textSize="12sp" />
 
-                <LinearLayout
-                    android:id="@+id/ll_smiley_container"
-                    android:layout_width="wrap_content"
-                    android:layout_height="match_parent"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal"
-                    android:paddingHorizontal="6dp" />
-            </HorizontalScrollView>
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/rv_smiley"
+                android:layout_width="match_parent"
+                android:layout_height="176dp"
+                android:overScrollMode="never"
+                android:visibility="gone" />
 
             <LinearLayout
                 android:id="@+id/ll_smiley_tabs"
@@ -369,7 +600,8 @@
                 android:layout_height="wrap_content"
                 android:gravity="center"
                 android:orientation="horizontal"
-                android:paddingTop="4dp" />
+                android:paddingTop="4dp"
+                android:paddingBottom="2dp" />
         </LinearLayout>
 
         <!-- @朋友面板 (气泡卡片) -->
@@ -548,6 +780,7 @@
                 android:focusable="true"
                 android:background="@drawable/bg_post_tool_btn">
                 <ImageView
+                    android:id="@+id/iv_tool_image"
                     android:layout_width="22dp"
                     android:layout_height="22dp"
                     android:layout_gravity="center"
@@ -566,6 +799,7 @@
                 android:focusable="true"
                 android:background="@drawable/bg_post_tool_btn">
                 <ImageView
+                    android:id="@+id/iv_tool_at"
                     android:layout_width="22dp"
                     android:layout_height="22dp"
                     android:layout_gravity="center"
@@ -584,6 +818,7 @@
                 android:focusable="true"
                 android:background="@drawable/bg_post_tool_btn">
                 <ImageView
+                    android:id="@+id/iv_tool_insert"
                     android:layout_width="22dp"
                     android:layout_height="22dp"
                     android:layout_gravity="center"
@@ -602,6 +837,7 @@
                 android:focusable="true"
                 android:background="@drawable/bg_post_tool_btn">
                 <ImageView
+                    android:id="@+id/iv_tool_smiley"
                     android:layout_width="22dp"
                     android:layout_height="22dp"
                     android:layout_gravity="center"
@@ -620,6 +856,7 @@
                 android:focusable="true"
                 android:background="@drawable/bg_post_tool_btn">
                 <ImageView
+                    android:id="@+id/iv_tool_attach"
                     android:layout_width="22dp"
                     android:layout_height="22dp"
                     android:layout_gravity="center"
@@ -638,6 +875,7 @@
                 android:focusable="true"
                 android:background="@drawable/bg_post_tool_btn">
                 <ImageView
+                    android:id="@+id/iv_tool_advanced"
                     android:layout_width="22dp"
                     android:layout_height="22dp"
                     android:layout_gravity="center"

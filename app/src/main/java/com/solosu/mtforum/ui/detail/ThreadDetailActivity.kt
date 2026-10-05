@@ -171,6 +171,11 @@ class ThreadDetailActivity : AppCompatActivity() {
     /** 论坛真实表情集（懒加载后缓存） */
     private var replySmileyCatalog: MutableList<ForumParser.SmileySet>? = null
     private var replySmileySetIndex = 0
+    private var replySmileyLoading = false
+    private var replySmileyLoadFailed = false
+
+    /** 当前高亮的回复弹窗工具按钮 */
+    private var replyHighlightedTool: View? = null
 
     /** 插入面板当前选中的内容类型 */
     private var pendingInsertType = -1
@@ -1008,6 +1013,67 @@ class ThreadDetailActivity : AppCompatActivity() {
         panel.findViewById<View>(R.id.ll_at_panel)?.visibility = View.GONE
         panel.findViewById<View>(R.id.ll_insert_panel)?.visibility = View.GONE
         panel.findViewById<View>(R.id.ll_reply_advanced)?.visibility = View.GONE
+        updateReplyToolHighlight(null)
+    }
+
+    /** 主题色选中底衬（回复弹窗工具按钮 / 插入 chip 共用） */
+    private fun selectedToolBackground(): android.graphics.drawable.GradientDrawable {
+        val themeColor = com.solosu.mtforum.util.ThemeManager.getThemeColor(this)
+        return android.graphics.drawable.GradientDrawable().apply {
+            cornerRadius = 12f * resources.displayMetrics.density
+            setColor(androidx.core.graphics.ColorUtils.setAlphaComponent(themeColor, 0x1F))
+            setStroke((1.2f * resources.displayMetrics.density).toInt(),
+                androidx.core.graphics.ColorUtils.setAlphaComponent(themeColor, 0x59))
+        }
+    }
+
+    /** 同步回复弹窗工具按钮高亮，传入 null 表示全部取消 */
+    private fun updateReplyToolHighlight(target: View?) {
+        if (replyHighlightedTool !== target) {
+            replyHighlightedTool?.let {
+                it.setBackgroundResource(borderlessSelectableBackground())
+                androidx.core.widget.ImageViewCompat.setImageTintList(
+                    it as ImageView,
+                    android.content.res.ColorStateList.valueOf(getColor(R.color.text_secondary))
+                )
+            }
+        }
+        replyHighlightedTool = target
+        target?.let {
+            it.background = selectedToolBackground()
+            androidx.core.widget.ImageViewCompat.setImageTintList(
+                it as ImageView,
+                android.content.res.ColorStateList.valueOf(
+                    com.solosu.mtforum.util.ThemeManager.getThemeColor(this)
+                )
+            )
+        }
+    }
+
+    /** 取消高亮时恢复 XML 里 ImageButton 的原始背景（无边框涟漪） */
+    private fun borderlessSelectableBackground(): Int {
+        val tv = android.util.TypedValue()
+        theme.resolveAttribute(android.R.attr.selectableItemBackgroundBorderless, tv, true)
+        return tv.resourceId
+    }
+
+    /** 插入类型 chip 的主题色选中态 */
+    private fun updateReplyInsertChip(type: Int) {
+        val panel = binding.containerReplyPanel
+        val ids = intArrayOf(
+            R.id.btn_ins_link, R.id.btn_ins_image, R.id.btn_ins_audio, R.id.btn_ins_video,
+            R.id.btn_ins_flash, R.id.btn_ins_quote, R.id.btn_ins_code, R.id.btn_ins_free, R.id.btn_ins_hide
+        )
+        for (i in ids.indices) {
+            val chip = panel.findViewById<TextView>(ids[i]) ?: continue
+            if (i + 1 == type) {
+                chip.background = selectedToolBackground()
+                chip.setTextColor(com.solosu.mtforum.util.ThemeManager.getThemeColor(this))
+            } else {
+                chip.setBackgroundResource(R.drawable.bg_post_forum_chip)
+                chip.setTextColor(getColor(R.color.text_secondary))
+            }
+        }
     }
 
     private fun toggleReplyAdvancedPanel() {
@@ -1015,7 +1081,10 @@ class ThreadDetailActivity : AppCompatActivity() {
         val adv = panel.findViewById<View>(R.id.ll_reply_advanced) ?: return
         val visible = adv.visibility == View.VISIBLE
         hideReplyToolPanels()
-        if (!visible) adv.visibility = View.VISIBLE
+        if (!visible) {
+            adv.visibility = View.VISIBLE
+            updateReplyToolHighlight(panel.findViewById<View>(R.id.btn_advanced))
+        }
     }
 
     private fun toggleReplyAtPanel() {
@@ -1025,6 +1094,7 @@ class ThreadDetailActivity : AppCompatActivity() {
         hideReplyToolPanels()
         if (!visible) {
             atPanel.visibility = View.VISIBLE
+            updateReplyToolHighlight(panel.findViewById<View>(R.id.btn_at))
             panel.findViewById<android.widget.EditText>(R.id.et_at_username)?.requestFocus()
         }
     }
@@ -1037,6 +1107,7 @@ class ThreadDetailActivity : AppCompatActivity() {
         hideReplyToolPanels()
         if (visible) return
         insert.visibility = View.VISIBLE
+        updateReplyToolHighlight(panel.findViewById<View>(R.id.btn_insert))
         panel.findViewById<View>(R.id.ll_insert_input)?.visibility = View.GONE
         panel.findViewById<View>(R.id.btn_ins_link)?.setOnClickListener { selectInsertType(panel, INSERT_LINK, true, false, "链接网址", "链接文字") }
         panel.findViewById<View>(R.id.btn_ins_image)?.setOnClickListener { selectInsertType(panel, INSERT_IMAGE, true, false, "图片地址", "") }
@@ -1051,6 +1122,7 @@ class ThreadDetailActivity : AppCompatActivity() {
 
     private fun selectInsertType(panel: View, type: Int, needUrl: Boolean, needText: Boolean, hint1: String, hint2: String) {
         pendingInsertType = type
+        updateReplyInsertChip(type)
         val input = panel.findViewById<View>(R.id.ll_insert_input) ?: return
         val f1 = panel.findViewById<android.widget.EditText>(R.id.et_insert_field1)
         val f2 = panel.findViewById<android.widget.EditText>(R.id.et_insert_field2)
@@ -1104,21 +1176,25 @@ class ThreadDetailActivity : AppCompatActivity() {
         hideReplyToolPanels()
         if (visible) return
         smiley.visibility = View.VISIBLE
+        updateReplyToolHighlight(panel.findViewById<View>(R.id.btn_smile))
         loadReplySmileyCatalog()
     }
 
-    private fun loadReplySmileyCatalog() {
+    private fun loadReplySmileyCatalog(force: Boolean = false) {
         val panel = binding.containerReplyPanel
         val rv = panel.findViewById<RecyclerView>(R.id.rv_smiley) ?: return
         val empty = panel.findViewById<TextView>(R.id.tv_smiley_empty)
         val tabs = panel.findViewById<LinearLayout>(R.id.ll_smiley_tabs)
-        val cached = replySmileyCatalog
+        val cached = if (force) null else replySmileyCatalog
         if (cached != null) {
             showSmileySet(rv, tabs, cached, replySmileySetIndex, empty)
             return
         }
+        if (replySmileyLoading) return
+        replySmileyLoading = true
         empty?.visibility = View.VISIBLE
         empty?.text = "表情加载中…"
+        empty?.setOnClickListener(null)
         rv.visibility = View.GONE
         tabs?.removeAllViews()
         val tidValue = tid
@@ -1160,44 +1236,29 @@ class ThreadDetailActivity : AppCompatActivity() {
             }
             val finalCatalog = catalog
             runOnUiThread {
-                if (finalCatalog.isNotEmpty()) replySmileyCatalog = finalCatalog
-                showSmileySet(rv, tabs, finalCatalog, 0, empty)
+                replySmileyLoading = false
+                if (finalCatalog.isEmpty()) {
+                    replySmileyLoadFailed = true
+                    val e = binding.containerReplyPanel.findViewById<TextView>(R.id.tv_smiley_empty)
+                    e?.visibility = View.VISIBLE
+                    e?.text = "表情加载失败，点击重试"
+                    e?.setOnClickListener { loadReplySmileyCatalog(force = true) }
+                } else {
+                    replySmileyLoadFailed = false
+                    replySmileyCatalog = finalCatalog
+                    showSmileySet(rv, tabs, finalCatalog, 0, empty)
+                }
             }
         }.start()
     }
 
-    /** 取不到论坛表情时回退内置图标（点击插入 [标签]），保证表情按钮始终可用 */
-    private fun renderFallbackSmileyIcons(rv: RecyclerView, tabs: LinearLayout?) {
-        val iconIds = intArrayOf(
-            R.drawable.ic_smile, R.drawable.ic_heart, R.drawable.ic_thumbs_up,
-            R.drawable.ic_fire, R.drawable.ic_star_filled, R.drawable.ic_check,
-            R.drawable.ic_cross, R.drawable.ic_lightbulb, R.drawable.ic_pin
-        )
-        val labels = arrayOf("微笑", "爱心", "点赞", "火热", "收藏", "同意", "反对", "想法", "置顶")
-        rv.visibility = View.VISIBLE
-        rv.layoutManager = GridLayoutManager(this, 6)
-        rv.adapter = object : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
-            @NonNull
-            override fun onCreateViewHolder(@NonNull parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder {
-                val size = dpToPx(40)
-                val iv = ImageView(parent.context)
-                iv.layoutParams = RecyclerView.LayoutParams(size, size)
-                iv.setPadding(dpToPx(8), dpToPx(8), dpToPx(8), dpToPx(8))
-                iv.scaleType = ImageView.ScaleType.FIT_CENTER
-                iv.isClickable = true
-                iv.setBackgroundResource(android.R.drawable.list_selector_background)
-                return object : RecyclerView.ViewHolder(iv) {}
-            }
-
-            override fun onBindViewHolder(@NonNull holder: RecyclerView.ViewHolder, position: Int) {
-                val iv = holder.itemView as ImageView
-                iv.setImageResource(iconIds[position])
-                iv.setOnClickListener { insertIntoReplyDialog("[" + labels[position] + "]") }
-            }
-
-            override fun getItemCount(): Int = iconIds.size
-        }
+    /** 取不到论坛表情时给出重试入口，不再回退内置图标 */
+    private fun showSmileyLoadFailed(rv: RecyclerView, tabs: LinearLayout?, empty: TextView?) {
+        rv.visibility = View.GONE
         tabs?.removeAllViews()
+        empty?.visibility = View.VISIBLE
+        empty?.text = "表情加载失败，点击重试"
+        empty?.setOnClickListener { loadReplySmileyCatalog(force = true) }
     }
 
     private fun showSmileySet(
@@ -1208,8 +1269,7 @@ class ThreadDetailActivity : AppCompatActivity() {
         empty: TextView?
     ) {
         if (catalog.isEmpty()) {
-            empty?.visibility = View.GONE
-            renderFallbackSmileyIcons(rv, tabs)
+            showSmileyLoadFailed(rv, tabs, empty)
             return
         }
         val idx = setIndex.coerceIn(0, catalog.size - 1)
@@ -1241,19 +1301,24 @@ class ThreadDetailActivity : AppCompatActivity() {
             override fun getItemCount(): Int = items.size
         }
         tabs?.removeAllViews()
-        if (catalog.size > 1) {
+        if (catalog.size > 1 && tabs != null) {
+            val themeColor = com.solosu.mtforum.util.ThemeManager.getThemeColor(this)
             for (i in catalog.indices) {
-                val dot = View(this)
-                val lp = LinearLayout.LayoutParams(dpToPx(7), dpToPx(7))
-                lp.marginStart = dpToPx(4)
-                lp.marginEnd = dpToPx(4)
-                dot.layoutParams = lp
-                dot.setBackgroundResource(
-                    if (i == idx) R.drawable.bg_segment_pill_selected else R.drawable.bg_page_indicator
-                )
-                dot.isClickable = true
-                dot.setOnClickListener { showSmileySet(rv, tabs, catalog, i, empty) }
-                tabs?.addView(dot)
+                val tv = TextView(this)
+                tv.text = if (catalog[i].name.isEmpty()) "表情" + (i + 1) else catalog[i].name
+                tv.textSize = 13f
+                tv.setPadding(dpToPx(14), dpToPx(6), dpToPx(14), dpToPx(6))
+                if (i == idx) {
+                    tv.setTextColor(themeColor)
+                    tv.setTypeface(null, Typeface.BOLD)
+                } else {
+                    tv.setTextColor(getColor(R.color.text_secondary))
+                    tv.setTypeface(null, Typeface.NORMAL)
+                }
+                tv.isClickable = true
+                tv.isFocusable = true
+                tv.setOnClickListener { showSmileySet(rv, tabs, catalog, i, empty) }
+                tabs.addView(tv)
             }
         }
     }

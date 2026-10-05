@@ -16,9 +16,12 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import com.solosu.mtforum.util.ToastUtil as Toast
 
+import androidx.annotation.NonNull
 import androidx.annotation.Nullable
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.recyclerview.widget.GridLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 
 import com.solosu.mtforum.R
 import com.solosu.mtforum.model.ForumCategory
@@ -77,6 +80,16 @@ class PostActivity : AppCompatActivity() {
     private lateinit var llInsertPanel: LinearLayout
     private lateinit var llInsertInput: LinearLayout
 
+    // 发投票
+    private lateinit var btnTabPost: TextView
+    private lateinit var btnTabPoll: TextView
+    private lateinit var llPollSection: LinearLayout
+    private lateinit var llPollOptions: LinearLayout
+    private lateinit var cbPollSingleBox: CheckBox
+    private lateinit var etPollOptionsMultiline: TextInputEditText
+    private lateinit var btnPollAddOption: View
+    private lateinit var etPollExpiration: TextInputEditText
+
     // data
     private var selectedFid: String? = null
     private var selectedForumName: String? = null
@@ -87,8 +100,18 @@ class PostActivity : AppCompatActivity() {
     /** 论坛真实表情集（从编辑器页解析后缓存） */
     private var smileyCatalog: MutableList<ForumParser.SmileySet>? = null
     private var postSmileySetIndex = 0
+    private var smileyLoading = false
+    private var smileyLoadFailed = false
     private var draftId = 0L
     private var postedDone = false
+
+    // 发投票
+    private var isPollMode = false
+    private val pollOptionRows = ArrayList<TextInputEditText>()
+
+    // 当前高亮的面板按钮 / 插入类型 chip
+    private var highlightedTool: View? = null
+    private var highlightedInsertChip: TextView? = null
 
     // build73: 编辑模式(本人帖)上下文
     private var editTid: String? = null
@@ -119,8 +142,11 @@ class PostActivity : AppCompatActivity() {
         initViews()
         setupTitleCounter()
         setupCircleSelector()
+        setupPostModeTabs()
         setupToolbarButtons()
         setupPublishButton()
+        // 表情目录与版块无关，进入即加载，避免首次点表情时仍是占位图标
+        loadSmileyCatalog()
         // build73: 编辑模式优先于草稿恢复
         loadFormhashAndUserInfo()
         setupEditMode()
@@ -162,6 +188,15 @@ class PostActivity : AppCompatActivity() {
         llImagePreview = findViewById(R.id.ll_image_preview)
         llInsertPanel = findViewById(R.id.ll_insert_panel)
         llInsertInput = findViewById(R.id.ll_insert_input)
+
+        btnTabPost = findViewById(R.id.btn_tab_post)
+        btnTabPoll = findViewById(R.id.btn_tab_poll)
+        llPollSection = findViewById(R.id.ll_poll_section)
+        llPollOptions = findViewById(R.id.ll_poll_options)
+        cbPollSingleBox = findViewById(R.id.cb_poll_single_box)
+        etPollOptionsMultiline = findViewById(R.id.et_poll_options_multiline)
+        btnPollAddOption = findViewById(R.id.btn_poll_add_option)
+        etPollExpiration = findViewById(R.id.et_poll_expiration)
     }
 
     private fun setupTitleCounter() {
@@ -180,6 +215,207 @@ class PostActivity : AppCompatActivity() {
         llCircleSelector.setOnClickListener { showForumPicker() }
     }
 
+    // ==================== 发表帖子 / 发投票 ====================
+
+    private fun setupPostModeTabs() {
+        btnTabPost.setOnClickListener { if (isPollMode) switchPostMode(false) }
+        btnTabPoll.setOnClickListener { if (!isPollMode) switchPostMode(true) }
+        cbPollSingleBox.setOnCheckedChangeListener { _, checked ->
+            llPollOptions.visibility = if (checked) View.GONE else View.VISIBLE
+            etPollOptionsMultiline.visibility = if (checked) View.VISIBLE else View.GONE
+            btnPollAddOption.visibility = if (checked) View.GONE else View.VISIBLE
+        }
+        btnPollAddOption.setOnClickListener { addPollOptionRow() }
+        updatePostModeTabs()
+        addPollOptionRow()
+        addPollOptionRow()
+        addPollOptionRow()
+    }
+
+    private fun switchPostMode(poll: Boolean) {
+        isPollMode = poll
+        llPollSection.visibility = if (poll) View.VISIBLE else View.GONE
+        etContent.hint = if (poll) "说点什么吧…（可选）" else getString(R.string.post_content_hint)
+        if (poll) {
+            hideAllPanels()
+        } else {
+            val t = if (etTitle.text != null) etTitle.text.toString().trim() else ""
+            val c = if (etContent.text != null) etContent.text.toString().trim() else ""
+            if (t.isEmpty() && c.isEmpty()) etTitle.requestFocus()
+        }
+        updatePostModeTabs()
+    }
+
+    private fun updatePostModeTabs() {
+        val selected = com.solosu.mtforum.util.ThemeManager.getThemeColor(this)
+        for ((tv, isSel) in listOf(btnTabPost to !isPollMode, btnTabPoll to isPollMode)) {
+            if (isSel) {
+                tv.setBackgroundResource(R.drawable.bg_segment_pill_selected)
+                tv.setTextColor(selected)
+                tv.setTypeface(null, android.graphics.Typeface.BOLD)
+            } else {
+                tv.setBackgroundColor(android.graphics.Color.TRANSPARENT)
+                tv.setTextColor(androidx.core.content.ContextCompat.getColor(this, R.color.text_secondary))
+                tv.setTypeface(null, android.graphics.Typeface.NORMAL)
+            }
+        }
+    }
+
+    /** 新增一个投票选项输入行，上限 20 项；已有 2 项以上时才能删行 */
+    private fun addPollOptionRow() {
+        if (pollOptionRows.size >= MAX_POLL_OPTIONS) {
+            Toast.makeText(this, "最多只能填写 20 个选项", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val density = resources.displayMetrics.density
+        val row = LinearLayout(this)
+        row.orientation = LinearLayout.HORIZONTAL
+        row.gravity = Gravity.CENTER_VERTICAL
+
+        val et = TextInputEditText(this)
+        et.hint = "填写投票选项"
+        et.textSize = 14f
+        et.setBackgroundResource(R.drawable.bg_edittext_border)
+        et.setPadding((12 * density).toInt(), 0, (12 * density).toInt(), 0)
+        et.setTextColor(androidx.core.content.ContextCompat.getColor(this, R.color.text_primary))
+        et.setHintTextColor(androidx.core.content.ContextCompat.getColor(this, R.color.text_hint))
+        val etLp = LinearLayout.LayoutParams(0, (40 * density).toInt(), 1f)
+        et.layoutParams = etLp
+        row.addView(et)
+
+        val del = ImageView(this)
+        val delSize = (20 * density).toInt()
+        val delLp = LinearLayout.LayoutParams(delSize, delSize)
+        delLp.marginStart = (10 * density).toInt()
+        del.layoutParams = delLp
+        del.setImageResource(R.drawable.ic_cross)
+        del.setPadding((2 * density).toInt(), (2 * density).toInt(), (2 * density).toInt(), (2 * density).toInt())
+        androidx.core.widget.ImageViewCompat.setImageTintList(
+            del, android.content.res.ColorStateList.valueOf(0xFFEF4444.toInt())
+        )
+        del.setOnClickListener {
+            if (pollOptionRows.size <= 2) {
+                Toast.makeText(this, "投票至少需要 2 个选项", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+            pollOptionRows.remove(et)
+            llPollOptions.removeView(row)
+        }
+        row.addView(del)
+
+        val rowLp = LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
+        )
+        rowLp.topMargin = (6 * density).toInt()
+        row.layoutParams = rowLp
+        pollOptionRows.add(et)
+        llPollOptions.addView(row)
+    }
+
+    /** 收集投票选项：单框模式按行拆分，否则取各行的非空值 */
+    private fun collectPollOptions(): ArrayList<String> {
+        val result = ArrayList<String>()
+        if (cbPollSingleBox.isChecked) {
+            val raw = if (etPollOptionsMultiline.text != null)
+                etPollOptionsMultiline.text.toString() else ""
+            for (line in raw.split("\n")) {
+                val v = line.trim()
+                if (v.isNotEmpty()) result.add(v)
+            }
+        } else {
+            for (et in pollOptionRows) {
+                val v = if (et.text != null) et.text.toString().trim() else ""
+                if (v.isNotEmpty()) result.add(v)
+            }
+        }
+        return result
+    }
+
+    /** 发投票帖：special=1 + polloption[]，其余字段与普通发帖共用 */
+    private fun attemptPostPoll(title: String, content: String) {
+        val options = collectPollOptions()
+        if (options.size < 2) {
+            showError("投票至少需要 2 个选项")
+            return
+        }
+        if (options.size > MAX_POLL_OPTIONS) {
+            showError("最多只能填写 20 个选项")
+            return
+        }
+        val maxChoicesRaw = findViewById<TextInputEditText>(R.id.et_poll_maxchoices)
+            ?.text?.toString()?.trim() ?: ""
+        val maxChoices = if (maxChoicesRaw.isEmpty()) 1 else (maxChoicesRaw.toIntOrNull() ?: 1)
+        val expiration = etPollExpiration.text?.toString()?.trim() ?: ""
+
+        btnPublish.isEnabled = false
+        btnPublish.text = "发布中..."
+
+        Thread {
+            try {
+                if (currentFormhash == null) loadFormhashSync()
+                if (currentFormhash == null || currentFormhash!!.isEmpty()) {
+                    runOnUiThread {
+                        showError("获取安全验证失败，请重试")
+                        resetPublishButton()
+                    }
+                    return@Thread
+                }
+
+                val params = HashMap<String, String>()
+                params["formhash"] = currentFormhash!!
+                params["subject"] = title
+                params["message"] = content
+                params["allownoticeauthor"] = "1"
+                params["special"] = "1"
+                if (cbAnonymous.isChecked) params["anonymous"] = "1"
+
+                if (cbPollSingleBox.isChecked) {
+                    params["tpolloption"] = "2"
+                    params["polloptions"] = options.joinToString("\n")
+                } else {
+                    params["tpolloption"] = "1"
+                }
+                for (i in options.indices) {
+                    params["polloption[" + i + "]"] = options[i]
+                }
+                params["maxchoices"] = maxChoices.toString()
+                if (expiration.isNotEmpty()) params["expiration"] = expiration
+                val swVisible = findViewById<com.google.android.material.switchmaterial.SwitchMaterial>(R.id.sw_poll_visible)
+                if (swVisible != null && swVisible.isChecked) params["visibilitypoll"] = "1"
+                val swOvert = findViewById<com.google.android.material.switchmaterial.SwitchMaterial>(R.id.sw_poll_overt)
+                if (swOvert != null && swOvert.isChecked) params["overt"] = "1"
+
+                val submitUrl = HttpClient.BASE_URL + "forum.php?mod=post&action=newthread&fid=" +
+                        selectedFid + "&special=1&topicsubmit=yes"
+                val response = HttpClient.getInstance().post(submitUrl, params)
+
+                if (response != null && (response.contains("tid=") || response.contains("viewthread"))) {
+                    runOnUiThread {
+                        postedDone = true
+                        if (draftId > 0) {
+                            DraftManager.delete(this@PostActivity, draftId)
+                            draftId = 0
+                        }
+                        Toast.makeText(this@PostActivity, "投票帖发布成功", Toast.LENGTH_SHORT).show()
+                        setResult(RESULT_OK, Intent().putExtra("tid", extractTid(response)))
+                        finish()
+                    }
+                } else {
+                    val errorMsg = extractErrorFromResponse(response)
+                    runOnUiThread {
+                        showError(errorMsg)
+                        resetPublishButton()
+                    }
+                }
+            } catch (e: Exception) {
+                runOnUiThread {
+                    showError(getString(R.string.network_error))
+                    resetPublishButton()
+                }
+            }
+        }.start()
+    }
+
     // ==================== 五大功能 ====================
 
     private fun setupToolbarButtons() {
@@ -195,6 +431,7 @@ class PostActivity : AppCompatActivity() {
             hideAllPanels()
             llAtPanel.visibility = if (visible) View.GONE else View.VISIBLE
             if (!visible) {
+                updateToolHighlight(btnAt)
                 etAtUsername.requestFocus()
             }
         }
@@ -230,6 +467,7 @@ class PostActivity : AppCompatActivity() {
             val visible = llAdvancedOptions.visibility == View.VISIBLE
             hideAllPanels()
             llAdvancedOptions.visibility = if (visible) View.GONE else View.VISIBLE
+            if (!visible) updateToolHighlight(btnAdvanced)
         }
 
         // 点击正文时自动收起快捷面板
@@ -241,41 +479,91 @@ class PostActivity : AppCompatActivity() {
 
     // ---- 表情功能 ----
 
+    /** 论坛真实表情集与版块无关，进页即预取，避免打开面板时只有占位内容 */
+    private fun loadSmileyCatalog(force: Boolean = false) {
+        if (!force && smileyCatalog != null) return
+        if (smileyLoading) return
+        smileyLoading = true
+        val empty = findViewById<TextView>(R.id.tv_smiley_empty)
+        empty?.text = "表情加载中…"
+        empty?.setOnClickListener(null)
+        Thread {
+            var parsed: MutableList<ForumParser.SmileySet> = ArrayList()
+            try {
+                for (url in ForumParser.getSmileyScriptUrlCandidates()) {
+                    parsed = ForumParser.parseSmileyCatalog(HttpClient.getInstance().get(url))
+                    if (parsed.isNotEmpty()) break
+                }
+            } catch (ignored: Exception) {
+            }
+            val finalCatalog = parsed
+            runOnUiThread {
+                smileyLoading = false
+                if (finalCatalog.isEmpty()) {
+                    smileyLoadFailed = true
+                    val e = findViewById<TextView>(R.id.tv_smiley_empty)
+                    e?.text = "表情加载失败，点击重试"
+                    e?.setOnClickListener { loadSmileyCatalog(force = true) }
+                } else {
+                    smileyLoadFailed = false
+                    smileyCatalog = finalCatalog
+                    if (llSmileyPanel.visibility == View.VISIBLE) renderPostSmileySet(finalCatalog)
+                }
+            }
+        }.start()
+    }
+
     /** 渲染论坛真实表情（当前分类 + 底部分类切换），点击插入对应表情代码 */
     private fun renderPostSmileySet(catalog: MutableList<ForumParser.SmileySet>) {
-        val container = findViewById<LinearLayout>(R.id.ll_smiley_container) ?: return
+        val rv = findViewById<RecyclerView>(R.id.rv_smiley) ?: return
         val tabs = findViewById<LinearLayout>(R.id.ll_smiley_tabs)
-        container.removeAllViews()
+        val empty = findViewById<TextView>(R.id.tv_smiley_empty)
+        empty?.visibility = View.GONE
+        rv.visibility = View.VISIBLE
         val idx = postSmileySetIndex.coerceIn(0, catalog.size - 1)
         postSmileySetIndex = idx
-        val density = resources.displayMetrics.density
-        val size = (40 * density).toInt()
-        val padding = (4 * density).toInt()
-        for (smiley in catalog[idx].items) {
-            val iv = ImageView(this)
-            iv.layoutParams = LinearLayout.LayoutParams(size, size)
-            iv.setPadding(padding, padding, padding, padding)
-            iv.scaleType = ImageView.ScaleType.FIT_CENTER
-            iv.setBackgroundResource(android.R.drawable.list_selector_background)
-            iv.isClickable = true
-            iv.isFocusable = true
-            Glide.with(this).load(smiley.url).into(iv)
-            iv.setOnClickListener { insertIntoContent(smiley.code) }
-            container.addView(iv)
+        val items = catalog[idx].items
+        rv.layoutManager = GridLayoutManager(this, 6)
+        rv.adapter = object : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
+            @NonNull
+            override fun onCreateViewHolder(@NonNull parent: android.view.ViewGroup, viewType: Int): RecyclerView.ViewHolder {
+                val size = (40 * resources.displayMetrics.density).toInt()
+                val iv = ImageView(parent.context)
+                iv.layoutParams = RecyclerView.LayoutParams(size, size)
+                val padding = (4 * resources.displayMetrics.density).toInt()
+                iv.setPadding(padding, padding, padding, padding)
+                iv.scaleType = ImageView.ScaleType.FIT_CENTER
+                iv.isClickable = true
+                iv.setBackgroundResource(android.R.drawable.list_selector_background)
+                return object : RecyclerView.ViewHolder(iv) {}
+            }
+
+            override fun onBindViewHolder(@NonNull holder: RecyclerView.ViewHolder, position: Int) {
+                val iv = holder.itemView as ImageView
+                val smiley = items[position]
+                Glide.with(this@PostActivity).load(smiley.url).into(iv)
+                iv.setOnClickListener { insertIntoContent(smiley.code) }
+            }
+
+            override fun getItemCount(): Int = items.size
         }
         tabs?.removeAllViews()
         if (catalog.size <= 1 || tabs == null) return
         for (i in catalog.indices) {
             val tv = TextView(this)
             tv.text = if (catalog[i].name.isEmpty()) "表情" + (i + 1) else catalog[i].name
-            tv.textSize = 12f
-            tv.setPadding((10 * density).toInt(), (4 * density).toInt(), (10 * density).toInt(), (4 * density).toInt())
-            tv.setTextColor(
-                androidx.core.content.ContextCompat.getColor(
-                    this,
-                    if (i == idx) R.color.text_primary else R.color.text_secondary
-                )
-            )
+            tv.textSize = 13f
+            tv.setPadding((14 * resources.displayMetrics.density).toInt(),
+                (6 * resources.displayMetrics.density).toInt(),
+                (14 * resources.displayMetrics.density).toInt(),
+                (6 * resources.displayMetrics.density).toInt())
+            if (i == idx) {
+                tv.setTextColor(com.solosu.mtforum.util.ThemeManager.getThemeColor(this))
+                tv.setTypeface(null, android.graphics.Typeface.BOLD)
+            } else {
+                tv.setTextColor(androidx.core.content.ContextCompat.getColor(this, R.color.text_secondary))
+                tv.setTypeface(null, android.graphics.Typeface.NORMAL)
+            }
             tv.isClickable = true
             tv.isFocusable = true
             tv.setOnClickListener {
@@ -286,73 +574,74 @@ class PostActivity : AppCompatActivity() {
         }
     }
 
+    /** 主题色选中态底衬：浅色主题色填充 + 描边 */
+    private fun selectedPanelBackground(): android.graphics.drawable.GradientDrawable {
+        val themeColor = com.solosu.mtforum.util.ThemeManager.getThemeColor(this)
+        return android.graphics.drawable.GradientDrawable().apply {
+            cornerRadius = 12f * resources.displayMetrics.density
+            setColor(androidx.core.graphics.ColorUtils.setAlphaComponent(themeColor, 0x1F))
+            setStroke((1.2f * resources.displayMetrics.density).toInt(),
+                androidx.core.graphics.ColorUtils.setAlphaComponent(themeColor, 0x59))
+        }
+    }
+
+    /** 同步工具栏按钮的高亮状态，传入 null 表示全部取消 */
+    private fun updateToolHighlight(target: View?) {
+        if (highlightedTool !== target) {
+            highlightedTool?.let {
+                it.setBackgroundResource(R.drawable.bg_post_tool_btn)
+                (it as? android.view.ViewGroup)?.getChildAt(0)?.let { icon ->
+                    androidx.core.widget.ImageViewCompat.setImageTintList(
+                        icon as ImageView,
+                        android.content.res.ColorStateList.valueOf(
+                            androidx.core.content.ContextCompat.getColor(this, R.color.text_secondary)
+                        )
+                    )
+                }
+            }
+        }
+        highlightedTool = target
+        target?.let {
+            it.background = selectedPanelBackground()
+            (it as? android.view.ViewGroup)?.getChildAt(0)?.let { icon ->
+                androidx.core.widget.ImageViewCompat.setImageTintList(
+                    icon as ImageView,
+                    android.content.res.ColorStateList.valueOf(
+                        com.solosu.mtforum.util.ThemeManager.getThemeColor(this)
+                    )
+                )
+            }
+        }
+    }
+
     private fun toggleSmileyPanel() {
-        // 自绘制快速回复图标,替代 emoji 表情
         hideAllPanelsExcept(llSmileyPanel)
         if (llSmileyPanel.visibility == View.VISIBLE) {
             llSmileyPanel.visibility = View.GONE
             return
         }
         llSmileyPanel.visibility = View.VISIBLE
-        val container = findViewById<LinearLayout>(R.id.ll_smiley_container) ?: return
-        container.removeAllViews()
+        updateToolHighlight(btnSmiley)
 
-        // 优先使用论坛真实表情（与回复弹窗同一套数据）；未取到时回退自绘图标
+        // 论坛真实表情（与回复弹窗同一套数据）；取不到时给出重试入口
         val catalog = smileyCatalog
         if (catalog != null && catalog.isNotEmpty() && catalog[0].items.isNotEmpty()) {
             renderPostSmileySet(catalog)
             return
         }
-
-        val iconIds = intArrayOf(
-            R.drawable.ic_smile, R.drawable.ic_heart, R.drawable.ic_thumbs_up,
-            R.drawable.ic_fire, R.drawable.ic_star_filled, R.drawable.ic_check,
-            R.drawable.ic_cross, R.drawable.ic_lightbulb, R.drawable.ic_pin
-        )
-        val labels = arrayOf("微笑", "爱心", "点赞", "火热", "收藏", "同意", "反对", "想法", "置顶")
-        val size = (48 * resources.displayMetrics.density).toInt()
-        val padding = (6 * resources.displayMetrics.density).toInt()
-
-        for (idx in iconIds.indices) {
-            val item = LinearLayout(this)
-            item.orientation = LinearLayout.VERTICAL
-            item.gravity = Gravity.CENTER
-            item.setPadding(padding, padding / 2, padding, padding / 2)
-            val itemLp = LinearLayout.LayoutParams(size, size)
-            item.layoutParams = itemLp
-            item.setBackgroundResource(android.R.drawable.list_selector_background)
-            item.isClickable = true
-            item.isFocusable = true
-
-            val iv = ImageView(this)
-            val iconSize = (28 * resources.displayMetrics.density).toInt()
-            val ivLp = LinearLayout.LayoutParams(iconSize, iconSize)
-            iv.layoutParams = ivLp
-            iv.scaleType = ImageView.ScaleType.FIT_CENTER
-            iv.setImageResource(iconIds[idx])
-            item.addView(iv)
-
-            val tv = TextView(this)
-            tv.text = labels[idx]
-            tv.setTextSize(9f)
-            tv.setTextColor(0xFF9CA3AF.toInt())
-            tv.gravity = Gravity.CENTER
-            tv.maxLines = 1
-            item.addView(tv)
-
-            val tag = "[" + labels[idx] + "]"
-            item.setOnClickListener {
-                val editable = etContent.text
-                if (editable == null) {
-                    etContent.setText(tag)
-                    return@setOnClickListener
-                }
-                var selStart = etContent.selectionStart
-                if (selStart < 0) selStart = editable.length
-                editable.insert(selStart, tag)
-                etContent.setSelection(selStart + tag.length)
-            }
-            container.addView(item)
+        val rv = findViewById<RecyclerView>(R.id.rv_smiley)
+        val empty = findViewById<TextView>(R.id.tv_smiley_empty)
+        rv?.visibility = View.GONE
+        findViewById<LinearLayout>(R.id.ll_smiley_tabs)?.removeAllViews()
+        if (smileyLoadFailed) {
+            empty?.visibility = View.VISIBLE
+            empty?.text = "表情加载失败，点击重试"
+            empty?.setOnClickListener { loadSmileyCatalog(force = true) }
+        } else {
+            empty?.visibility = View.VISIBLE
+            empty?.text = "表情加载中…"
+            empty?.setOnClickListener(null)
+            loadSmileyCatalog()
         }
     }
 
@@ -362,6 +651,7 @@ class PostActivity : AppCompatActivity() {
         hideAllPanels()
         if (visible) return
         llInsertPanel.visibility = View.VISIBLE
+        updateToolHighlight(btnInsert)
         llInsertInput.visibility = View.GONE
         findViewById<View>(R.id.btn_ins_link)?.setOnClickListener { selectInsertType(INSERT_LINK, true, false, "链接网址", "链接文字") }
         findViewById<View>(R.id.btn_ins_image)?.setOnClickListener { selectInsertType(INSERT_IMAGE, true, false, "图片地址", "") }
@@ -377,6 +667,7 @@ class PostActivity : AppCompatActivity() {
     private fun selectInsertType(type: Int, needUrl: Boolean, needText: Boolean, hint1: String, hint2: String) {
         val f1 = findViewById<TextInputEditText>(R.id.et_insert_field1)
         val f2 = findViewById<TextInputEditText>(R.id.et_insert_field2)
+        updateInsertChipHighlight(type)
         llInsertInput.visibility = View.VISIBLE
         f1?.setText("")
         f2?.setText("")
@@ -386,6 +677,25 @@ class PostActivity : AppCompatActivity() {
         f2?.visibility = if (needUrl && needText && hint2.isNotEmpty()) View.VISIBLE else View.GONE
         findViewById<View>(R.id.btn_insert_confirm)?.setOnClickListener {
             applyInsert(type, f1?.text?.toString()?.trim() ?: "", f2?.text?.toString()?.trim() ?: "")
+        }
+    }
+
+    /** 插入类型 chip 的主题色选中态，同步更新上/当前项 */
+    private fun updateInsertChipHighlight(type: Int) {
+        val ids = intArrayOf(
+            R.id.btn_ins_link, R.id.btn_ins_image, R.id.btn_ins_audio, R.id.btn_ins_video,
+            R.id.btn_ins_flash, R.id.btn_ins_quote, R.id.btn_ins_code, R.id.btn_ins_free, R.id.btn_ins_hide
+        )
+        for (i in ids.indices) {
+            val chip = findViewById<TextView>(ids[i]) ?: continue
+            if (i + 1 == type) {
+                chip.background = selectedPanelBackground()
+                chip.setTextColor(com.solosu.mtforum.util.ThemeManager.getThemeColor(this))
+                highlightedInsertChip = chip
+            } else {
+                chip.setBackgroundResource(R.drawable.bg_post_forum_chip)
+                chip.setTextColor(androidx.core.content.ContextCompat.getColor(this, R.color.text_secondary))
+            }
         }
     }
 
@@ -954,6 +1264,7 @@ class PostActivity : AppCompatActivity() {
         llAtPanel.visibility = View.GONE
         llAdvancedOptions.visibility = View.GONE
         llInsertPanel.visibility = View.GONE
+        updateToolHighlight(null)
     }
 
     private fun hideAllPanelsExcept(except: View) {
@@ -1174,7 +1485,7 @@ class PostActivity : AppCompatActivity() {
                 if (desktopHtml != null) {
                     if (currentFormhash == null) currentFormhash = ForumParser.parseFormhash(desktopHtml)
                     extractUidAndHash(desktopHtml)
-                    cacheSmileyCatalog(desktopHtml)
+                    cacheSmileyCatalogFromEditor(desktopHtml)
                 }
             } catch (ignored: Exception) {
             }
@@ -1182,7 +1493,7 @@ class PostActivity : AppCompatActivity() {
     }
 
     /** 桌面编辑器页内联了论坛表情数据，从中解析并缓存，供表情面板使用 */
-    private fun cacheSmileyCatalog(html: String?) {
+    private fun cacheSmileyCatalogFromEditor(html: String?) {
         if (smileyCatalog != null) return
         var parsed: MutableList<ForumParser.SmileySet> = ArrayList()
         for (url in ForumParser.getSmileyScriptUrlCandidates()) {
@@ -1216,7 +1527,7 @@ class PostActivity : AppCompatActivity() {
             if (desktopHtml != null) {
                 if (currentFormhash == null) currentFormhash = ForumParser.parseFormhash(desktopHtml)
                 extractUidAndHash(desktopHtml)
-                cacheSmileyCatalog(desktopHtml)
+                cacheSmileyCatalogFromEditor(desktopHtml)
             }
         } catch (ignored: Exception) {
         }
@@ -1407,8 +1718,13 @@ class PostActivity : AppCompatActivity() {
             showError("请选择版块")
             return
         }
-        if (content.isEmpty()) {
+        if (content.isEmpty() && !isPollMode) {
             showError("请输入正文内容")
+            return
+        }
+
+        if (isPollMode) {
+            attemptPostPoll(title, content)
             return
         }
 
@@ -1531,6 +1847,7 @@ class PostActivity : AppCompatActivity() {
         if (!TextUtils.isEmpty(fid)) {
             selectedFid = fid
         }
+        findViewById<View>(R.id.ll_post_mode_tabs)?.visibility = View.GONE
         if (etTitle != null) {
             etTitle.setText(it.getStringExtra("edit_title"))
             etTitle.isEnabled = false // 编辑不改标题,避免触发审核
@@ -1665,5 +1982,7 @@ class PostActivity : AppCompatActivity() {
         private const val INSERT_CODE = 7
         private const val INSERT_FREE = 8
         private const val INSERT_HIDE = 9
+
+        private const val MAX_POLL_OPTIONS = 20
     }
 }
