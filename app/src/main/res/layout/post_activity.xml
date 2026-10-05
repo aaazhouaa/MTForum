@@ -1,9 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.coordinatorlayout.widget.CoordinatorLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:fitsSystemWindows="true"
+    android:orientation="vertical"
     android:background="@color/top_bar">
 
     <!-- 顶部 Toolbar -->
@@ -82,8 +83,8 @@
     <!-- 主布局：主滚动区 + 浮动子面板 + 底部快捷工具栏 + 底部操作栏 -->
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:layout_marginTop="48dp"
+        android:layout_height="0dp"
+        android:layout_weight="1"
         android:background="@color/top_bar"
         android:orientation="vertical">
 
@@ -1005,4 +1006,4 @@
         </LinearLayout>
     </LinearLayout>
 
-</androidx.coordinatorlayout.widget.CoordinatorLayout>
+</LinearLayout>

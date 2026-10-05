@@ -1934,14 +1934,12 @@ class PostActivity : AppCompatActivity() {
         findViewById<View>(R.id.ll_post_mode_tabs)?.visibility = View.GONE
         if (etTitle != null) {
             etTitle.setText(it.getStringExtra("edit_title"))
-            etTitle.isEnabled = false // 编辑不改标题,避免触发审核
+            // 编辑允许改标题：Discuz 提交时 subject 会随之更新
         }
         if (etContent != null) {
             etContent.setText(it.getStringExtra("edit_message"))
         }
         if (btnPublish != null) btnPublish.text = "保存修改"
-        if (tvTitleCount != null) tvTitleCount.visibility = View.GONE
-        // 编辑模式:不给改版块
         if (llCircleSelector != null) llCircleSelector.visibility = View.GONE
     }
 
