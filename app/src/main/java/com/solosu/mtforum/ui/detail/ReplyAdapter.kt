@@ -486,7 +486,9 @@ class ReplyAdapter(rawReplies: List<ReplyItem>?) :
 
         // 图六楼中楼与底栏新控件
         private val tvReplyBottomTime: TextView? = itemView.findViewById(R.id.tv_reply_bottom_time)
-        private val btnToggleSubReplies: ImageView? = itemView.findViewById(R.id.btn_toggle_sub_replies)
+        private val btnToggleSubReplies: View? = itemView.findViewById(R.id.btn_toggle_sub_replies)
+        private val ivToggleArrow: ImageView? = itemView.findViewById(R.id.iv_toggle_arrow)
+        private val tvToggleText: TextView? = itemView.findViewById(R.id.tv_toggle_text)
         private val btnReplyText: ImageView? = itemView.findViewById(R.id.btn_reply_text)
         private val layoutSubRepliesContainer: LinearLayout? = itemView.findViewById(R.id.layout_sub_replies_container)
         private val llSubRepliesList: LinearLayout? = itemView.findViewById(R.id.ll_sub_replies_list)
@@ -760,11 +762,13 @@ class ReplyAdapter(rawReplies: List<ReplyItem>?) :
             layoutCollapsedHint?.visibility = View.GONE
         }
 
-        /** 收起/展开箭头：ic_arrow_right 默认朝右，旋转 90° 朝下（待展开）、270° 朝上（已展开）。 */
+        /** 收起/展开：折叠时箭头朝下 +「N 条回复」，展开时箭头朝上 +「收起回复」。
+         *  ic_arrow_right 默认朝右，旋转 90° 朝下、270° 朝上。 */
         private fun updateToggleArrow(expanded: Boolean, subCount: Int) {
-            btnToggleSubReplies?.rotation = if (expanded) 270f else 90f
+            ivToggleArrow?.rotation = if (expanded) 270f else 90f
+            tvToggleText?.text = if (expanded) "收起回复" else "$subCount 条回复"
             btnToggleSubReplies?.contentDescription =
-                if (expanded) "收起回复" else "展开回复（$subCount）"
+                if (expanded) "收起回复" else "展开 $subCount 条回复"
         }
 
         private fun bindSubReplies(item: ReplyItem) {
@@ -787,7 +791,7 @@ class ReplyAdapter(rawReplies: List<ReplyItem>?) :
                 val tvSubOpBadge = subView.findViewById<TextView>(R.id.tv_sub_op_badge)
                 val tvSubContent = subView.findViewById<TextView>(R.id.tv_sub_content)
                 val tvSubTimeLoc = subView.findViewById<TextView>(R.id.tv_sub_time_location)
-                val btnSubReply = subView.findViewById<TextView>(R.id.btn_sub_reply)
+                val btnSubReply = subView.findViewById<android.view.View>(R.id.btn_sub_reply)
 
                 if (!TextUtils.isEmpty(subItem.avatarUrl)) {
                     Glide.with(ivSubAvatar.context)
@@ -833,15 +837,8 @@ class ReplyAdapter(rawReplies: List<ReplyItem>?) :
                 val inReplyTo = subItem.inReplyToName
                 val subSb = android.text.SpannableStringBuilder()
                 if (!TextUtils.isEmpty(inReplyTo)) {
-                    val prefix = "回复 $inReplyTo："
-                    val prefixSpan = android.text.SpannableString(prefix)
-                    val primaryColor = com.solosu.mtforum.util.ThemeManager.getThemeColor(itemView.context)
-                    prefixSpan.setSpan(
-                        android.text.style.ForegroundColorSpan(primaryColor),
-                        0, prefix.length,
-                        android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
-                    )
-                    subSb.append(prefixSpan)
+                    // 「回复 用户名：」保持常规正文颜色，不做主题色高亮
+                    subSb.append("回复 $inReplyTo：")
                 }
                 if (!TextUtils.isEmpty(subBody)) {
                     subSb.append(trimSpanned(subBody!!))

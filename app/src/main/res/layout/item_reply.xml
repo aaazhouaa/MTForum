@@ -170,20 +170,37 @@
             android:textSize="11sp"
             android:textColor="@color/text_secondary" />
 
-        <!-- 收起/展开回复（折叠=向下箭头，展开=向上箭头，由代码旋转） -->
-        <ImageView
+        <!-- 收起/展开回复：箭头 + 文字（折叠=向下箭头+「N 条回复」，展开=向上箭头+「收起回复」） -->
+        <LinearLayout
             android:id="@+id/btn_toggle_sub_replies"
-            android:layout_width="26dp"
+            android:layout_width="wrap_content"
             android:layout_height="26dp"
-            android:padding="3dp"
-            android:src="@drawable/ic_arrow_right"
-            app:tint="@color/icon_secondary"
-            android:scaleType="centerInside"
-            android:contentDescription="收起或展开回复"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingHorizontal="4dp"
             android:clickable="true"
             android:focusable="true"
             android:background="?attr/selectableItemBackgroundBorderless"
-            android:visibility="gone" />
+            android:visibility="gone">
+
+            <ImageView
+                android:id="@+id/iv_toggle_arrow"
+                android:layout_width="18dp"
+                android:layout_height="18dp"
+                android:src="@drawable/ic_arrow_right"
+                android:scaleType="centerInside"
+                android:importantForAccessibility="no"
+                app:tint="@color/icon_secondary" />
+
+            <TextView
+                android:id="@+id/tv_toggle_text"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="1dp"
+                android:text="展开回复"
+                android:textColor="@color/text_secondary"
+                android:textSize="12sp" />
+        </LinearLayout>
 
         <!-- 回复按钮（气泡+横线图标，灰白） -->
         <ImageView

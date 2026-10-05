@@ -11,30 +11,28 @@
         android:layout_height="match_parent"
         android:orientation="vertical">
 
-        <!-- 白色 Toolbar -->
+        <!-- 白色 Toolbar：不给标题，让右侧操作图标左移到标题位置 -->
         <com.google.android.material.appbar.MaterialToolbar
             android:id="@+id/toolbar"
             android:layout_width="match_parent"
             android:layout_height="?attr/actionBarSize"
             android:background="@color/top_bar"
             android:theme="@style/ThemeOverlay.AppCompat.DayNight"
-            app:title="@string/title_thread_detail"
-            app:titleTextColor="@color/text_primary"
             app:navigationIcon="@drawable/ic_back"
             app:navigationIconTint="@color/text_primary">
 
-            <!-- 工具栏里 layout_gravity=end 的子项按 XML 顺序从右向左排列：
-                 先写的靠最右。分享要固定在最右，所以它必须是第一个。 -->
+            <!-- 图标靠左排列（跟随返回键），XML 先写的靠左：举报 → 打赏 → 分享。
+                 与原先靠右时的视觉顺序保持一致。 -->
             <ImageButton
-                android:id="@+id/btn_share"
+                android:id="@+id/btn_kick"
                 android:layout_width="40dp"
                 android:layout_height="?attr/actionBarSize"
-                android:layout_gravity="end"
+                android:layout_gravity="start"
                 android:minWidth="0dp"
-                android:src="@drawable/ic_share_outline"
+                android:src="@drawable/ic_report_shield"
                 android:scaleType="fitCenter"
                 android:background="?attr/selectableItemBackgroundBorderless"
-                android:contentDescription="@string/action_share"
+                android:contentDescription="@string/kick_title"
                 app:tint="@color/icon_secondary"
                 android:padding="10dp" />
 
@@ -43,7 +41,7 @@
                 android:id="@+id/btn_reward"
                 android:layout_width="40dp"
                 android:layout_height="?attr/actionBarSize"
-                android:layout_gravity="end"
+                android:layout_gravity="start"
                 android:minWidth="0dp"
                 android:src="@drawable/ic_reward_packet_cny"
                 android:scaleType="fitCenter"
@@ -53,15 +51,15 @@
                 android:padding="10dp" />
 
             <ImageButton
-                android:id="@+id/btn_kick"
+                android:id="@+id/btn_share"
                 android:layout_width="40dp"
                 android:layout_height="?attr/actionBarSize"
-                android:layout_gravity="end"
+                android:layout_gravity="start"
                 android:minWidth="0dp"
-                android:src="@drawable/ic_report_shield"
+                android:src="@drawable/ic_share_outline"
                 android:scaleType="fitCenter"
                 android:background="?attr/selectableItemBackgroundBorderless"
-                android:contentDescription="@string/kick_title"
+                android:contentDescription="@string/action_share"
                 app:tint="@color/icon_secondary"
                 android:padding="10dp" />
         </com.google.android.material.appbar.MaterialToolbar>

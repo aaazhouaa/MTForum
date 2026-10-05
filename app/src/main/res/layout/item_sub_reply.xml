@@ -73,17 +73,17 @@
             android:textSize="11sp"
             android:textColor="@color/text_secondary" />
 
-        <TextView
+        <ImageView
             android:id="@+id/btn_sub_reply"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:paddingHorizontal="6dp"
-            android:paddingVertical="2dp"
-            android:text="回复"
-            android:textSize="12sp"
-            android:textColor="?attr/colorPrimary"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:padding="2dp"
+            android:src="@drawable/ic_comment_lines"
+            android:scaleType="centerInside"
+            android:contentDescription="回复"
             android:clickable="true"
             android:focusable="true"
-            android:background="?attr/selectableItemBackgroundBorderless" />
+            android:background="?attr/selectableItemBackgroundBorderless"
+            app:tint="@color/icon_secondary" />
     </LinearLayout>
 </LinearLayout>
