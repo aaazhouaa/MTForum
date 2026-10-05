@@ -17,9 +17,9 @@ local.properties
 *.iws
 .cxx/
 .externalNativeBuild/
-# 签名(默认忽略,防止误传私钥;本项目为演示 keystore 已附,正式分发请自换)
-# *.jks
-# *.keystore
+# 签名私钥与口令：一律不入库（口令写在 local.properties，本文件已忽略）
+*.jks
+*.keystore
 # 系统垃圾
 .DS_Store
 Thumbs.db

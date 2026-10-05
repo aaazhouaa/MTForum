@@ -10,6 +10,19 @@ android {
     // AGP 8.13 默认要 35.0.0，本机 SDK 只装了 36.0.0，且容器禁止自动下载 SDK 组件。
     buildToolsVersion '36.0.0'
 
+    // 签名口令不入库：从 local.properties（已在 .gitignore 中）读取。
+    // 缺任一项时不配置 release 签名，产出未签名包，避免把私钥材料写进仓库。
+    def localProps = new Properties()
+    def localPropsFile = rootProject.file('local.properties')
+    if (localPropsFile.exists()) {
+        localPropsFile.withInputStream { localProps.load(it) }
+    }
+    def releaseStoreFile = localProps.getProperty('RELEASE_STORE_FILE')
+    def releaseStorePassword = localProps.getProperty('RELEASE_STORE_PASSWORD')
+    def releaseKeyAlias = localProps.getProperty('RELEASE_KEY_ALIAS')
+    def releaseKeyPassword = localProps.getProperty('RELEASE_KEY_PASSWORD')
+    def hasReleaseSigning = releaseStoreFile && releaseStorePassword && releaseKeyAlias && releaseKeyPassword
+
     defaultConfig {
         applicationId 'com.solosu.mtforum.tp'
         minSdk 29
@@ -19,13 +32,15 @@ android {
     }
 
     signingConfigs {
-        release {
-            storeFile file("release.keystore")
-            storePassword "mtforum123"
-            keyAlias "mtforum"
-            keyPassword "mtforum123"
-            v1SigningEnabled true
-            v2SigningEnabled true
+        if (hasReleaseSigning) {
+            release {
+                storeFile file(releaseStoreFile)
+                storePassword releaseStorePassword
+                keyAlias releaseKeyAlias
+                keyPassword releaseKeyPassword
+                v1SigningEnabled true
+                v2SigningEnabled true
+            }
         }
     }
 
@@ -34,7 +49,11 @@ android {
             // 调试包沿用 AGP 默认的 debug 签名
         }
         release {
-            signingConfig signingConfigs.release
+            if (hasReleaseSigning) {
+                signingConfig signingConfigs.release
+            } else {
+                logger.lifecycle("[签名] 未配置 RELEASE_* 于 local.properties，release 将产出未签名包")
+            }
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
             shrinkResources false
