@@ -9,15 +9,18 @@ import android.graphics.drawable.Drawable
 import android.text.Html
 import android.text.Spannable
 import android.text.SpannableString
+import android.text.Spanned
 import android.text.TextPaint
 import android.text.TextUtils
 import android.text.method.LinkMovementMethod
 import android.text.style.ClickableSpan
+import android.text.style.ImageSpan
 import android.text.style.RelativeSizeSpan
 import android.text.style.StyleSpan
 import android.text.style.URLSpan
 import android.util.TypedValue
 import android.view.LayoutInflater
+import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
@@ -852,6 +855,8 @@ class ReplyAdapter(rawReplies: List<ReplyItem>?) :
                     subSb.append(trimSpanned(subBody!!))
                 }
                 tvSubContent.text = subSb
+                // 子回复正文里的附件配图是内联 ImageSpan，默认不可点击，这里挂上点击放大
+                attachInlineImageClick(tvSubContent)
                 val subEditTime = subEditSplit?.second
                 if (!subEditTime.isNullOrEmpty()) {
                     tvSubEditTime.visibility = View.VISIBLE
@@ -1191,6 +1196,66 @@ class ReplyAdapter(rawReplies: List<ReplyItem>?) :
                         && !value.contains("blank.gif", ignoreCase = true)) {
                         return value
                     }
+                }
+            }
+            return null
+        }
+
+        /**
+         * 楼中楼正文里的图片是 Html.ImageGetter 生成的内联 ImageSpan，自身不响应点击，
+         * 这里按点击坐标命中 ImageSpan 时打开全屏预览。不设置 movementMethod，
+         * 避免抢占长按菜单与列表滚动。
+         */
+        private fun attachInlineImageClick(textView: TextView) {
+            val slop = android.view.ViewConfiguration.get(textView.context).scaledTouchSlop
+            textView.setOnTouchListener(object : View.OnTouchListener {
+                private var downX = 0f
+                private var downY = 0f
+                private var downTime = 0L
+
+                override fun onTouch(v: View, event: MotionEvent): Boolean {
+                    when (event.actionMasked) {
+                        MotionEvent.ACTION_DOWN -> {
+                            downX = event.x
+                            downY = event.y
+                            downTime = System.currentTimeMillis()
+                        }
+                        MotionEvent.ACTION_UP -> {
+                            val moved = Math.abs(event.x - downX) > slop ||
+                                    Math.abs(event.y - downY) > slop
+                            val longPress = System.currentTimeMillis() - downTime > 400
+                            if (!moved && !longPress) {
+                                val url = findInlineImageUrlAt(textView, event.x, event.y)
+                                if (url != null) {
+                                    val intent = Intent(v.context, ImagePreviewActivity::class.java)
+                                    intent.putExtra("image_url", url)
+                                    v.context.startActivity(intent)
+                                    return true
+                                }
+                            }
+                        }
+                    }
+                    return false
+                }
+            })
+        }
+
+        /** 返回坐标处的正文内联图片地址；表情不参与点击。 */
+        private fun findInlineImageUrlAt(textView: TextView, x: Float, y: Float): String? {
+            val layout = textView.layout ?: return null
+            val text = textView.text as? Spanned ?: return null
+            for (span in text.getSpans(0, text.length, ImageSpan::class.java)) {
+                val start = text.getSpanStart(span)
+                val end = text.getSpanEnd(span)
+                if (start < 0 || end < 0) continue
+                val top = layout.getLineTop(layout.getLineForOffset(start))
+                val bottom = layout.getLineBottom(layout.getLineForOffset(end))
+                val left = layout.getPrimaryHorizontal(start)
+                val right = layout.getPrimaryHorizontal(end)
+                if (x in left..right && y >= top && y <= bottom) {
+                    val url = normalizeImageUrl(span.source) ?: continue
+                    if (isSmileyOrIcon(url)) continue
+                    return url
                 }
             }
             return null
