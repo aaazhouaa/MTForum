@@ -51,6 +51,7 @@
                     android:layout_marginStart="2dp"
                     android:textSize="14sp"
                     android:textColor="@color/text_primary"
+                    android:alpha="0.8"
                     android:maxLines="1"
                     android:ellipsize="end"
                     android:text="匿名" />

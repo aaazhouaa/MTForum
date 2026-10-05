@@ -28,7 +28,8 @@
             android:layout_height="wrap_content"
             android:layout_marginStart="8dp"
             android:textSize="13sp"
-            android:textColor="@color/text_primary" />
+            android:textColor="@color/text_primary"
+            android:alpha="0.8" />
 
         <TextView
             android:id="@+id/tv_sub_op_badge"
