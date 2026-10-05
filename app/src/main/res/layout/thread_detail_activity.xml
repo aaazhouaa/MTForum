@@ -62,6 +62,20 @@
                 android:contentDescription="@string/action_share"
                 app:tint="@color/icon_secondary"
                 android:padding="10dp" />
+
+            <!-- 版块名：与三个操作图标同行，靠最右显示（纯文字，不占位时隐藏） -->
+            <TextView
+                android:id="@+id/tv_toolbar_forum"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="end"
+                android:layout_marginEnd="16dp"
+                android:maxWidth="120dp"
+                android:maxLines="1"
+                android:ellipsize="end"
+                android:textSize="11sp"
+                android:textColor="@color/text_secondary"
+                android:visibility="gone" />
         </com.google.android.material.appbar.MaterialToolbar>
 
         <ProgressBar

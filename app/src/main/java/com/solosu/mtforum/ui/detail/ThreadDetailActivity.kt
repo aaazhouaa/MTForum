@@ -370,10 +370,10 @@ class ThreadDetailActivity : AppCompatActivity() {
             true
         }
         if (!TextUtils.isEmpty(detail.forumName)) {
-            hb.tvForumName.visibility = View.VISIBLE
-            hb.tvForumName.text = detail.forumName
+            binding.tvToolbarForum.visibility = View.VISIBLE
+            binding.tvToolbarForum.text = detail.forumName
         } else {
-            hb.tvForumName.visibility = View.GONE
+            binding.tvToolbarForum.visibility = View.GONE
         }
         val avatarUrl = detail.avatarUrl
         if (!TextUtils.isEmpty(avatarUrl)) {
@@ -582,10 +582,10 @@ class ThreadDetailActivity : AppCompatActivity() {
         binding.progressBar.visibility = View.GONE
         binding.swipeRefresh.isEnabled = true
         if (!TextUtils.isEmpty(postDetail.forumName)) {
-            headerBinding!!.tvForumName.visibility = View.VISIBLE
-            headerBinding!!.tvForumName.text = postDetail.forumName
+            binding.tvToolbarForum.visibility = View.VISIBLE
+            binding.tvToolbarForum.text = postDetail.forumName
         } else {
-            headerBinding!!.tvForumName.visibility = View.GONE
+            binding.tvToolbarForum.visibility = View.GONE
         }
         headerBinding!!.tvThreadTitle.text = if (!TextUtils.isEmpty(postDetail.title)) postDetail.title else ""
         // build75: 长按标题 -> 举报帖子
@@ -4776,6 +4776,51 @@ class ThreadDetailActivity : AppCompatActivity() {
         }
     }
 
+    private fun separateInlineImagesFromText(html: String): String {
+        if (TextUtils.isEmpty(html) || !html.contains("<img", ignoreCase = true)) return html
+        val blockDelimiter = Regex(
+            "(?i)</?(?:br|p|div|li|tr|td|th|table|h[1-6]|blockquote|pre|ul|ol|center|dl|dt|dd|figure|section|article)\\b[^>]*>"
+        )
+        val imgPattern = Regex("(?i)<img\\b[^>]*>")
+        val srcPattern = Regex("(?i)src=[\"']([^\"']+)[\"']")
+        val tagPattern = Regex("<[^>]+>")
+        val tableRanges = Regex("(?is)<table\\b.*?</table>").findAll(html).map { it.range }.toList()
+
+        val sb = StringBuilder(html.length + 16)
+        var cursor = 0
+        fun process(segment: String, segStart: Int) {
+            val segEnd = segStart + segment.length
+            val inTable = tableRanges.any { it.first < segEnd && segStart <= it.last }
+            if (inTable || !segment.contains("<img", ignoreCase = true)) {
+                sb.append(segment)
+                return
+            }
+            var last = 0
+            for (img in imgPattern.findAll(segment)) {
+                val url = srcPattern.find(img.value)?.groupValues?.get(1) ?: ""
+                if (url.isEmpty() || isSmileyOrIcon(url)) continue
+                val before = segment.substring(0, img.range.first)
+                    .replace(tagPattern, "").replace("&nbsp;", " ").isNotBlank()
+                val after = segment.substring(img.range.last + 1)
+                    .replace(tagPattern, "").replace("&nbsp;", " ").isNotBlank()
+                if (!before && !after) continue
+                sb.append(segment, last, img.range.first)
+                if (before) sb.append("<br>")
+                sb.append(img.value)
+                if (after) sb.append("<br>")
+                last = img.range.last + 1
+            }
+            sb.append(segment, last, segment.length)
+        }
+        for (d in blockDelimiter.findAll(html)) {
+            process(html.substring(cursor, d.range.first), cursor)
+            sb.append(d.value)
+            cursor = d.range.last + 1
+        }
+        process(html.substring(cursor), cursor)
+        return sb.toString()
+    }
+
     private fun groupContinuousImages(html: String): String {
         if (TextUtils.isEmpty(html)) return ""
         val imgPattern = Pattern.compile("(?i)<img\\b[^>]*src=[\"']([^\"']+)[\"'][^>]*>")
@@ -4979,7 +5024,7 @@ class ThreadDetailActivity : AppCompatActivity() {
         val collapsedHtml = Regex("(?i)(?:<br\\s*/?>\\s*){2,}").replace(cleanedHtml, "<br>")
             .replace(Regex("(?i)<p\\s*>\\s*(?:&nbsp;|&#160;|\\s)*</p>"), "")
             .replace(Regex("(?i)(?:\\r?\\n\\s*){3,}"), "\n\n")
-        val processedHtml = groupContinuousImages(collapsedHtml)
+        val processedHtml = separateInlineImagesFromText(groupContinuousImages(collapsedHtml))
 
         val hasTable = processedHtml.contains("<table", ignoreCase = true)
         val hasGallery = processedHtml.contains("continuous-image-gallery", ignoreCase = true)
