@@ -1375,6 +1375,7 @@ class ThreadDetailActivity : AppCompatActivity() {
                     showUploadError("获取附件上传授权失败，请重新登录后重试")
                     return@Thread
                 }
+                logUploadAuth(uid, hash)
                 val extra = HashMap<String, String>()
                 extra["uid"] = uid!!
                 extra["hash"] = hash!!
@@ -3207,6 +3208,7 @@ class ThreadDetailActivity : AppCompatActivity() {
                     }
                     return@Thread
                 }
+                logUploadAuth(uid, hash)
                 val extra = HashMap<String, String>()
                 extra["uid"] = uid!!
                 extra["hash"] = hash!!
@@ -3391,26 +3393,81 @@ class ThreadDetailActivity : AppCompatActivity() {
         }.start()
     }
 
-    private fun extractUploadError(response: String?): String {
-        if (TextUtils.isEmpty(response)) {
-            return "图片上传失败，服务器未返回结果"
+    /**
+     * 解析上传响应取 aid。Discuz forum_upload::uploadmsg() 真实格式：
+     *   simple=2：DISCUZUPLOAD|是否图片|状态码|aid|…
+     *   simple=1：DISCUZUPLOAD|状态码|aid|…
+     * 取 aid 需先确认状态码为 0（原实现把 parts[1] 当状态码，在 simple=2 下会误判并落到正则兑底）。
+     */
+    private fun parseUploadAid(response: String?): String? {
+        if (TextUtils.isEmpty(response)) return null
+        val text = Regex("(?s)<[^>]+>").replace(response!!.trim(), "").trim()
+        if (text.isEmpty()) return null
+        if (text.uppercase(Locale.ROOT).startsWith("DISCUZUPLOAD|")) {
+            val parts = text.split("\\|".toRegex(), -1).toTypedArray()
+            val statusIndex = if (parts.size >= 8) 2 else 1
+            val aidIndex = statusIndex + 1
+            if (parts.size > aidIndex
+                && parts[statusIndex].trim().toIntOrNull() == 0
+                && parts[aidIndex].trim().matches(Regex("\\d+"))
+            ) {
+                return parts[aidIndex].trim()
+            }
+            return null
         }
-        if (ForumParser.isLoginPage(response) || containsAny(response, "请先登录", "登录")) {
+        return null
+    }
+
+    /** 上传请求侧诊断：记录 uid/hash 是否存在与长度（不落敏感值），便于定位空响应根因。 */
+    private fun logUploadAuth(uid: String?, hash: String?) {
+        com.solosu.mtforum.util.AiLog.i(
+            "upload",
+            "upload auth uid=" + (uid ?: "null") + " hashLen=" + (hash?.length ?: 0)
+                    + " loggedIn=" + httpClient.isLoggedIn()
+        )
+    }
+
+    /**
+     * 把上传响应转成可展示的失败原因。
+     * 关键：misc_swfupload 校验失败时 exit() 直接返回**空响应**，页面根本不输出错误码，
+     * 因此「响应为空」优先提示鉴权/登录问题，而不是笼统的格式或大小错误。
+     */
+    private fun extractUploadError(response: String?): String {
+        val raw = response?.trim() ?: ""
+        com.solosu.mtforum.util.AiLog.i("upload", "附件上传响应: " + com.solosu.mtforum.util.AiLog.clip(raw, 300))
+        if (raw.isEmpty()) {
+            return "附件上传失败：上传校验未通过，请重新登录后重试"
+        }
+        if (ForumParser.isLoginPage(raw) || containsAny(raw, "请先登录")) {
             return "登录状态已失效，请重新登录"
         }
-        val text = Regex("(?s)<[^>]+>").replace(response!!, " ").trim()
-        if (text.startsWith("DISCUZUPLOAD|")) {
+        val text = Regex("(?s)<[^>]+>").replace(raw, " ").trim()
+        if (text.uppercase(Locale.ROOT).startsWith("DISCUZUPLOAD|")) {
             val parts = text.split("\\|".toRegex(), -1).toTypedArray()
-            if (parts.size > 3) {
-                val error = parts[parts.size - 1].trim()
-                if (!TextUtils.isEmpty(error) && !error.matches(Regex("\\d+"))) {
-                    return "图片上传失败：$error"
-                }
-                return "图片上传失败，请检查图片格式、大小和登录状态"
-            }
-            return "图片上传失败，请检查图片格式、大小和登录状态"
+            val statusIndex = if (parts.size >= 8) 2 else 1
+            val status = if (parts.size > statusIndex) parts[statusIndex].trim().toIntOrNull() else null
+            if (status != null && status != 0) return uploadStatusReason(status)
+            return "附件上传失败，请检查文件格式、大小和登录状态"
         }
-        return "图片上传失败，请检查图片格式、大小和登录状态"
+        return "附件上传失败，请检查文件格式、大小和登录状态"
+    }
+
+    /** Discuz forum_upload 状态码文案。 */
+    private fun uploadStatusReason(status: Int): String {
+        return when (status) {
+            1 -> "此类型附件不允许上传"
+            2 -> "文件上传失败或为空"
+            3 -> "附件超过大小限制"
+            4, 5 -> "该格式附件被禁止或超过格式大小限制"
+            6 -> "今日附件数量已达上限"
+            7 -> "不是有效的图片文件"
+            8, 9 -> "附件保存失败，请稍后重试"
+            10 -> "上传校验失败，请重新登录后重试"
+            11 -> "今日附件总大小已达上限"
+            12 -> "文件名含敏感词，请改名后重试"
+            13 -> "图片尺寸不符合要求"
+            else -> "附件上传失败（错误码 $status）"
+        }
     }
 
     private fun showUploadError(message: String) {
@@ -3452,35 +3509,6 @@ class ThreadDetailActivity : AppCompatActivity() {
         ).matcher(html)
         if (m.find()) return m.group(1)
         m = Pattern.compile("[?&]" + quotedKey + "=([^&\"'<>\\s]+)", Pattern.CASE_INSENSITIVE).matcher(html)
-        if (m.find()) return m.group(1)
-        return null
-    }
-
-    private fun parseUploadAid(response: String?): String? {
-        if (TextUtils.isEmpty(response)) {
-            return null
-        }
-        val trimmed = response!!.trim()
-        if (trimmed.isEmpty()) {
-            return null
-        }
-        val text = Regex("(?s)<[^>]+>").replace(trimmed, "").trim()
-        if (text.uppercase(Locale.ROOT).startsWith("DISCUZUPLOAD|")) {
-            val parts = text.split("\\|".toRegex(), -1).toTypedArray()
-            if (parts.size >= 4 && "0" == parts[2] && parts[3].matches(Regex("\\d+"))) {
-                return parts[3]
-            }
-            if (parts.size >= 3 && "0" == parts[1] && parts[2].matches(Regex("\\d+"))) {
-                return parts[2]
-            }
-            val mPipe = Pattern.compile("(?i)DISCUZUPLOAD\\|[^|]*\\|0\\|([^|]+)").matcher(text)
-            if (mPipe.find() && mPipe.group(1)!!.matches(Regex("\\d+"))) {
-                return mPipe.group(1)
-            }
-        }
-        var m = Pattern.compile("(?:aid|attach)(?:Id)?[\\s:='\"]+(\\d+)", Pattern.CASE_INSENSITIVE).matcher(text)
-        if (m.find()) return m.group(1)
-        m = Pattern.compile("\\\"(?:aid|attach)(?:Id)?\\\"\\s*:\\s*(\\d+)", Pattern.CASE_INSENSITIVE).matcher(text)
         if (m.find()) return m.group(1)
         return null
     }

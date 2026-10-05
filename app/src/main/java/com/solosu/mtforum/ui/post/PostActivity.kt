@@ -28,6 +28,7 @@ import com.solosu.mtforum.model.ForumCategory
 import com.solosu.mtforum.network.ForumParser
 import com.solosu.mtforum.network.HttpClient
 import com.solosu.mtforum.session.DraftManager
+import com.solosu.mtforum.util.AiLog
 import com.bumptech.glide.Glide
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.textfield.TextInputEditText
@@ -787,12 +788,6 @@ class PostActivity : AppCompatActivity() {
                     )
                     val aid = parseDiscuzUploadResponse(response)
                     if (aid == null) {
-                        runOnUiThread {
-                            Toast.makeText(
-                                this,
-                                "$fileName 上传失败", Toast.LENGTH_SHORT
-                            ).show()
-                        }
                         continue
                     }
 
@@ -1063,12 +1058,6 @@ class PostActivity : AppCompatActivity() {
                 )
                 val aid = parseDiscuzUploadResponse(response)
                 if (aid == null) {
-                    runOnUiThread {
-                        Toast.makeText(
-                            this,
-                            "附件上传失败", Toast.LENGTH_SHORT
-                        ).show()
-                    }
                     return@Thread
                 }
 
@@ -1098,38 +1087,55 @@ class PostActivity : AppCompatActivity() {
     }
 
     /**
-     * 解析 Discuz! 附件上传响应（管道分隔符格式）
-     * 成功: DISCUZUPLOAD|aid|uploadId|imageWidth|imageHeight
-     * 失败: DISCUZUPLOAD|error|错误码|错误信息
+     * 解析 Discuz 上传响应。forum_upload::uploadmsg() 的真实格式：
+     *   simple=2：DISCUZUPLOAD|是否图片(0/1)|状态码|aid|是否图片(-1/0/1)|附件路径|文件名|大小上限
+     *   simple=1：DISCUZUPLOAD|状态码|aid|是否图片|大小上限
+     * 仅状态码为 0 时 aid 有效；失败时按状态码给出原因（原实现只认 parts[1]=="error"，
+     * 永远匹配不上真实失败格式，所有失败都被归为笼统的「上传失败」）。
      */
     private fun parseDiscuzUploadResponse(response: String?): String? {
-        if (response == null) return null
-        val text = response.trim()
-        if (text.isEmpty()) return null
-        try {
-            // Discuz! 实际格式：DISCUZUPLOAD|状态|错误码|aid|hash|路径|文件名...
-            // 成功条件是 data[0]=DISCUZUPLOAD 且 data[2]=0，aid 在 data[3]。
-            if (text.startsWith("DISCUZUPLOAD|")) {
-                val parts = text.split("\\|".toRegex(), 0).toTypedArray()
-                if (parts.size > 3 && "0" == parts[2]
-                    && parts[3].matches(Regex("\\d+"))
-                ) {
-                    return parts[3]
-                }
-                if (parts.size > 3 && "error".equals(parts[1], ignoreCase = true)) {
-                    val errorMsg = if (parts.size > 7) parts[7]
-                    else (if (parts.size > 3) parts[3] else "未知错误")
-                    runOnUiThread {
-                        Toast.makeText(
-                            this@PostActivity,
-                            "上传错误: $errorMsg", Toast.LENGTH_SHORT
-                        ).show()
-                    }
-                }
-            }
-        } catch (ignored: Exception) {
+        val text = response?.let { Regex("(?s)<[^>]+>").replace(it, "") }?.trim() ?: ""
+        if (text.isEmpty()) {
+            AiLog.e("upload", "附件上传响应为空（misc_swfupload 鉴权失败时会直接 exit）")
+            runOnUiThread { Toast.makeText(this@PostActivity, "附件上传失败：校验未通过，请重新登录后重试", Toast.LENGTH_SHORT).show() }
+            return null
+        }
+        AiLog.i("upload", "附件上传响应: " + AiLog.clip(text, 300))
+        if (!text.startsWith("DISCUZUPLOAD|")) {
+            AiLog.e("upload", "未识别的上传响应（可能是风控挑战页）")
+            runOnUiThread { Toast.makeText(this@PostActivity, "附件上传失败，请稍后重试", Toast.LENGTH_SHORT).show() }
+            return null
+        }
+        val parts = text.split("\\|".toRegex(), -1).toTypedArray()
+        val statusIndex = if (parts.size >= 8) 2 else 1
+        val aidIndex = statusIndex + 1
+        if (parts.size <= aidIndex) return null
+        val status = parts[statusIndex].trim().toIntOrNull()
+        val aidPart = parts[aidIndex].trim()
+        if (status == 0 && aidPart.matches(Regex("\\d+"))) return aidPart
+        if (status != null && status != 0) {
+            val reason = uploadStatusReason(status)
+            runOnUiThread { Toast.makeText(this@PostActivity, reason, Toast.LENGTH_SHORT).show() }
         }
         return null
+    }
+
+    /** Discuz forum_upload 的状态码文案（见 source/class/forum/forum_upload.php）。 */
+    private fun uploadStatusReason(status: Int): String {
+        return when (status) {
+            1 -> "此类型附件不允许上传"
+            2 -> "文件上传失败或为空"
+            3 -> "附件超过大小限制"
+            4, 5 -> "该格式附件被禁止或超过格式大小限制"
+            6 -> "今日附件数量已达上限"
+            7 -> "不是有效的图片文件"
+            8, 9 -> "附件保存失败，请稍后重试"
+            10 -> "上传校验失败，请重新登录后重试"
+            11 -> "今日附件总大小已达上限"
+            12 -> "文件名含敏感词，请改名后重试"
+            13 -> "图片尺寸不符合要求"
+            else -> "附件上传失败（错误码 $status）"
+        }
     }
 
     private fun extractAttachUrlFromResponse(response: String?): String? {
@@ -1160,14 +1166,29 @@ class PostActivity : AppCompatActivity() {
         return null
     }
 
+    /** 从 content:// 解析真实文件名：此前直接用 uri.path 末段，相册返回纯数字 id 时会拼出无扩展名的名字 */
     private fun getFileNameFromUri(uri: Uri): String {
-        var name = "attachment"
+        var name = ""
+        var cursor: android.database.Cursor? = null
         try {
-            val path = uri.path
-            if (path != null) name = path.substring(path.lastIndexOf('/') + 1)
+            cursor = contentResolver.query(
+                uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null
+            )
+            if (cursor != null && cursor.moveToFirst()) {
+                val column = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                if (column >= 0) name = cursor.getString(column) ?: ""
+            }
         } catch (ignored: Exception) {
+        } finally {
+            cursor?.close()
         }
-        if (!name.contains(".")) name += ".dat"
+        if (TextUtils.isEmpty(name)) {
+            val path = uri.lastPathSegment
+            if (!TextUtils.isEmpty(path)) name = path!!
+        }
+        name = Regex("[\\\\/:*?\"<>|]").replace(name, "_")
+        if (TextUtils.isEmpty(name)) name = "attachment"
+        if (!name.matches(Regex("(?i).*\\.[a-z0-9]{2,5}$"))) name += ".dat"
         return name
     }
 
