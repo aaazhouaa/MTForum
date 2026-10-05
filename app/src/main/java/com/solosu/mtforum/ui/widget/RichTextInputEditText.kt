@@ -16,7 +16,7 @@ import com.google.android.material.textfield.TextInputEditText
 /**
  * 支持从输入法剪切板和系统剪贴板直接粘贴/提交图片的输入框
  */
-class RichTextInputEditText @JvmOverloads constructor(
+open class RichTextInputEditText @JvmOverloads constructor(
     context: Context,
     attrs: AttributeSet? = null,
     defStyleAttr: Int = android.R.attr.editTextStyle

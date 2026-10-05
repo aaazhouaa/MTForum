@@ -96,6 +96,7 @@ import com.solosu.mtforum.ui.message.ChatActivity
 import com.solosu.mtforum.ui.space.UserProfileActivity
 import com.solosu.mtforum.ui.widget.DialogHelper
 import com.solosu.mtforum.ui.widget.FrostedGlassHelper
+import com.solosu.mtforum.util.AiLog
 import com.solosu.mtforum.util.BBCodeUtil
 import com.solosu.mtforum.util.NavigationHelper
 import com.solosu.mtforum.util.RoundedImageDrawable
@@ -124,7 +125,7 @@ class ThreadDetailActivity : AppCompatActivity() {
     private lateinit var binding: ThreadDetailActivityBinding
     private lateinit var httpClient: HttpClient
     private var mBottomSheetDialog: BottomSheetDialog? = null
-    private var mEtReplyDialog: com.solosu.mtforum.ui.widget.RichTextInputEditText? = null
+    private var mEtReplyDialog: com.solosu.mtforum.ui.widget.SmileyAwareEditText? = null
     private var mTvReplyTarget: TextView? = null
     private var mBtnSendReply: MaterialButton? = null
     private var postDetail: PostDetail? = null
@@ -439,6 +440,13 @@ class ThreadDetailActivity : AppCompatActivity() {
         // build73: 评论长按 -> 回复 / 举报 / (本人)删除
         replyAdapter!!.setOnReplyLongClickListener(object : ReplyAdapter.OnReplyLongClickListener {
             override fun onReplyLongClick(item: ReplyItem?, position: Int) {
+                // 长按菜单的“是不是本人”完全靠 uid 比，用户反馈“长按自己的评论没有删除项”
+                // 时，这行能直接区分「长按事件没触发」与「身份判定错了」。
+                AiLog.e(
+                    "menu",
+                    "评论长按 pid=" + item?.pid + " author=" + item?.author +
+                            " authorUid=" + item?.authorUid + " myUid=" + loginUid()
+                )
                 showReplyActionMenu(item)
             }
         })
@@ -916,7 +924,7 @@ class ThreadDetailActivity : AppCompatActivity() {
         binding.vReplyMask.setOnClickListener { hideReplyPanel() }
 
         val panel = binding.containerReplyPanel
-        val etReplyDialog = panel.findViewById<com.solosu.mtforum.ui.widget.RichTextInputEditText>(R.id.et_reply_dialog)
+        val etReplyDialog = panel.findViewById<com.solosu.mtforum.ui.widget.SmileyAwareEditText>(R.id.et_reply_dialog)
         val btnSend = panel.findViewById<MaterialButton>(R.id.btn_send_reply)
         val tvTarget = panel.findViewById<TextView>(R.id.tv_reply_target)
         val btnPickImage = panel.findViewById<ImageButton>(R.id.btn_pick_image)
@@ -1829,8 +1837,14 @@ class ThreadDetailActivity : AppCompatActivity() {
             if (item != null && pid == item.pid) {
                 val author = if (!TextUtils.isEmpty(item.author)) item.author else "匿名"
                 val time = if (!TextUtils.isEmpty(item.time)) item.time else ""
-                val content = if (TextUtils.isEmpty(item.contentText)) "" else item.contentText
-                return "[quote][color=#999999]" + author + " 发表于 " + time + "[/color]\n" + content + "[/quote]"
+                val content = (item.contentText ?: "")
+                    .replace("[quote]", "").replace("[/quote]", "")
+                // 引用头必须带 goto=findpost&pid= 链接：服务端不会把 [quote] 里的作者当成
+                // 回复对象，被引用楼层只能靠这段链接定位。缺了它，抓回页面解析不出父 pid，
+                // 客户端只能按昵称猜，回复自己的楼层就会挂到最近的另一条同名楼层上。
+                return "[quote][size=2][url=forum.php?mod=redirect&goto=findpost&pid=" + pid +
+                        "&ptid=" + (tid ?: "") + "][color=#999999]" + author + " 发表于 " + time +
+                        "[/color][/url][/size]" + content + "[/quote]"
             }
         }
         return null
@@ -4012,6 +4026,12 @@ class ThreadDetailActivity : AppCompatActivity() {
         it.putExtra("edit_forum_name", detail.forumName)
         it.putExtra("edit_title", detail.title)
         it.putExtra("edit_message", stripContentHtml(detail.contentHtml))
+        // 编辑页只回填 aid，无法据此给图片缩略图一个可加载地址：
+        // [attachimg]aid[/attachimg] 拼出的 forum.php?mod=image&aid=N 无 key 时被 302 到
+        // none.gif，而 Glide 不携带 App 的 OkHttp Cookie。
+        // detail.imageUrls 是 ForumParser 从正文 img 的 file/zoomfile 等属性解析出的直链
+        // （详情页正是用它成功渲染），按正文图片顺序传过去供编辑页回填。
+        it.putStringArrayListExtra("edit_attach_urls", ArrayList(detail.imageUrls ?: emptyList()))
         startActivityForResult(it, REQUEST_EDIT_THREAD)
     }
 
@@ -4147,12 +4167,34 @@ class ThreadDetailActivity : AppCompatActivity() {
                 params["delete"] = "1"
                 params["pid"] = pid
                 params["tid"] = tid!!
-                val url = HttpClient.BASE_URL + "forum.php?mod=post&action=edit&tid=" + tid +
-                        "&pid=" + pid + "&delete=1&deletesubmit=yes&mobile=2"
-                httpClient.post(url, params)
+                // Discuz 的 editpost 用 submitcheck('editsubmit') 判定是否提交，
+                // 参数写成 deletesubmit 会被服务端当成“打开编辑页”，请求照常 200 却什么都没删。
+                params["editsubmit"] = "yes"
+                val url = HttpClient.BASE_URL + "forum.php?mod=post&action=edit&extra=&tid=" + tid +
+                        "&pid=" + pid + "&page=1&delete=1&mobile=2"
+                val resp = httpClient.post(url, params)
+                // 没有 editsubmit 的编辑页仍然是完整的编辑表单；用它区分“真的删掉了”
+                // 与“服务端拒删（权限/审核）却返回 200”，避免提示成功而评论还在。
+                val stillEditForm = resp.contains("editsubmit") || resp.contains("name=\"message\"")
+                val ok = !TextUtils.isEmpty(resp) && !ForumParser.isLoginPage(resp) && !stillEditForm
+                if (!ok) {
+                    AiLog.e(
+                        "delete",
+                        "删除回复未生效 pid=" + pid + " respLen=" + resp.length +
+                                " stillEditForm=" + stillEditForm
+                    )
+                }
                 runOnUiThread {
-                    Toast.makeText(this, "已删除该回复", Toast.LENGTH_SHORT).show()
-                    refreshPostDetail()
+                    if (ok) {
+                        Toast.makeText(this, "已删除该回复", Toast.LENGTH_SHORT).show()
+                        refreshPostDetail()
+                    } else {
+                        Toast.makeText(
+                            this,
+                            "删除未生效：站点可能不允许用户删除自己的回复",
+                            Toast.LENGTH_LONG
+                        ).show()
+                    }
                 }
             } catch (e: Exception) {
                 runOnUiThread {
@@ -4253,9 +4295,14 @@ class ThreadDetailActivity : AppCompatActivity() {
 
     private fun isOwnReply(item: ReplyItem?): Boolean {
         if (item == null) return false
-        val me = loginUid()
-        if (TextUtils.isEmpty(me)) return false
-        return me == item.authorUid
+        val myUid = loginUid()
+        val uid = item.authorUid
+        if (!TextUtils.isEmpty(myUid) && !TextUtils.isEmpty(uid)) return myUid == uid
+        // 任一侧 uid 缺失时退化为用户名比较：登录态可能只回注了 Cookie 而没写 uid，
+        // 此时按 uid 比会把本人评论判成别人的，菜单里就只剩「打赏/举报」。
+        val myName = UserSessionManager.getInstance().getUsername(applicationContext)
+        val name = item.author
+        return !TextUtils.isEmpty(myName) && !TextUtils.isEmpty(name) && myName == name
     }
 
     /** 复制该条评论的正文（contentText 优先，为空时从 contentHtml 剥标签兜底） */

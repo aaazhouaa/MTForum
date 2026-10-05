@@ -60,7 +60,7 @@ class PostActivity : AppCompatActivity() {
     private lateinit var llCircleSelector: LinearLayout
     private lateinit var tvCircleLabel: TextView
     private lateinit var tvSelectedForum: TextView
-    private lateinit var etContent: TextInputEditText
+    private lateinit var etContent: com.solosu.mtforum.ui.widget.SmileyAwareEditText
     private lateinit var cbAnonymous: CheckBox
     private lateinit var btnPublish: MaterialButton
 
@@ -941,7 +941,7 @@ class PostActivity : AppCompatActivity() {
                     iv.clipToOutline = true
 
                     Glide.with(this)
-                        .load(af.path)
+                        .load(if (!TextUtils.isEmpty(af.path)) af.path!! else af.url)
                         .placeholder(R.drawable.ic_image_placeholder)
                         .error(R.drawable.ic_image_error)
                         .transform(com.bumptech.glide.load.resource.bitmap.CenterCrop(), com.bumptech.glide.load.resource.bitmap.RoundedCorners(Math.round(8 * density)))
@@ -968,6 +968,7 @@ class PostActivity : AppCompatActivity() {
                     delBtn.setPadding(p4, p4, p4, p4)
                     androidx.core.widget.ImageViewCompat.setImageTintList(delBtn, android.content.res.ColorStateList.valueOf(0xFFFFFFFF.toInt()))
                     delBtn.setOnClickListener {
+                        removeAttachMarkerFromContent(af.aid)
                         attachFiles.remove(af)
                         updateAttachList()
                         updateImagePreview()
@@ -1330,6 +1331,7 @@ class PostActivity : AppCompatActivity() {
             delBtn.setPadding(Math.round(2 * density), Math.round(2 * density), Math.round(2 * density), Math.round(2 * density))
             androidx.core.widget.ImageViewCompat.setImageTintList(delBtn, android.content.res.ColorStateList.valueOf(0xFFEF4444.toInt()))
             delBtn.setOnClickListener {
+                removeAttachMarkerFromContent(af.aid)
                 attachFiles.remove(af)
                 updateAttachList()
             }
@@ -1359,6 +1361,31 @@ class PostActivity : AppCompatActivity() {
     }
 
     // 插入内容到正文
+    /**
+     * 从正文中移除该附件的 BBCode 标记。
+     *
+     * 编辑已发布帖时服务器按正文标记决定附件是否保留：只把附件从列表里删掉、
+     * 正文标记却留着，保存后图片/附件会照旧出现。因此删除时必须同步清标记。
+     * 顺带吃掉标记紧邻的换行，避免删除处留下空行。
+     */
+    private fun removeAttachMarkerFromContent(aid: String?) {
+        if (TextUtils.isEmpty(aid)) return
+        val editable = etContent.text ?: return
+        val text = editable.toString()
+        var newText = text
+        for (tag in arrayOf("attachimg", "attach")) {
+            newText = Regex(
+                "\\s*\\[" + tag + "\\]" + Regex.escape(aid!!) + "\\[/" + tag + "\\]",
+                RegexOption.IGNORE_CASE
+            ).replace(newText, "")
+        }
+        if (newText != text) {
+            val sel = etContent.selectionStart
+            editable.replace(0, editable.length, newText)
+            etContent.setSelection(sel.coerceIn(0, newText.length))
+        }
+    }
+
     private fun insertIntoContent(text: String) {
         val editable = etContent.text
         if (editable == null) {
@@ -1936,11 +1963,109 @@ class PostActivity : AppCompatActivity() {
             etTitle.setText(it.getStringExtra("edit_title"))
             // 编辑允许改标题：Discuz 提交时 subject 会随之更新
         }
+        // 正文先用传入的剥标签文本占位，随后异步拉编辑页原文覆盖（拿得到才覆盖）
         if (etContent != null) {
             etContent.setText(it.getStringExtra("edit_message"))
         }
         if (btnPublish != null) btnPublish.text = "保存修改"
         if (llCircleSelector != null) llCircleSelector.visibility = View.GONE
+        loadEditSourceFromServer()
+    }
+
+    /**
+     * 拉取该楼编辑页，用真实的 BBCode 原文覆盖正文。
+     *
+     * 详情页传过来的 edit_message 是「正文 HTML 剥标签」的产物，会丢 [b]/[img]/换行/隐藏内容，
+     * 直接拿来编辑会格式全丢、已有附件变纯文本且看不到，于是用户重新插图导致重复。
+     * 编辑页的 textarea[name=message] 才是站端保存的原文，必须以它为准。
+     */
+    private fun loadEditSourceFromServer() {
+        val tid = editTid ?: return
+        val pid = editPid ?: return
+        Thread {
+            try {
+                val html = HttpClient.getInstance().get(
+                    HttpClient.BASE_URL + "forum.php?mod=post&action=edit&tid=" + tid +
+                            "&pid=" + pid + "&mobile=2"
+                )
+                if (TextUtils.isEmpty(html)) return@Thread
+                val doc = Jsoup.parse(html)
+                val ta = doc.selectFirst("textarea[name=message]")
+                    ?: doc.selectFirst("textarea#e")
+                val source = ta?.text()
+                val fh = ForumParser.parseFormhash(html)
+                runOnUiThread {
+                    if (!TextUtils.isEmpty(fh)) currentFormhash = fh
+                    if (!TextUtils.isEmpty(source)) {
+                        etContent.setText(source)
+                        etContent.setSelection(etContent.text?.length ?: 0)
+                    }
+                    fillExistingAttachments(doc)
+                }
+            } catch (ignored: Exception) {
+            }
+        }.start()
+    }
+
+    /**
+     * 把编辑页里「已存在的附件」回填到 attachFiles，让编辑时能看到/删除已有附件。
+     *
+     * 只接收正文中已带 [attach]/[attachimg] 标记的附件：编辑页也会列出“历史未使用附件”，
+     * 把它们一并当成已关联会让保存时重复带上。
+     */
+    private fun fillExistingAttachments(doc: Document) {
+        try {
+            val msg = etContent.text?.toString() ?: ""
+            // 按正文标记分类：Discuz 里 [attachimg] 是内联图片、[attach] 是普通附件。
+            // 不能靠文件名扩展名猜——回填名往往不带图片扩展名，会把图片全错当成附件。
+            val imageAids = LinkedHashSet<String>()
+            val fileAids = LinkedHashSet<String>()
+            for (m in Regex("\\[attachimg\\](\\d+)\\[/attachimg\\]", RegexOption.IGNORE_CASE).findAll(msg)) {
+                imageAids.add(m.groupValues[1])
+            }
+            for (m in Regex("\\[attach\\](\\d+)\\[/attach\\]", RegexOption.IGNORE_CASE).findAll(msg)) {
+                val aid = m.groupValues[1]
+                if (!imageAids.contains(aid)) fileAids.add(aid)
+            }
+            if (imageAids.isEmpty() && fileAids.isEmpty()) return
+
+            // 图片直链从详情页传过来：编辑页回填的只有 aid，拼不出可加载地址。
+            // 正文图片与 [attachimg] 标记同源同序，按顺序配对即可。
+            val providedUrls = intent.getStringArrayListExtra("edit_attach_urls") ?: ArrayList()
+            val restored = ArrayList<AttachFile>()
+            var imgIndex = 0
+            for (aid in imageAids) {
+                addRestoredAttach(doc, aid, true, restored, providedUrls.getOrNull(imgIndex))
+                imgIndex++
+            }
+            for (aid in fileAids) addRestoredAttach(doc, aid, false, restored, null)
+            if (restored.isEmpty()) return
+            synchronized(attachFiles) { attachFiles.addAll(restored) }
+            updateAttachList()
+            updateImagePreview()
+        } catch (ignored: Exception) {
+        }
+    }
+
+    /** 回填单个已有附件；图片用图片扩展名保证进图片预览区，附件用文件名/占位名 */
+    private fun addRestoredAttach(
+        doc: Document, aid: String, isImage: Boolean, out: MutableList<AttachFile>, url: String? = null
+    ) {
+        if (attachFiles.any { it.aid == aid } || out.any { it.aid == aid }) return
+        // 优先取编辑页附件区的真实文件名
+        val real = doc.selectFirst("#attach_" + aid + " .atitle")?.text()?.trim()
+            ?: doc.selectFirst("#attach_" + aid + " a")?.text()?.trim()
+            ?: doc.selectFirst("a[href*=aid=" + aid + "]")?.text()?.trim()
+        val name = when {
+            isImage && !real.isNullOrEmpty() && real.matches(Regex("(?i).*\\.(jpg|jpeg|png|gif|bmp|webp)$")) -> real!!
+            isImage -> "image_" + aid + ".jpg"
+            !real.isNullOrEmpty() -> real!!
+            else -> "附件 " + aid
+        }
+        val af = AttachFile(name, null)
+        af.aid = aid
+        af.url = url
+        out.add(af)
     }
 
     private fun isEditMode(): Boolean {

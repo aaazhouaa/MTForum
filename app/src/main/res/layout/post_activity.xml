@@ -428,7 +428,7 @@
                 </LinearLayout>
 
                 <!-- 正文编辑输入框 -->
-                <com.google.android.material.textfield.TextInputEditText
+                <com.solosu.mtforum.ui.widget.SmileyAwareEditText
                     android:id="@+id/et_content"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"

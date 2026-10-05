@@ -2016,6 +2016,17 @@ object ForumParser {
                             val uidM = uidPtn.matcher(href)
                             if (uidM.find()) reply.quotedUid = uidM.group(1)
                         }
+                        // 引用头常常只是纯文本（cite / 无链接的 .quote_author），此时 pid 要退一步
+                        // 从引用块里的楼层链接取（Discuz 标准引用头是 goto=findpost&pid=X&ptid=Y）。
+                        // 取不到 pid 会让客户端归并退化到按昵称猜楼层——回复自己时必错。
+                        if (TextUtils.isEmpty(reply.quotedPid)) {
+                            val link = quote.selectFirst("a[href*=\"goto=findpost\"][href*=pid=]")
+                                ?: quote.selectFirst("a[href*=pid=]")
+                            if (link != null) {
+                                val pidM = Pattern.compile("pid=(\\d+)").matcher(link.attr("href"))
+                                if (pidM.find()) reply.quotedPid = pidM.group(1)
+                            }
+                        }
                         reply.quotedContentHtml = quote.html().trim()
                         reply.quotedContentText = quote.text().replace('\u00a0', ' ').trim()
                         quote.remove()

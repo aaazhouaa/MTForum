@@ -120,19 +120,20 @@ class ReplyAdapter(rawReplies: List<ReplyItem>?) :
             // 被引用楼层：可能是顶层评论，也可能是一条子回复
             var target: ReplyItem? = null
 
-            // 引用块里一旦带有明确的 pid，就说明消息指向的是「某一条具体楼层」。
-            // 命中不了只有一种可能：那条被引用楼层不在当前已加载的楼层里，
-            // 此时必须放弃归并 —— 绝不能退化成“按作者名找个人”，
-            // 否则会把回复挂到该作者另一条无关楼层上，出现父子挂反。
+            // 引用块里带明确 pid 时，就说明消息指向的是「某一条具体楼层」。
+            // 但 pid 可能缺失（模板不输出引用链接）或指向未加载的楼层，
+            // 此时必须降级推断（见下方 matchByQuotedContent 的优先级说明）。
             val quotedPid = item.quotedPid
             if (!quotedPid.isNullOrEmpty()) {
                 val cand = pidMap[quotedPid]
                 if (cand != null && cand !== item) target = cand
-            } else {
-                // 无 pid 的模板只能按 uid / 昵称匹配，
-                // 并用「列表顺序号」作先后约束（被引用楼层必须排在引用者之前）。
-                // 不再解析楼层文字（沙发/下水道/7# 等节点名无法穷举，
-                // 一旦解析成 -1 会让约束失效，取到同名者最后一条而挂反）。
+            }
+            if (target == null) {
+                // pid 缺失（或该楼层不在已加载范围内）时只能降级推断，顺序按证据强度，
+                // 不能颠倒：昵称是最弱的证据——回复自己时，自己的每条楼层都同名，
+                // 只按「昵称 + 最近一条」猜，必然挂到别的同名楼层上。
+                // 被引用楼层必须排在引用者之前（orderIndex 约束）。
+                target = matchByQuotedContent(item, all)
                 if (target == null) {
                     val uid = item.quotedUid
                     if (!uid.isNullOrEmpty()) {
@@ -141,12 +142,13 @@ class ReplyAdapter(rawReplies: List<ReplyItem>?) :
                         }
                     }
                 }
-
                 if (target == null) {
                     val name = item.quotedAuthorName ?: extractQuotedNameFromQuote(item)
                     if (!name.isNullOrEmpty()) {
+                        // 子回复有自己的宿主楼层，把它当父楼层会让这条回复
+                        // 显示成「回复 xx：」的二级回复，语义完全错位。
                         target = nameMap[name]?.lastOrNull {
-                            it !== item && it.orderIndex < item.orderIndex
+                            it !== item && !it.isSubReply && it.orderIndex < item.orderIndex
                         }
                     }
                 }
@@ -171,6 +173,63 @@ class ReplyAdapter(rawReplies: List<ReplyItem>?) :
         }
     }
 
+    /**
+     * pid 缺失时的降级匹配：拿引用块里的正文去比对各楼层的正文。
+     *
+     * 昵称与 uid 都区分不了「同一个人发的多条楼层」，而引用块天然携带被引用楼的原话，
+     * 内容匹配是这里唯一能精确到楼层的证据。用最长公共子串而非前缀比较：
+     * 引用块开头还挂着「回复 X 发表于 …」这段 meta，前缀比对上必然对不齐。
+     */
+    private fun matchByQuotedContent(item: ReplyItem, all: List<ReplyItem>): ReplyItem? {
+        val quoted = normalizeForMatch(item.quotedContentText ?: return null)
+        // 太短的引用（纯表情/单个词）区分不了楼层，宁可交给后面的弱证据
+        if (quoted.length < MATCH_MIN_CHARS) return null
+        val qa = quoted.toCharArray()
+        var best: ReplyItem? = null
+        var bestScore = 0
+        for (cand in all) {
+            if (cand === item || cand.orderIndex >= item.orderIndex) continue
+            val body = normalizeForMatch(cand.contentText)
+            if (body.isEmpty()) continue
+            val score = longestCommonSubstring(qa, body.toCharArray())
+            if (score > bestScore) {
+                bestScore = score
+                best = cand
+            }
+        }
+        if (best == null) return null
+        // 引文是被引楼正文的连续片段，命中时重合度应接近整段引文；
+        // 只重合寥寥几字更像巧合同词，放弃比挂错好。
+        return if (bestScore >= MATCH_MIN_CHARS && bestScore >= quoted.length / 3) best else null
+    }
+
+    /** 提取可比较的纯文本：把引文里残留的标签与 BBCode 都清掉，再压缩空白。 */
+    private fun normalizeForMatch(raw: String?): String {
+        if (raw.isNullOrEmpty()) return ""
+        var s = Regex("(?s)<[^>]+>").replace(raw, "")
+        s = Regex("(?i)\\[/?(?:quote|free|hide|code|color|url|size|b|i|u|font|align)[^\\]]*\\]").replace(s, "")
+        return Regex("[\\s\\u00A0]").replace(s, "")
+    }
+
+    /** 两个字符序列的最长公共子串长度（滚动数组，空间 O(m)）。 */
+    private fun longestCommonSubstring(a: CharArray, b: CharArray): Int {
+        if (a.isEmpty() || b.isEmpty()) return 0
+        var prev = IntArray(b.size + 1)
+        var cur = IntArray(b.size + 1)
+        var best = 0
+        for (i in 1..a.size) {
+            for (j in 1..b.size) {
+                cur[j] = if (a[i - 1] == b[j - 1]) prev[j - 1] + 1 else 0
+                if (cur[j] > best) best = cur[j]
+            }
+            val swap = prev
+            prev = cur
+            cur = swap
+            java.util.Arrays.fill(cur, 0)
+        }
+        return best
+    }
+
     /** 向上找到某条回复所属的顶层评论（其 subReplies 中包含它的那条）。 */
     private fun topLevelOf(child: ReplyItem, all: List<ReplyItem>): ReplyItem? {
         return all.firstOrNull { !it.isSubReply && it.subReplies.contains(child) }
@@ -181,6 +240,10 @@ class ReplyAdapter(rawReplies: List<ReplyItem>?) :
      *
      * 引用块的文本形态在不同模板下有两种：文本在前（“回复 mt007 发表于 …”）
      * 或 meta 在尾部（“依旧给力… 回复 mt007 发表于 …”），两者都要能解析到。
+     *
+     * 注意：本站 comiis 移动版引用块不带 pid/uid 链接，昵称是唯一可用的定位线索；
+     * 因此不能排除“名字等于自己”的情况——用户引用自己更早的楼层很常见，
+     * 一旦排除，这类回复就永远归不上楼中楼（父子方向由 orderIndex 约束保证）。
      */
     private fun extractQuotedNameFromQuote(item: ReplyItem): String? {
         val quote = item.quotedContentText ?: return null
@@ -189,12 +252,12 @@ class ReplyAdapter(rawReplies: List<ReplyItem>?) :
             val name = it.groupValues[1].trim()
                 .removePrefix("回复").trim()
                 .removePrefix("@").trim()
-            if (name.isNotEmpty() && name != item.author) return name
+            if (name.isNotEmpty()) return name
         }
         // “回复 xxx” 且没有“发表于”（部分手机版只带这句）
         Regex("回复\\s*@?([^\\s，。,:：]{1,24})").find(quote)?.let {
             val name = it.groupValues[1].trim()
-            if (name.isNotEmpty() && name != item.author) return name
+            if (name.isNotEmpty()) return name
         }
         return null
     }
@@ -650,8 +713,11 @@ class ReplyAdapter(rawReplies: List<ReplyItem>?) :
 
             if (remainingSource.isNotEmpty()) {
                 tvContent.visibility = View.VISIBLE
+                // 附件图已被 extractImagesFromHtml 抽到下方独立图片区，正文里留下它们原本占位的
+                // 连续 <br> 与空块；不压缩就会在文字与图片之间撑出一大块空白。
+                val collapsedSource = collapseReplyHtml(remainingSource)
                 // 用户要求：去除彩色字体，恢复正常文本颜色
-                val cleanSource = BBCodeUtil.stripHtmlColors(remainingSource)
+                val cleanSource = BBCodeUtil.stripHtmlColors(collapsedSource)
                 val spannedSource = Html.fromHtml(
                     cleanSource, Html.FROM_HTML_MODE_COMPACT,
                     createInlineImageGetter(tvContent),
@@ -831,7 +897,7 @@ class ReplyAdapter(rawReplies: List<ReplyItem>?) :
                 // 子回复的 HTML 未经过主帖那套归一化：附件图真实地址在 file/zoomfile 上（src 只是 none.gif 占位），
                 // 且可能残留连续换行空段落；先恢复真实地址并压缩空白再交给 fromHtml
                 val subSource = if (subEditSplit != null) {
-                    collapseSubReplyHtml(restoreInlineImageSources(subEditSplit.first))
+                    collapseReplyHtml(restoreInlineImageSources(subEditSplit.first))
                 } else {
                     ""
                 }
@@ -912,6 +978,9 @@ class ReplyAdapter(rawReplies: List<ReplyItem>?) :
     }
 
     companion object {
+
+        /** 归并时内容匹配的最短重合字符数；低于此值视为巧合同词。 */
+        private const val MATCH_MIN_CHARS = 6
 
         /** item 类型：页首正文头 / 普通回复 / 底部状态行 */
         private const val TYPE_HEADER = 0
@@ -1283,10 +1352,16 @@ class ReplyAdapter(rawReplies: List<ReplyItem>?) :
         }
 
         /** 压缩楼中楼正文的连续换行与空段落（主帖正文在 renderContentSections 里做过同样处理）。 */
-        private fun collapseSubReplyHtml(html: String): String {
+        /**
+         * 压缩正文 HTML 里的连续换行与空块。
+         * 主评论与楼中楼子回复共用：图片抽走后残留的占位换行、模板自带的空段落
+         * 都会渲染成一片空白，必须统一压掉。
+         */
+        private fun collapseReplyHtml(html: String): String {
             if (html.isEmpty()) return html
             return Regex("(?i)(?:<br\\s*/?>\\s*){2,}").replace(html, "<br>")
                 .replace(Regex("(?i)<p\\s*>\\s*(?:&nbsp;|&#160;|\\s)*</p>"), "")
+                .replace(Regex("(?i)<div[^>]*>\\s*(?:&nbsp;|&#160;|<br\\s*/?>|\\s)*</div>"), "")
                 .replace(Regex("(?i)(?:\\r?\\n\\s*){3,}"), "\n\n")
         }
 
