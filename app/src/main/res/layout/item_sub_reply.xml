@@ -43,6 +43,19 @@
             android:textSize="9.5sp"
             android:textStyle="bold"
             android:visibility="gone" />
+
+        <!-- 编辑标记：仅保留「修改时间 编辑」，紧跟用户名同行 -->
+        <TextView
+            android:id="@+id/tv_sub_edit_time"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="6dp"
+            android:textSize="11sp"
+            android:textColor="@color/text_secondary"
+            android:maxLines="1"
+            android:ellipsize="end"
+            android:visibility="gone" />
     </LinearLayout>
 
     <!-- 子回复正文 -->

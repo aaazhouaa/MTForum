@@ -642,22 +642,8 @@ class ReplyAdapter(rawReplies: List<ReplyItem>?) :
                 }
             }
 
-            var remainingSource = sourceHtml
-            var editFooterText: String? = null
-            val editPattern = Pattern.compile("(?is)(?:<(?:i|span|font|div|p|em)\\b[^>]*>|\\s)*本[帖贴]最后由[\\s\\S]*?编辑(?:\\s*</(?:i|span|font|div|p|em)>)*")
-            val editMatcher = editPattern.matcher(sourceHtml)
-            if (editMatcher.find()) {
-                val matched = editMatcher.group(0) ?: ""
-                var pureText = Regex("<[^>]+>").replace(matched, "")
-                pureText = Regex("&nbsp;").replace(pureText, " ").trim()
-                editFooterText = pureText
-                remainingSource = stripLeadingHtmlBreak(editMatcher.replaceFirst(""))
-            } else {
-                remainingSource = stripLeadingHtmlBreak(sourceHtml)
-            }
-
-            // 编辑标记：从「本帖最后由 xxx 于 时间 编辑」中只取时间，跟到用户名同行显示
-            val editTime = extractEditTime(editFooterText)
+            // 编辑标记：剥离「本帖最后由 xxx 于 时间 编辑」整句，只把时间跟到用户名同行显示
+            val (remainingSource, editTime) = splitEditMarker(sourceHtml)
             if (!editTime.isNullOrEmpty()) {
                 tvReplyEditTime?.visibility = View.VISIBLE
                 tvReplyEditTime?.text = "$editTime 编辑"
@@ -790,6 +776,7 @@ class ReplyAdapter(rawReplies: List<ReplyItem>?) :
                 val tvSubAuthor = subView.findViewById<TextView>(R.id.tv_sub_author)
                 val tvSubOpBadge = subView.findViewById<TextView>(R.id.tv_sub_op_badge)
                 val tvSubContent = subView.findViewById<TextView>(R.id.tv_sub_content)
+                val tvSubEditTime = subView.findViewById<TextView>(R.id.tv_sub_edit_time)
                 val tvSubTimeLoc = subView.findViewById<TextView>(R.id.tv_sub_time_location)
                 val btnSubReply = subView.findViewById<android.view.View>(R.id.btn_sub_reply)
 
@@ -822,9 +809,11 @@ class ReplyAdapter(rawReplies: List<ReplyItem>?) :
                 // 注意：纯表情/纯图片帖子的 contentText 会是「空串」而非 null，
                 // 不能再用 ?: 兜底，否则内容会被判空而整段丢失。
                 val subHtml = subItem.contentHtml
-                val subBody: CharSequence? = if (!TextUtils.isEmpty(subHtml)) {
+                // 楼中楼同样剥离「本帖最后由 xxx 于 时间 编辑」整句，时间单独显示在用户名行末
+                val subEditSplit = if (TextUtils.isEmpty(subHtml)) null else splitEditMarker(subHtml)
+                val subBody: CharSequence? = if (subEditSplit != null) {
                     val rendered = Html.fromHtml(
-                        BBCodeUtil.stripHtmlColors(subHtml),
+                        BBCodeUtil.stripHtmlColors(subEditSplit.first),
                         Html.FROM_HTML_MODE_COMPACT,
                         createInlineImageGetter(tvSubContent),
                         BBCodeUtil.createTagHandler(itemView.context)
@@ -844,6 +833,13 @@ class ReplyAdapter(rawReplies: List<ReplyItem>?) :
                     subSb.append(trimSpanned(subBody!!))
                 }
                 tvSubContent.text = subSb
+                val subEditTime = subEditSplit?.second
+                if (!subEditTime.isNullOrEmpty()) {
+                    tvSubEditTime.visibility = View.VISIBLE
+                    tvSubEditTime.text = "$subEditTime 编辑"
+                } else {
+                    tvSubEditTime.visibility = View.GONE
+                }
                 tvSubContent.setOnLongClickListener {
                     replyLongClickListener?.onReplyLongClick(subItem, bindingAdapterPosition)
                     true
@@ -1321,13 +1317,12 @@ class ReplyAdapter(rawReplies: List<ReplyItem>?) :
                             val maxSize = if (maxW > 0) maxW else dpToPx(tv.context, 320)
                             if (w <= 0) w = emotSize
                             if (h <= 0) h = emotSize
-                            // 表情类小图（≤32dp）保持原尺寸；大图限宽
+                            // 站内表情的声明尺寸只有 20x20 像素，若按原始像素显示会远小于 dp 目标值，
+                            // 这里对表情一律等比缩放到 emotSize；大图仍只限宽
                             if (w <= dpToPx(tv.context, 32)) {
-                                if (w > emotSize || h > emotSize) {
-                                    val r = emotSize.toFloat() / Math.max(w, h)
-                                    w = (w * r).toInt()
-                                    h = (h * r).toInt()
-                                }
+                                val r = emotSize.toFloat() / Math.max(w, h)
+                                w = Math.max(1, (w * r).toInt())
+                                h = Math.max(1, (h * r).toInt())
                             } else if (w > maxSize) {
                                 h = (h.toLong() * maxSize / Math.max(1, w)).toInt()
                                 w = maxSize
@@ -1352,6 +1347,24 @@ class ReplyAdapter(rawReplies: List<ReplyItem>?) :
             "^((?:回复\\s+)?.+?\\s+发表于[^\\r\\n]+)[\\r\\n]+\\s*([\\s\\S]*)",
             Pattern.CASE_INSENSITIVE
         )
+
+        /** 正文里的「本帖最后由 xxx 于 <时间> 编辑」整句（含包裹标签与前后空白）。 */
+        private val P_EDIT_MARKER = Pattern.compile(
+            "(?is)(?:<(?:i|span|font|div|p|em)\\b[^>]*>|\\s)*本[帖贴]最后由[\\s\\S]*?编辑(?:\\s*</(?:i|span|font|div|p|em)>)*"
+        )
+
+        /**
+         * 剥离正文中的「本帖最后由 xxx 于 <时间> 编辑」整句。
+         * 返回 (剩余正文 HTML, 时间文本)；未出现该标记时时间返回 null。
+         */
+        private fun splitEditMarker(html: String?): Pair<String, String?> {
+            if (html.isNullOrEmpty()) return (html ?: "") to null
+            val m = P_EDIT_MARKER.matcher(html)
+            if (!m.find()) return stripLeadingHtmlBreak(html) to null
+            var pureText = Regex("<[^>]+>").replace(m.group(0) ?: "", "")
+            pureText = Regex("&nbsp;").replace(pureText, " ").trim()
+            return stripLeadingHtmlBreak(m.replaceFirst("")) to extractEditTime(pureText)
+        }
 
         private fun stripLeadingHtmlBreak(html: String?): String {
             if (html.isNullOrEmpty()) return ""
