@@ -459,12 +459,15 @@
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/et_insert_field1"
                 android:layout_width="match_parent"
-                android:layout_height="38dp"
+                android:layout_height="96dp"
                 android:background="@drawable/bg_spinner_border"
+                android:gravity="top|start"
                 android:hint="请输入"
-                android:inputType="textUri"
+                android:inputType="textMultiLine|textCapSentences"
+                android:maxLines="6"
                 android:paddingHorizontal="12dp"
-                android:paddingVertical="0dp"
+                android:paddingTop="10dp"
+                android:paddingBottom="10dp"
                 android:textColor="@color/text_primary"
                 android:textColorHint="@color/text_hint"
                 android:textSize="13sp" />
@@ -482,6 +485,80 @@
                 android:textColor="@color/text_primary"
                 android:textColorHint="@color/text_hint"
                 android:textSize="13sp"
+                android:visibility="gone" />
+
+            <!-- 隐藏内容专用参数行：积分大于 / 可见隐藏天数（均可不填） -->
+            <LinearLayout
+                android:id="@+id/ll_insert_extra"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:visibility="gone">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="积分大于"
+                    android:textColor="@color/text_primary"
+                    android:textSize="13sp" />
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/et_insert_credit"
+                    android:layout_width="0dp"
+                    android:layout_height="34dp"
+                    android:layout_marginStart="6dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/bg_spinner_border"
+                    android:hint="可不填"
+                    android:inputType="number"
+                    android:paddingHorizontal="10dp"
+                    android:paddingVertical="0dp"
+                    android:textColor="@color/text_primary"
+                    android:textColorHint="@color/text_hint"
+                    android:textSize="13sp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="12dp"
+                    android:text="可见，隐藏天数"
+                    android:textColor="@color/text_primary"
+                    android:textSize="13sp" />
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/et_insert_days"
+                    android:layout_width="0dp"
+                    android:layout_height="34dp"
+                    android:layout_marginStart="6dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/bg_spinner_border"
+                    android:hint="可不填"
+                    android:inputType="number"
+                    android:paddingHorizontal="10dp"
+                    android:paddingVertical="0dp"
+                    android:textColor="@color/text_primary"
+                    android:textColorHint="@color/text_hint"
+                    android:textSize="13sp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="4dp"
+                    android:text="天"
+                    android:textColor="@color/text_primary"
+                    android:textSize="13sp" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/tv_insert_tip"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="不设置积分和天数，默认为回复可见"
+                android:textColor="@color/warning"
+                android:textSize="11sp"
                 android:visibility="gone" />
 
             <com.google.android.material.button.MaterialButton

@@ -654,28 +654,82 @@ class PostActivity : AppCompatActivity() {
         llInsertPanel.visibility = View.VISIBLE
         updateToolHighlight(btnInsert)
         llInsertInput.visibility = View.GONE
-        findViewById<View>(R.id.btn_ins_link)?.setOnClickListener { selectInsertType(INSERT_LINK, true, false, "链接网址", "链接文字") }
-        findViewById<View>(R.id.btn_ins_image)?.setOnClickListener { selectInsertType(INSERT_IMAGE, true, false, "图片地址", "") }
-        findViewById<View>(R.id.btn_ins_audio)?.setOnClickListener { selectInsertType(INSERT_AUDIO, true, false, "音乐文件地址", "") }
-        findViewById<View>(R.id.btn_ins_video)?.setOnClickListener { selectInsertType(INSERT_VIDEO, true, false, "视频地址", "") }
-        findViewById<View>(R.id.btn_ins_flash)?.setOnClickListener { selectInsertType(INSERT_FLASH, true, false, "Flash 地址", "") }
-        findViewById<View>(R.id.btn_ins_quote)?.setOnClickListener { selectInsertType(INSERT_QUOTE, false, true, "", "") }
-        findViewById<View>(R.id.btn_ins_code)?.setOnClickListener { selectInsertType(INSERT_CODE, false, true, "", "") }
-        findViewById<View>(R.id.btn_ins_free)?.setOnClickListener { selectInsertType(INSERT_FREE, false, true, "", "") }
-        findViewById<View>(R.id.btn_ins_hide)?.setOnClickListener { selectInsertType(INSERT_HIDE, false, true, "", "") }
+        findViewById<View>(R.id.btn_ins_link)?.setOnClickListener { selectInsertType(INSERT_LINK) }
+        findViewById<View>(R.id.btn_ins_image)?.setOnClickListener { selectInsertType(INSERT_IMAGE) }
+        findViewById<View>(R.id.btn_ins_audio)?.setOnClickListener { selectInsertType(INSERT_AUDIO) }
+        findViewById<View>(R.id.btn_ins_video)?.setOnClickListener { selectInsertType(INSERT_VIDEO) }
+        findViewById<View>(R.id.btn_ins_flash)?.setOnClickListener { selectInsertType(INSERT_FLASH) }
+        findViewById<View>(R.id.btn_ins_quote)?.setOnClickListener { selectInsertType(INSERT_QUOTE) }
+        findViewById<View>(R.id.btn_ins_code)?.setOnClickListener { selectInsertType(INSERT_CODE) }
+        findViewById<View>(R.id.btn_ins_free)?.setOnClickListener { selectInsertType(INSERT_FREE) }
+        findViewById<View>(R.id.btn_ins_hide)?.setOnClickListener { selectInsertType(INSERT_HIDE) }
     }
 
-    private fun selectInsertType(type: Int, needUrl: Boolean, needText: Boolean, hint1: String, hint2: String) {
+    /**
+     * 选中插入类型后，按类型把输入区摆成对应形态（对齐网页端）：
+     * 链接=网址+链接文字两个单行框；图片/音乐/视频/Flash=单个单行框；
+     * 引用/代码/免费/隐藏=多行文本框；隐藏内容额外显示积分/天数参数行与橙字提示。
+     */
+    private fun selectInsertType(type: Int) {
         val f1 = findViewById<TextInputEditText>(R.id.et_insert_field1)
         val f2 = findViewById<TextInputEditText>(R.id.et_insert_field2)
+        val extra = findViewById<View>(R.id.ll_insert_extra)
+        val tip = findViewById<View>(R.id.tv_insert_tip)
         updateInsertChipHighlight(type)
         llInsertInput.visibility = View.VISIBLE
         f1?.setText("")
         f2?.setText("")
+        findViewById<TextInputEditText>(R.id.et_insert_credit)?.setText("")
+        findViewById<TextInputEditText>(R.id.et_insert_days)?.setText("")
+
+        val singleLine = android.text.InputType.TYPE_CLASS_TEXT or
+                android.text.InputType.TYPE_TEXT_VARIATION_URI
+        val multiLine = android.text.InputType.TYPE_CLASS_TEXT or
+                android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE or
+                android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
+
+        var hint1 = ""
+        var multiline = false
+        var hint2 = ""
+        var showExtra = false
+        var showTip = false
+        when (type) {
+            INSERT_LINK -> {
+                hint1 = "链接网址"
+                hint2 = "链接文字"
+            }
+            INSERT_IMAGE -> hint1 = "图片地址"
+            INSERT_AUDIO -> hint1 = "音乐文件地址"
+            INSERT_VIDEO -> hint1 = "视频地址"
+            INSERT_FLASH -> hint1 = "Flash 地址"
+            INSERT_QUOTE -> {
+                hint1 = "请输入引用内容"
+                multiline = true
+            }
+            INSERT_CODE -> {
+                hint1 = "请输入代码"
+                multiline = true
+            }
+            INSERT_FREE -> {
+                hint1 = "如果您设置了帖子收费，请输入购买前可免费浏览的内容"
+                multiline = true
+            }
+            INSERT_HIDE -> {
+                hint1 = "请输入要隐藏的信息内容"
+                multiline = true
+                showExtra = true
+                showTip = true
+            }
+        }
+
         f1?.hint = hint1
-        f1?.visibility = if (needUrl || needText) View.VISIBLE else View.GONE
+        f1?.inputType = if (multiline) multiLine else singleLine
+        f1?.visibility = View.VISIBLE
         f2?.hint = hint2
-        f2?.visibility = if (needUrl && needText && hint2.isNotEmpty()) View.VISIBLE else View.GONE
+        f2?.visibility = if (hint2.isNotEmpty()) View.VISIBLE else View.GONE
+        extra?.visibility = if (showExtra) View.VISIBLE else View.GONE
+        tip?.visibility = if (showTip) View.VISIBLE else View.GONE
+
         findViewById<View>(R.id.btn_insert_confirm)?.setOnClickListener {
             applyInsert(type, f1?.text?.toString()?.trim() ?: "", f2?.text?.toString()?.trim() ?: "")
         }
@@ -707,6 +761,10 @@ class PostActivity : AppCompatActivity() {
             Toast.makeText(this, "请输入地址", Toast.LENGTH_SHORT).show()
             return
         }
+        if ((type == INSERT_FREE || type == INSERT_HIDE) && TextUtils.isEmpty(field1)) {
+            Toast.makeText(this, "请输入内容", Toast.LENGTH_SHORT).show()
+            return
+        }
         val text = when (type) {
             INSERT_LINK -> {
                 val label = if (TextUtils.isEmpty(field2)) field1 else field2
@@ -718,8 +776,13 @@ class PostActivity : AppCompatActivity() {
             INSERT_FLASH -> "[flash]" + field1 + "[/flash]"
             INSERT_QUOTE -> "\n[quote]请输入引用内容[/quote]\n"
             INSERT_CODE -> "\n[code]请输入代码[/code]\n"
-            INSERT_FREE -> "\n[free]请输入免费公开内容[/free]\n"
-            INSERT_HIDE -> "\n[hide]请输入回复后可见的隐藏内容[/hide]\n"
+            INSERT_FREE -> "\n[free]" + field1 + "[/free]\n"
+            INSERT_HIDE -> {
+                val credit = findViewById<TextInputEditText>(R.id.et_insert_credit)?.text?.toString()?.trim() ?: ""
+                val days = findViewById<TextInputEditText>(R.id.et_insert_days)?.text?.toString()?.trim() ?: ""
+                val tag = if (credit.isEmpty() && days.isEmpty()) "[hide]" else "[hide=" + credit + "," + days + "]"
+                "\n" + tag + field1 + "[/hide]\n"
+            }
             else -> ""
         }
         insertIntoContent(text)

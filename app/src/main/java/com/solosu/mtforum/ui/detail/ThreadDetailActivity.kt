@@ -1109,35 +1109,88 @@ class ThreadDetailActivity : AppCompatActivity() {
         insert.visibility = View.VISIBLE
         updateReplyToolHighlight(panel.findViewById<View>(R.id.btn_insert))
         panel.findViewById<View>(R.id.ll_insert_input)?.visibility = View.GONE
-        panel.findViewById<View>(R.id.btn_ins_link)?.setOnClickListener { selectInsertType(panel, INSERT_LINK, true, false, "链接网址", "链接文字") }
-        panel.findViewById<View>(R.id.btn_ins_image)?.setOnClickListener { selectInsertType(panel, INSERT_IMAGE, true, false, "图片地址", "") }
-        panel.findViewById<View>(R.id.btn_ins_audio)?.setOnClickListener { selectInsertType(panel, INSERT_AUDIO, true, false, "音乐文件地址", "") }
-        panel.findViewById<View>(R.id.btn_ins_video)?.setOnClickListener { selectInsertType(panel, INSERT_VIDEO, true, false, "视频地址", "") }
-        panel.findViewById<View>(R.id.btn_ins_flash)?.setOnClickListener { selectInsertType(panel, INSERT_FLASH, true, false, "Flash 地址", "") }
-        panel.findViewById<View>(R.id.btn_ins_quote)?.setOnClickListener { selectInsertType(panel, INSERT_QUOTE, false, true, "", "") }
-        panel.findViewById<View>(R.id.btn_ins_code)?.setOnClickListener { selectInsertType(panel, INSERT_CODE, false, true, "", "") }
-        panel.findViewById<View>(R.id.btn_ins_free)?.setOnClickListener { selectInsertType(panel, INSERT_FREE, false, true, "", "") }
-        panel.findViewById<View>(R.id.btn_ins_hide)?.setOnClickListener { selectInsertType(panel, INSERT_HIDE, false, true, "", "") }
+        panel.findViewById<View>(R.id.btn_ins_link)?.setOnClickListener { selectInsertType(panel, INSERT_LINK) }
+        panel.findViewById<View>(R.id.btn_ins_image)?.setOnClickListener { selectInsertType(panel, INSERT_IMAGE) }
+        panel.findViewById<View>(R.id.btn_ins_audio)?.setOnClickListener { selectInsertType(panel, INSERT_AUDIO) }
+        panel.findViewById<View>(R.id.btn_ins_video)?.setOnClickListener { selectInsertType(panel, INSERT_VIDEO) }
+        panel.findViewById<View>(R.id.btn_ins_flash)?.setOnClickListener { selectInsertType(panel, INSERT_FLASH) }
+        panel.findViewById<View>(R.id.btn_ins_quote)?.setOnClickListener { selectInsertType(panel, INSERT_QUOTE) }
+        panel.findViewById<View>(R.id.btn_ins_code)?.setOnClickListener { selectInsertType(panel, INSERT_CODE) }
+        panel.findViewById<View>(R.id.btn_ins_free)?.setOnClickListener { selectInsertType(panel, INSERT_FREE) }
+        panel.findViewById<View>(R.id.btn_ins_hide)?.setOnClickListener { selectInsertType(panel, INSERT_HIDE) }
     }
 
-    private fun selectInsertType(panel: View, type: Int, needUrl: Boolean, needText: Boolean, hint1: String, hint2: String) {
+    /**
+     * 选中插入类型后按类型摆放输入区形态（与发布页完全一致）：
+     * 链接=网址+链接文字；图片/音乐/视频/Flash=单行；引用/代码/免费/隐藏=多行；
+     * 隐藏内容额外显示积分/天数参数行与橙字提示。
+     */
+    private fun selectInsertType(panel: View, type: Int) {
         pendingInsertType = type
         updateReplyInsertChip(type)
         val input = panel.findViewById<View>(R.id.ll_insert_input) ?: return
         val f1 = panel.findViewById<android.widget.EditText>(R.id.et_insert_field1)
         val f2 = panel.findViewById<android.widget.EditText>(R.id.et_insert_field2)
+        val extra = panel.findViewById<View>(R.id.ll_insert_extra)
+        val tip = panel.findViewById<View>(R.id.tv_insert_tip)
         val confirm = panel.findViewById<View>(R.id.btn_insert_confirm)
         input.visibility = View.VISIBLE
         f1?.setText("")
         f2?.setText("")
+        panel.findViewById<android.widget.EditText>(R.id.et_insert_credit)?.setText("")
+        panel.findViewById<android.widget.EditText>(R.id.et_insert_days)?.setText("")
+
+        val singleLine = android.text.InputType.TYPE_CLASS_TEXT or
+                android.text.InputType.TYPE_TEXT_VARIATION_URI
+        val multiLine = android.text.InputType.TYPE_CLASS_TEXT or
+                android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE or
+                android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
+
+        var hint1 = ""
+        var multiline = false
+        var hint2 = ""
+        var showExtra = false
+        var showTip = false
+        when (type) {
+            INSERT_LINK -> {
+                hint1 = "链接网址"
+                hint2 = "链接文字"
+            }
+            INSERT_IMAGE -> hint1 = "图片地址"
+            INSERT_AUDIO -> hint1 = "音乐文件地址"
+            INSERT_VIDEO -> hint1 = "视频地址"
+            INSERT_FLASH -> hint1 = "Flash 地址"
+            INSERT_QUOTE -> {
+                hint1 = "请输入引用内容"
+                multiline = true
+            }
+            INSERT_CODE -> {
+                hint1 = "请输入代码"
+                multiline = true
+            }
+            INSERT_FREE -> {
+                hint1 = "如果您设置了帖子收费，请输入购买前可免费浏览的内容"
+                multiline = true
+            }
+            INSERT_HIDE -> {
+                hint1 = "请输入要隐藏的信息内容"
+                multiline = true
+                showExtra = true
+                showTip = true
+            }
+        }
+
         f1?.hint = hint1
-        f1?.visibility = if (needUrl || needText) View.VISIBLE else View.GONE
+        f1?.inputType = if (multiline) multiLine else singleLine
+        f1?.visibility = View.VISIBLE
         f2?.hint = hint2
-        f2?.visibility = if (needUrl && needText && hint2.isNotEmpty()) View.VISIBLE else View.GONE
-        confirm?.setOnClickListener { applyInsert(type, f1?.text?.toString()?.trim() ?: "", f2?.text?.toString()?.trim() ?: "") }
+        f2?.visibility = if (hint2.isNotEmpty()) View.VISIBLE else View.GONE
+        extra?.visibility = if (showExtra) View.VISIBLE else View.GONE
+        tip?.visibility = if (showTip) View.VISIBLE else View.GONE
+        confirm?.setOnClickListener { applyInsert(panel, type, f1?.text?.toString()?.trim() ?: "", f2?.text?.toString()?.trim() ?: "") }
     }
 
-    private fun applyInsert(type: Int, field1: String, field2: String) {
+    private fun applyInsert(panel: View, type: Int, field1: String, field2: String) {
         if (type == INSERT_LINK && TextUtils.isEmpty(field1)) {
             Toast.makeText(this, "请输入链接网址", Toast.LENGTH_SHORT).show()
             return
@@ -1146,6 +1199,10 @@ class ThreadDetailActivity : AppCompatActivity() {
             && TextUtils.isEmpty(field1)
         ) {
             Toast.makeText(this, "请输入地址", Toast.LENGTH_SHORT).show()
+            return
+        }
+        if ((type == INSERT_FREE || type == INSERT_HIDE) && TextUtils.isEmpty(field1)) {
+            Toast.makeText(this, "请输入内容", Toast.LENGTH_SHORT).show()
             return
         }
         val text = when (type) {
@@ -1159,8 +1216,13 @@ class ThreadDetailActivity : AppCompatActivity() {
             INSERT_FLASH -> "[flash]" + field1 + "[/flash]"
             INSERT_QUOTE -> "\n[quote]请输入引用内容[/quote]\n"
             INSERT_CODE -> "\n[code]请输入代码[/code]\n"
-            INSERT_FREE -> "\n[free]请输入免费公开内容[/free]\n"
-            INSERT_HIDE -> "\n[hide]请输入回复后可见的隐藏内容[/hide]\n"
+            INSERT_FREE -> "\n[free]" + field1 + "[/free]\n"
+            INSERT_HIDE -> {
+                val credit = panel.findViewById<android.widget.EditText>(R.id.et_insert_credit)?.text?.toString()?.trim() ?: ""
+                val days = panel.findViewById<android.widget.EditText>(R.id.et_insert_days)?.text?.toString()?.trim() ?: ""
+                val tag = if (credit.isEmpty() && days.isEmpty()) "[hide]" else "[hide=" + credit + "," + days + "]"
+                "\n" + tag + field1 + "[/hide]\n"
+            }
             else -> ""
         }
         if (text.isNotEmpty()) insertIntoReplyDialog(text)
