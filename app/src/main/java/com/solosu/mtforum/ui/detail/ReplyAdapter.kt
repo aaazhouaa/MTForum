@@ -532,14 +532,6 @@ class ReplyAdapter(rawReplies: List<ReplyItem>?) :
                 }
             }
 
-            // build73: 整项长按 -> 操作菜单(回复/举报/删除)
-            itemView.setOnLongClickListener {
-                if (replyLongClickListener != null) {
-                    replyLongClickListener!!.onReplyLongClick(currentItem, bindingAdapterPosition)
-                    return@setOnLongClickListener true
-                }
-                false
-            }
 
             // 楼层标签（沙发/椅子/地毯/报纸/N#）
             val floorLabel = item.floorLabel
@@ -621,7 +613,6 @@ class ReplyAdapter(rawReplies: List<ReplyItem>?) :
                 fullQuote.append(trimmedBody)
 
                 tvReplyQuote.text = fullQuote
-                attachCopyOnLongClick(tvReplyQuote)
             } else {
                 layoutReplyQuote.visibility = View.GONE
                 tvReplyQuote.text = ""
@@ -669,7 +660,6 @@ class ReplyAdapter(rawReplies: List<ReplyItem>?) :
                 val uncolored = BBCodeUtil.stripForegroundColorSpans(spannedSource)
                 tvContent.text = trimSpanned(uncolored ?: spannedSource)
                 setupClickableLinks(tvContent)
-                attachCopyOnLongClick(tvContent)
             } else {
                 tvContent.visibility = View.GONE
             }
@@ -696,6 +686,11 @@ class ReplyAdapter(rawReplies: List<ReplyItem>?) :
                     imageView.clipToOutline = true
                     imageView.isClickable = true
                     imageView.isFocusable = true
+                    imageView.isLongClickable = true
+                    imageView.setOnLongClickListener {
+                        replyLongClickListener?.onReplyLongClick(item, bindingAdapterPosition)
+                        true
+                    }
                     setImageClick(itemView.context, imageView, imgUrl)
                     Glide.with(itemView.context)
                         .load(imgUrl)
@@ -752,6 +747,22 @@ class ReplyAdapter(rawReplies: List<ReplyItem>?) :
 
             // 用户要求：废弃原卡片内的折叠胶囊，统一折叠到顶部标题栏
             layoutCollapsedHint?.visibility = View.GONE
+
+            // 长按该条评论占用的任意区域(整项/正文/引用块) -> 统一弹出操作菜单。
+            // 必须放在 setupClickableLinks 之后：那里为了不拦截链接点击会把 TextView 设回
+            // 不可长按，先挂就会被失效。
+            val longPress = View.OnLongClickListener {
+                replyLongClickListener?.onReplyLongClick(currentItem, bindingAdapterPosition)
+                true
+            }
+            itemView.isLongClickable = true
+            itemView.setOnLongClickListener(longPress)
+            tvContent.isLongClickable = true
+            tvContent.setOnLongClickListener(longPress)
+            if (layoutReplyQuote.visibility == View.VISIBLE) {
+                tvReplyQuote.isLongClickable = true
+                tvReplyQuote.setOnLongClickListener(longPress)
+            }
         }
 
         /** 收起/展开：折叠时箭头朝下 +「N 条回复」，展开时箭头朝上 +「收起回复」。
@@ -868,6 +879,14 @@ class ReplyAdapter(rawReplies: List<ReplyItem>?) :
                     replyLongClickListener?.onReplyLongClick(subItem, bindingAdapterPosition)
                     true
                 }
+                tvSubAuthor.setOnLongClickListener {
+                    replyLongClickListener?.onReplyLongClick(subItem, bindingAdapterPosition)
+                    true
+                }
+                ivSubAvatar.setOnLongClickListener {
+                    replyLongClickListener?.onReplyLongClick(subItem, bindingAdapterPosition)
+                    true
+                }
 
                 val sTime = subItem.time ?: ""
                 val sLoc = subItem.location ?: ""
@@ -964,35 +983,6 @@ class ReplyAdapter(rawReplies: List<ReplyItem>?) :
          *
          * 注意：此方法不会覆盖已有文本，只会在现有 Spannable 上添加链接处理
          */
-        /**
-         * build71: 长按复制回复内容。
-         * 之前 setupClickableLinks 里写死 setLongClickable(false)(为了不拦截链接点击),
-         * 导致别人回复根本没法复制。长按和单击是两个事件,挂长按不影响链接跳转。
-         */
-        private fun attachCopyOnLongClick(textView: TextView?) {
-            if (textView == null) return
-            textView.isLongClickable = true
-            textView.setOnLongClickListener {
-                val cs = textView.text
-                val text = cs?.toString()?.trim() ?: ""
-                if (text.isEmpty()) return@setOnLongClickListener false
-                try {
-                    val cm = textView.context
-                        .getSystemService(Context.CLIPBOARD_SERVICE) as? android.content.ClipboardManager
-                    if (cm != null) {
-                        cm.setPrimaryClip(android.content.ClipData.newPlainText("回复内容", text))
-                        com.solosu.mtforum.util.ToastUtil.makeText(
-                            textView.context, "已复制回复内容",
-                            com.solosu.mtforum.util.ToastUtil.LENGTH_SHORT
-                        ).show()
-                        return@setOnLongClickListener true
-                    }
-                } catch (ignored: Exception) {
-                }
-                false
-            }
-        }
-
         private fun setupClickableLinks(textView: TextView?) {
             if (textView == null) return
 

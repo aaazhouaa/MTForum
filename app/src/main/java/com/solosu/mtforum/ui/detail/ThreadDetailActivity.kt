@@ -150,6 +150,13 @@ class ThreadDetailActivity : AppCompatActivity() {
     private var isLoadingMore = false
     private var currentReplyPid = ""
     private var currentLoginUid: String? = null // build73: 当前登录 uid(判定是否本人)
+    // 评论编辑态（复用回复弹窗）：非空表示当前弹窗处于编辑模式
+    private var editingReplyPid: String = ""
+    private var editingReplyItem: ReplyItem? = null
+    private var editOriginalMessage: String = ""
+    private var editFormhash: String = ""
+    private var editDraftTouched = false // 原文拉回前用户已自行输入则不再覆盖
+    private var editPrefilling = false    // 防止程序回填触发 TextWatcher 误判为“用户已输入”
     // build74b: 打赏目标(空=主楼;有值=评论楼层)
     private var rewardTargetPid = ""
     private var rewardTargetName = ""
@@ -950,10 +957,24 @@ class ThreadDetailActivity : AppCompatActivity() {
                 etReplyDialog?.error = getString(R.string.reply_hint_empty)
             } else {
                 etReplyDialog?.error = null
-                val attachTags = buildAttachTags()
-                attemptReply(attachTags + text, etReplyDialog)
+                if (!TextUtils.isEmpty(editingReplyPid)) {
+                    // 编辑态：不带 reppid/引用字段，避免把“编辑”变成“回复”
+                    attemptEditReply(text)
+                } else {
+                    val attachTags = buildAttachTags()
+                    attemptReply(attachTags + text, etReplyDialog)
+                }
             }
         }
+
+        // 用户在原文拉回前自行改动，则不再覆盖其内容
+        etReplyDialog?.addTextChangedListener(object : android.text.TextWatcher {
+            override fun afterTextChanged(s: android.text.Editable?) {
+                if (!editPrefilling && !TextUtils.isEmpty(editingReplyPid)) editDraftTouched = true
+            }
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+        })
 
         btnPickImage?.setOnClickListener { pickImage() }
         registerReplyFilePicker()
@@ -1548,6 +1569,8 @@ class ThreadDetailActivity : AppCompatActivity() {
         // 用户需求：已输入的内容未发送时暂时保留（草稿暂存），离开当前帖子时才清除
         currentReplyPid = ""
         currentReplyTarget = ""
+        // 编辑态退出时清除，避免下次“回复”误入编辑分支
+        if (!TextUtils.isEmpty(editingReplyPid)) exitReplyEditUi()
     }
 
     private fun showReplyBottomSheet(prefillText: String?) {
@@ -4180,6 +4203,9 @@ class ThreadDetailActivity : AppCompatActivity() {
             currentReplyTarget = "回复 $author："
             showReplyBottomSheet("")
         }, dialog)
+        addActionRow(container, R.drawable.ic_copy, "复制", false, {
+            copyReplyContent(item)
+        }, dialog)
         if (!isOwnReply(item)) {
             addActionRow(container, R.drawable.ic_reward, "打赏", false, {
                 rewardTargetPid = item.pid ?: ""
@@ -4191,6 +4217,9 @@ class ThreadDetailActivity : AppCompatActivity() {
                 reportPost(item.pid)
             }, dialog)
         } else {
+            addActionRow(container, R.drawable.ic_edit, "编辑", false, {
+                editReply(item)
+            }, dialog)
             addActionRow(container, R.drawable.ic_delete, "删除", true, {
                 confirmDeleteReply(item)
             }, dialog)
@@ -4227,6 +4256,185 @@ class ThreadDetailActivity : AppCompatActivity() {
         val me = loginUid()
         if (TextUtils.isEmpty(me)) return false
         return me == item.authorUid
+    }
+
+    /** 复制该条评论的正文（contentText 优先，为空时从 contentHtml 剥标签兜底） */
+    private fun copyReplyContent(item: ReplyItem?) {
+        if (item == null) return
+        var text = item.contentText?.trim() ?: ""
+        if (text.isEmpty() && !TextUtils.isEmpty(item.contentHtml)) {
+            text = stripContentHtml(item.contentHtml).trim()
+        }
+        if (text.isEmpty()) {
+            Toast.makeText(this, "无可复制内容", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val cm = getSystemService(Context.CLIPBOARD_SERVICE) as? android.content.ClipboardManager
+        cm?.setPrimaryClip(android.content.ClipData.newPlainText("回复内容", text))
+        Toast.makeText(this, "已复制回复内容", Toast.LENGTH_SHORT).show()
+    }
+
+    /**
+     * 编辑自己的回复：复用底部回复弹窗（拉取该楼 BBCode 原文回填），
+     * 而不是跳发帖页。发帖页是主题帖语义（标题/版块/投票），拿来改一条评论完全不对位。
+     */
+    private fun editReply(item: ReplyItem?) {
+        if (item == null) return
+        if (!httpClient.isLoggedIn()) {
+            promptLogin()
+            return
+        }
+        if (TextUtils.isEmpty(item.pid)) {
+            Toast.makeText(this, "缺少回复编号，无法编辑", Toast.LENGTH_SHORT).show()
+            return
+        }
+        editingReplyPid = item.pid ?: ""
+        editingReplyItem = item
+        editFormhash = ""
+        editDraftTouched = false
+        editOriginalMessage = stripReplyReplyPrefix(item)
+        // 打开弹窗并把标题栏/发送按钮切成编辑语义
+        showReplyBottomSheet(null)
+        enterReplyEditUi()
+        fetchReplyEditSource(item.pid ?: "")
+    }
+
+    /** 评论正文去掉开头的「回复 @xxx：」引用前缀，避免编辑时把那截前缀当正文一起改 */
+    private fun stripReplyReplyPrefix(item: ReplyItem): String {
+        var t = item.contentText?.trim() ?: ""
+        if (t.isEmpty() && !TextUtils.isEmpty(item.contentHtml)) {
+            t = stripContentHtml(item.contentHtml).trim()
+        }
+        return t.replace(Regex("^回复\\s*@?[^：:]{0,30}[：:]\\s*"), "").trim()
+    }
+
+    /** 弹窗进入编辑态：目标栏文案 + 发送按钮文案 */
+    private fun enterReplyEditUi() {
+        mTvReplyTarget?.text = "编辑该评论"
+        mTvReplyTarget?.visibility = View.VISIBLE
+        mBtnSendReply?.text = "保存修改"
+        val et = mEtReplyDialog ?: return
+        editPrefilling = true
+        et.setText(editOriginalMessage)
+        et.setSelection(et.text?.length ?: 0)
+        editPrefilling = false
+    }
+
+    /** 退出编辑态，恢复“发表回复”语义 */
+    private fun exitReplyEditUi() {
+        editingReplyPid = ""
+        editingReplyItem = null
+        editOriginalMessage = ""
+        editFormhash = ""
+        editDraftTouched = false
+        mBtnSendReply?.text = "发表回复"
+    }
+
+    /**
+     * 拉取该楼的编辑页，取 BBCode 原文与 formhash 回填。
+     * 注意不能用正文 HTML 剥标签代替：那会丢掉 [b]/[img] 等 bbcode，改完保存就是格式全没。
+     */
+    private fun fetchReplyEditSource(pid: String) {
+        java.lang.Thread {
+            try {
+                val url = HttpClient.BASE_URL + "forum.php?mod=post&action=edit&tid=" + tid +
+                        "&pid=" + pid + "&mobile=2"
+                val html = httpClient.get(url)
+                var source = ""
+                var fh: String? = ""
+                if (!TextUtils.isEmpty(html)) {
+                    val doc = Jsoup.parse(html)
+                    val ta = doc.selectFirst("textarea[name=message]")
+                    if (ta != null) source = ta.text()
+                    fh = ForumParser.parseFormhash(html)
+                    if (TextUtils.isEmpty(source)) {
+                        // 个别模板把编辑器放在 textarea#e（无 name）里，退一步按 id 取
+                        val ta2 = doc.selectFirst("textarea#e")
+                        if (ta2 != null) source = ta2.text()
+                    }
+                }
+                val finalSource = source
+                val finalFh = fh
+                runOnUiThread {
+                    if (editingReplyPid != pid) return@runOnUiThread
+                    if (!TextUtils.isEmpty(finalFh)) editFormhash = finalFh!!
+                    if (TextUtils.isEmpty(finalSource)) {
+                        Toast.makeText(this, "未能获取原文，直接保存可能丢失排版", Toast.LENGTH_LONG).show()
+                        return@runOnUiThread
+                    }
+                    // 用户在拉取期间已自行输入，就不覆盖其内容
+                    if (editDraftTouched) return@runOnUiThread
+                    editOriginalMessage = finalSource
+                    val et = mEtReplyDialog ?: return@runOnUiThread
+                    editPrefilling = true
+                    et.setText(finalSource)
+                    et.setSelection(et.text?.length ?: 0)
+                    editPrefilling = false
+                }
+            } catch (e: Exception) {
+                runOnUiThread {
+                    if (editingReplyPid == pid) {
+                        Toast.makeText(
+                            this@ThreadDetailActivity,
+                            "未能获取原文：" + (if (TextUtils.isEmpty(e.message)) "网络异常" else e.message),
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }
+                }
+            }
+        }.start()
+    }
+
+    /** 提交评论编辑：forum.php?mod=post&action=edit&editsubmit=yes */
+    private fun attemptEditReply(message: String) {
+        val pid = editingReplyPid
+        if (TextUtils.isEmpty(pid)) return
+        java.lang.Thread {
+            try {
+                var fh: String? = editFormhash
+                if (TextUtils.isEmpty(fh)) {
+                    val form = httpClient.get(
+                        HttpClient.BASE_URL + "forum.php?mod=post&action=edit&tid=" + tid +
+                                "&pid=" + pid + "&mobile=2"
+                    )
+                    fh = ForumParser.parseFormhash(form)
+                }
+                if (TextUtils.isEmpty(fh)) fh = postDetail?.formhash
+                if (TextUtils.isEmpty(fh)) {
+                    runOnUiThread { showReplyFailure("获取安全验证失败，请重试") }
+                    return@Thread
+                }
+                val params = HashMap<String, String>()
+                params["formhash"] = fh!!
+                params["subject"] = ""
+                params["message"] = message
+                params["editsubmit"] = "yes"
+                synchronized(pendingUploadAids) {
+                    for (aid in pendingUploadAids) {
+                        if (!TextUtils.isEmpty(aid)) params["attachnew[" + aid + "][description]"] = ""
+                    }
+                }
+                val url = HttpClient.BASE_URL + "forum.php?mod=post&action=edit&extra=&editsubmit=yes&mobile=2" +
+                        "&handlekey=editform&tid=" + tid + "&pid=" + pid + "&page=1"
+                val resp = httpClient.post(url, params)
+                val ok = !TextUtils.isEmpty(resp) && !ForumParser.isLoginPage(resp)
+                        && (resp!!.contains("viewthread") || resp.contains("thread-" + tid)
+                        || resp.contains("成功") || resp.contains("回复"))
+                runOnUiThread {
+                    if (ok) {
+                        Toast.makeText(this, "已保存修改", Toast.LENGTH_SHORT).show()
+                        hideReplyPanel()
+                        refreshPostDetail()
+                    } else {
+                        showReplyFailure("保存失败，请稍后重试")
+                    }
+                }
+            } catch (e: Exception) {
+                runOnUiThread {
+                    showReplyFailure("保存失败：" + (if (TextUtils.isEmpty(e.message)) "网络异常" else e.message))
+                }
+            }
+        }.start()
     }
 
     private fun confirmDeleteReply(item: ReplyItem?) {
@@ -5179,7 +5387,21 @@ class ThreadDetailActivity : AppCompatActivity() {
         addTextChunk(textAfter)
     }
 
+    /**
+     * 剥掉隐藏内容开头的「本帖隐藏的内容[:：]」标题与随之残留的换行。
+     * 必须 DOTALL：网站 HTML 常在标题前带换行缩进，`.` 默认不跨行会让整条正则失配，
+     * 结果就是卡片头部与正文里各出现一次标题、中间空出一大段。
+     */
+    private fun stripHiddenHeader(raw: String): String {
+        var s = raw.replace(Regex("(?is)^.*?本帖隐藏的内容[:：]?[\\s]*(?:<br\\s*/?>)*"), "")
+        s = stripLeadingHtmlBreak(s)
+        s = Regex("(?i)(?:<br\\s*/?>\\s*){2,}").replace(s, "<br>")
+        s = Regex("(?i)<p\\s*>\\s*(?:&nbsp;|&#160;|\\s)*</p>").replace(s, "")
+        return s
+    }
+
     private fun createUnlockedHiddenCard(innerHtml: String): View {
+        val content = stripHiddenHeader(innerHtml)
         val card = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             val lp = LinearLayout.LayoutParams(
@@ -5190,20 +5412,17 @@ class ThreadDetailActivity : AppCompatActivity() {
                 bottomMargin = dpToPx(12)
             }
             layoutParams = lp
-            val isDark = (resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) == android.content.res.Configuration.UI_MODE_NIGHT_YES
-            val bgColor = if (isDark) 0x1AF59E0B.toInt() else 0x14F59E0B.toInt()
-            val strokeColor = if (isDark) 0x59F59E0B.toInt() else 0x66F59E0B.toInt()
             val gd = android.graphics.drawable.GradientDrawable().apply {
-                setColor(bgColor)
-                cornerRadius = dpToPx(10).toFloat()
-                setStroke(dpToPx(1), strokeColor)
+                setColor(getColor(R.color.background_secondary))
+                cornerRadius = dpToPx(12).toFloat()
+                setStroke(dpToPx(1), getColor(R.color.divider))
             }
             background = gd
             val pad = dpToPx(12)
             setPadding(pad, pad, pad, pad)
         }
 
-        // 顶栏：左侧标题「🔓 本帖隐藏的内容」，右侧「复制」胶囊按钮
+        // 顶栏：左侧金色锁图标 + 标题，右侧「复制」胶囊按钮
         val topRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
@@ -5213,31 +5432,40 @@ class ThreadDetailActivity : AppCompatActivity() {
             )
         }
 
+        val accent = com.solosu.mtforum.util.ThemeManager.getThemeColor(this)
+
+        val ivLock = ImageView(this).apply {
+            setImageResource(R.drawable.ic_lock_outline)
+            setColorFilter(accent)
+            layoutParams = LinearLayout.LayoutParams(dpToPx(16), dpToPx(16)).apply {
+                marginEnd = dpToPx(6)
+            }
+        }
+        topRow.addView(ivLock)
+
         val tvTitle = TextView(this).apply {
-            text = "🔓 本帖隐藏的内容"
+            text = "本帖隐藏的内容"
             textSize = 13.5f
             typeface = Typeface.DEFAULT_BOLD
-            setTextColor(0xFFD97706.toInt())
+            setTextColor(accent)
             layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
         }
         topRow.addView(tvTitle)
 
         // 纯文本内容提取
-        val cleanContent = innerHtml.replace(Regex("(?i)^.*?本帖隐藏的内容[:：]?\\s*"), "")
-            .replace(Regex("(?i)<br\\s*/?>"), "\n")
+        val cleanContent = content.replace(Regex("(?i)<br\\s*/?>"), "\n")
             .replace(Regex("<[^>]+>"), "")
             .trim()
 
         val btnCopy = TextView(this).apply {
             text = "复制"
             textSize = 11.5f
-            setTextColor(0xFFD97706.toInt())
+            setTextColor(accent)
             typeface = Typeface.DEFAULT_BOLD
             setPadding(dpToPx(10), dpToPx(3), dpToPx(10), dpToPx(3))
-            val isDark = (resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) == android.content.res.Configuration.UI_MODE_NIGHT_YES
             val btnBg = android.graphics.drawable.GradientDrawable().apply {
-                setColor(if (isDark) 0x33F59E0B.toInt() else 0x24F59E0B.toInt())
-                cornerRadius = dpToPx(12).toFloat()
+                setColor(androidx.core.graphics.ColorUtils.setAlphaComponent(accent, 0x1A))
+                cornerRadius = dpToPx(8).toFloat()
             }
             background = btnBg
             isClickable = true
@@ -5262,12 +5490,11 @@ class ThreadDetailActivity : AppCompatActivity() {
                 topMargin = dpToPx(8)
             }
             layoutParams = lp
-            textSize = 14.5f
+            textSize = 15f
             setTextColor(getColor(R.color.text_primary))
-            setLineSpacing(dpToPx(5).toFloat(), 1.0f)
-            val bodyHtml = innerHtml.replace(Regex("(?i)^.*?本帖隐藏的内容[:：]?\\s*"), "")
+            setLineSpacing(dpToPx(6).toFloat(), 1.0f)
             text = safeFromHtml(
-                bodyHtml,
+                content,
                 createInlineImageGetter(this),
                 BBCodeUtil.createTagHandler(this@ThreadDetailActivity)
             )
