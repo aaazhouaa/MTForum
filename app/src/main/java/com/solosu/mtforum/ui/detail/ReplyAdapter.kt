@@ -3,6 +3,7 @@ package com.solosu.mtforum.ui.detail
 import android.content.Context
 import android.content.Intent
 import android.content.res.Resources
+import android.graphics.Typeface
 import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.Drawable
 import android.text.Html
@@ -12,6 +13,8 @@ import android.text.TextPaint
 import android.text.TextUtils
 import android.text.method.LinkMovementMethod
 import android.text.style.ClickableSpan
+import android.text.style.RelativeSizeSpan
+import android.text.style.StyleSpan
 import android.text.style.URLSpan
 import android.util.TypedValue
 import android.view.LayoutInflater
@@ -811,9 +814,16 @@ class ReplyAdapter(rawReplies: List<ReplyItem>?) :
                 val subHtml = subItem.contentHtml
                 // 楼中楼同样剥离「本帖最后由 xxx 于 时间 编辑」整句，时间单独显示在用户名行末
                 val subEditSplit = if (TextUtils.isEmpty(subHtml)) null else splitEditMarker(subHtml)
+                // 子回复的 HTML 未经过主帖那套归一化：附件图真实地址在 file/zoomfile 上（src 只是 none.gif 占位），
+                // 且可能残留连续换行空段落；先恢复真实地址并压缩空白再交给 fromHtml
+                val subSource = if (subEditSplit != null) {
+                    collapseSubReplyHtml(restoreInlineImageSources(subEditSplit.first))
+                } else {
+                    ""
+                }
                 val subBody: CharSequence? = if (subEditSplit != null) {
                     val rendered = Html.fromHtml(
-                        BBCodeUtil.stripHtmlColors(subEditSplit.first),
+                        BBCodeUtil.stripHtmlColors(subSource),
                         Html.FROM_HTML_MODE_COMPACT,
                         createInlineImageGetter(tvSubContent),
                         BBCodeUtil.createTagHandler(itemView.context)
@@ -826,8 +836,17 @@ class ReplyAdapter(rawReplies: List<ReplyItem>?) :
                 val inReplyTo = subItem.inReplyToName
                 val subSb = android.text.SpannableStringBuilder()
                 if (!TextUtils.isEmpty(inReplyTo)) {
-                    // 「回复 用户名：」保持常规正文颜色，不做主题色高亮
-                    subSb.append("回复 $inReplyTo：")
+                    // 「回复 用户名：」弱化为小一号斜体前缀，颜色仍跟随正文
+                    val prefix = "回复 $inReplyTo："
+                    subSb.append(prefix)
+                    subSb.setSpan(
+                        RelativeSizeSpan(0.85f), 0, prefix.length,
+                        Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
+                    )
+                    subSb.setSpan(
+                        StyleSpan(Typeface.ITALIC), 0, prefix.length,
+                        Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
+                    )
                 }
                 if (!TextUtils.isEmpty(subBody)) {
                     subSb.append(trimSpanned(subBody!!))
@@ -1177,6 +1196,45 @@ class ReplyAdapter(rawReplies: List<ReplyItem>?) :
             return null
         }
 
+        /**
+         * 楼中楼正文里 Discuz 附件图的真实地址存在 file/zoomfile 等属性上，
+         * 而 src 往往是 static/image/common/none.gif 占位；Html.ImageGetter 只能拿到 src，
+         * 直接渲染会去加载占位图并留下一块空白。这里把真实地址写回 src。
+         */
+        private fun restoreInlineImageSources(html: String?): String {
+            if (html.isNullOrEmpty() || !html.contains("<img", ignoreCase = true)) return html ?: ""
+            return try {
+                val doc = org.jsoup.Jsoup.parseBodyFragment(html)
+                for (ignoreOp in doc.select("ignore_js_op")) {
+                    ignoreOp.unwrap()
+                }
+                for (img in doc.select("img")) {
+                    val realUrl = firstNonEmptyAttr(
+                        img,
+                        "zoomfile", "file", "comiis_loadimages", "data-original",
+                        "data-src", "data-file", "data-lazy-src", "src"
+                    )
+                    val fullUrl = normalizeImageUrl(realUrl)
+                    if (fullUrl.isNullOrEmpty()) {
+                        img.remove()
+                    } else {
+                        img.attr("src", fullUrl)
+                    }
+                }
+                doc.body().html()
+            } catch (e: Exception) {
+                html
+            }
+        }
+
+        /** 压缩楼中楼正文的连续换行与空段落（主帖正文在 renderContentSections 里做过同样处理）。 */
+        private fun collapseSubReplyHtml(html: String): String {
+            if (html.isEmpty()) return html
+            return Regex("(?i)(?:<br\\s*/?>\\s*){2,}").replace(html, "<br>")
+                .replace(Regex("(?i)<p\\s*>\\s*(?:&nbsp;|&#160;|\\s)*</p>"), "")
+                .replace(Regex("(?i)(?:\\r?\\n\\s*){3,}"), "\n\n")
+        }
+
         private fun extractImagesFromHtml(html: String?, outImageUrls: MutableList<String>): String {
             if (TextUtils.isEmpty(html)) {
                 return ""
@@ -1330,6 +1388,13 @@ class ReplyAdapter(rawReplies: List<ReplyItem>?) :
                             resource.setBounds(0, 0, w, h)
                             // item 内联图：只回填，不 setText 重排（避免回收复用时乱跳）
                             placeholder.setRealNoRelayout(resource)
+                        }
+
+                        override fun onLoadFailed(errorDrawable: Drawable?) {
+                            // 加载失败时把占位塌缩为零尺寸并请求重排，避免行内留下一块透明空白
+                            placeholder.setBounds(0, 0, 0, 0)
+                            tv.requestLayout()
+                            tv.postInvalidate()
                         }
 
                         override fun onLoadCleared(placeholderD: Drawable?) {
