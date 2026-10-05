@@ -474,23 +474,20 @@ class ReplyAdapter(rawReplies: List<ReplyItem>?) :
         private val tvAuthor: TextView = itemView.findViewById(R.id.tv_reply_author)
         private val tvOpBadge: TextView = itemView.findViewById(R.id.tv_op_badge)
         private val tvLevel: TextView = itemView.findViewById(R.id.tv_reply_level)
-        private val tvTime: TextView = itemView.findViewById(R.id.tv_reply_time)
-        private val tvReplyEditFooter: TextView? = itemView.findViewById(R.id.tv_reply_edit_footer)
+        private val tvReplyEditTime: TextView? = itemView.findViewById(R.id.tv_reply_edit_time)
         private val tvContent: TextView = itemView.findViewById(R.id.tv_reply_content)
         private val layoutReplyQuote: LinearLayout = itemView.findViewById(R.id.layout_reply_quote)
         private val tvReplyQuoteTitle: TextView? = itemView.findViewById(R.id.tv_reply_quote_title)
         private val tvReplyQuote: TextView = itemView.findViewById(R.id.tv_reply_quote)
         private val llReplyImages: LinearLayout = itemView.findViewById(R.id.ll_reply_images)
-        private val btnReplyTo: View = itemView.findViewById(R.id.btn_reply_to)
         private val layoutCollapsedHint: View? = itemView.findViewById(R.id.layout_collapsed_hint)
         private val ivCollapsedIcon: ImageView? = itemView.findViewById(R.id.iv_collapsed_icon)
         private val tvCollapsedText: TextView? = itemView.findViewById(R.id.tv_collapsed_text)
 
         // 图六楼中楼与底栏新控件
         private val tvReplyBottomTime: TextView? = itemView.findViewById(R.id.tv_reply_bottom_time)
-        private val btnToggleSubReplies: TextView? = itemView.findViewById(R.id.btn_toggle_sub_replies)
-        private val btnReplyText: TextView? = itemView.findViewById(R.id.btn_reply_text)
-        private val btnReplyMore: ImageView? = itemView.findViewById(R.id.btn_reply_more)
+        private val btnToggleSubReplies: ImageView? = itemView.findViewById(R.id.btn_toggle_sub_replies)
+        private val btnReplyText: ImageView? = itemView.findViewById(R.id.btn_reply_text)
         private val layoutSubRepliesContainer: LinearLayout? = itemView.findViewById(R.id.layout_sub_replies_container)
         private val llSubRepliesList: LinearLayout? = itemView.findViewById(R.id.ll_sub_replies_list)
 
@@ -558,21 +555,7 @@ class ReplyAdapter(rawReplies: List<ReplyItem>?) :
             // 等级/称号：按用户要求在评论区完全隐藏，保持作者栏清爽统一
             tvLevel.visibility = View.GONE
 
-            // 时间
-            val time = item.time
-            if (!TextUtils.isEmpty(time)) {
-                tvTime.visibility = View.VISIBLE
-                tvTime.text = time
-            } else {
-                tvTime.visibility = View.GONE
-            }
-
-            // 评论区按参考样式仅显示时间，不显示回复项地点，避免与回复按钮并列出现重复灰色定位文字。
-
-            // 回复按钮：旧版头像旁图标废弃隐藏，统一由图六底栏呈现
-            btnReplyTo.visibility = View.GONE
-
-            // 内容 - 优先显示纯文本
+            // 时间与回复图标已改由底栏呈现（原先头部行内的控件已删除）
 
             // 引用内容单独显示，模拟网页端的浅黄色引用框；当前回复保持深色正文。
             val quotedText = item.quotedContentText
@@ -671,11 +654,13 @@ class ReplyAdapter(rawReplies: List<ReplyItem>?) :
                 remainingSource = stripLeadingHtmlBreak(sourceHtml)
             }
 
-            if (!editFooterText.isNullOrEmpty()) {
-                tvReplyEditFooter?.visibility = View.VISIBLE
-                tvReplyEditFooter?.text = editFooterText
+            // 编辑标记：从「本帖最后由 xxx 于 时间 编辑」中只取时间，跟到用户名同行显示
+            val editTime = extractEditTime(editFooterText)
+            if (!editTime.isNullOrEmpty()) {
+                tvReplyEditTime?.visibility = View.VISIBLE
+                tvReplyEditTime?.text = "$editTime 编辑"
             } else {
-                tvReplyEditFooter?.visibility = View.GONE
+                tvReplyEditTime?.visibility = View.GONE
             }
 
             if (remainingSource.isNotEmpty()) {
@@ -730,9 +715,7 @@ class ReplyAdapter(rawReplies: List<ReplyItem>?) :
                 llReplyImages.visibility = View.GONE
             }
 
-            // 隐藏旧版头像旁的时间和回复图标，统一由图六底栏呈现
-            btnReplyTo.visibility = View.GONE
-            tvTime.visibility = View.GONE
+            // 隐藏旧版头像旁的时间与回复图标已删除，统一由底栏呈现
 
             // 图六底栏：左侧显示「时间 来自 属地」
             val timeStr = item.time ?: ""
@@ -745,7 +728,7 @@ class ReplyAdapter(rawReplies: List<ReplyItem>?) :
             tvReplyBottomTime?.text = fullTimeLoc
             tvReplyBottomTime?.visibility = if (fullTimeLoc.isNotEmpty()) View.VISIBLE else View.GONE
 
-            // 图六底栏：回复按钮
+            // 图六底栏：回复图标
             val author = item.author
             if (!TextUtils.isEmpty(author)) {
                 btnReplyText?.visibility = View.VISIBLE
@@ -756,20 +739,14 @@ class ReplyAdapter(rawReplies: List<ReplyItem>?) :
                 btnReplyText?.visibility = View.GONE
             }
 
-            // 图六底栏：更多操作按钮（三个点）
-            btnReplyMore?.visibility = View.VISIBLE
-            btnReplyMore?.setOnClickListener {
-                replyLongClickListener?.onReplyLongClick(item, bindingAdapterPosition)
-            }
-
-            // 楼中楼折叠与展开控制
+            // 楼中楼折叠与展开控制（箭头图标：折叠=向下，展开=向上；数量放 contentDescription）
             val subCount = item.subReplies.size
             if (subCount > 0) {
                 btnToggleSubReplies?.visibility = View.VISIBLE
-                btnToggleSubReplies?.text = if (item.isSubRepliesExpanded) "收起回复" else "展开回复 ($subCount)"
+                updateToggleArrow(item.isSubRepliesExpanded, subCount)
                 btnToggleSubReplies?.setOnClickListener {
                     item.isSubRepliesExpanded = !item.isSubRepliesExpanded
-                    btnToggleSubReplies?.text = if (item.isSubRepliesExpanded) "收起回复" else "展开回复 ($subCount)"
+                    updateToggleArrow(item.isSubRepliesExpanded, subCount)
                     bindSubReplies(item)
                 }
             } else {
@@ -781,6 +758,13 @@ class ReplyAdapter(rawReplies: List<ReplyItem>?) :
 
             // 用户要求：废弃原卡片内的折叠胶囊，统一折叠到顶部标题栏
             layoutCollapsedHint?.visibility = View.GONE
+        }
+
+        /** 收起/展开箭头：ic_arrow_right 默认朝右，旋转 90° 朝下（待展开）、270° 朝上（已展开）。 */
+        private fun updateToggleArrow(expanded: Boolean, subCount: Int) {
+            btnToggleSubReplies?.rotation = if (expanded) 270f else 90f
+            btnToggleSubReplies?.contentDescription =
+                if (expanded) "收起回复" else "展开回复（$subCount）"
         }
 
         private fun bindSubReplies(item: ReplyItem) {
@@ -1407,6 +1391,16 @@ class ReplyAdapter(rawReplies: List<ReplyItem>?) :
 
         private fun dpToPx(context: Context, dp: Int): Int {
             return (dp * context.resources.displayMetrics.density).toInt()
+        }
+
+        /**
+         * 从「本帖最后由 xxx 于 2026-10-4 21:45 编辑」里取出时间部分（含前后空白）。
+         * 取不到时返回 null，避免把整句原样降级显示。
+         */
+        private fun extractEditTime(text: String?): String? {
+            if (text.isNullOrBlank()) return null
+            val m = Regex("\\d{4}[-/]\\d{1,2}[-/]\\d{1,2}\\s+\\d{1,2}:\\d{2}(?::\\d{2})?").find(text)
+            return m?.value
         }
     }
 }
