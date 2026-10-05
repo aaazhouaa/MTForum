@@ -162,6 +162,19 @@ class ThreadDetailActivity : AppCompatActivity() {
     private val pendingImageUris: MutableList<Uri> = ArrayList()
     private val uploadedAidMap: MutableMap<Uri, String> = HashMap()
 
+    /** 回复弹窗非图片附件 */
+    private val replyAttachFiles: MutableList<ReplyAttachFile> = ArrayList()
+
+    /** 回复弹窗附件选择器 */
+    private var replyFilePickerLauncher: ActivityResultLauncher<Array<String>>? = null
+
+    /** 论坛真实表情集（懒加载后缓存） */
+    private var replySmileyCatalog: MutableList<ForumParser.SmileySet>? = null
+    private var replySmileySetIndex = 0
+
+    /** 插入面板当前选中的内容类型 */
+    private var pendingInsertType = -1
+
     /** 当前帖全部图片(正文+附件+隐藏区,按 bindData 收集顺序) */
     private var currentImageList: MutableList<String> = ArrayList()
 
@@ -896,6 +909,23 @@ class ThreadDetailActivity : AppCompatActivity() {
         val tvTarget = panel.findViewById<TextView>(R.id.tv_reply_target)
         val btnPickImage = panel.findViewById<ImageButton>(R.id.btn_pick_image)
 
+        // 表情 / @朋友 / 插入 / 附件 / 高级
+        panel.findViewById<View>(R.id.btn_smile)?.setOnClickListener { toggleReplySmileyPanel() }
+        panel.findViewById<View>(R.id.btn_at)?.setOnClickListener { toggleReplyAtPanel() }
+        panel.findViewById<View>(R.id.btn_insert)?.setOnClickListener { toggleReplyInsertPanel() }
+        panel.findViewById<View>(R.id.btn_attach)?.setOnClickListener { hideReplyToolPanels(); pickReplyFile() }
+        panel.findViewById<View>(R.id.btn_advanced)?.setOnClickListener { toggleReplyAdvancedPanel() }
+        panel.findViewById<View>(R.id.btn_at_insert)?.setOnClickListener {
+            val name = panel.findViewById<android.widget.EditText>(R.id.et_at_username)?.text?.toString()?.trim() ?: ""
+            if (name.isEmpty()) {
+                Toast.makeText(this, "请输入用户名", Toast.LENGTH_SHORT).show()
+            } else {
+                insertIntoReplyDialog("@$name ")
+                panel.findViewById<android.widget.EditText>(R.id.et_at_username)?.setText("")
+                hideReplyToolPanels()
+            }
+        }
+
         mEtReplyDialog = etReplyDialog
         mTvReplyTarget = tvTarget
         mBtnSendReply = btnSend
@@ -921,6 +951,7 @@ class ThreadDetailActivity : AppCompatActivity() {
         }
 
         btnPickImage?.setOnClickListener { pickImage() }
+        registerReplyFilePicker()
 
         // 输入法激活时，拦截系统返回键一步同时收起键盘与回复面板，不再需要按两次
         etReplyDialog?.onKeyPreImeListener = {
@@ -945,6 +976,409 @@ class ThreadDetailActivity : AppCompatActivity() {
         }
         onBackPressedDispatcher.addCallback(this, callback)
         replyBackPressedCallback = callback
+    }
+
+    /** 回复弹窗内单个非图片附件 */
+    private class ReplyAttachFile(val name: String, val aid: String)
+
+    /** 向回复弹窗输入框光标处插入文本（替换选中内容），语义与发帖页一致 */
+    private fun insertIntoReplyDialog(text: String) {
+        val et = mEtReplyDialog ?: return
+        val editable = et.text
+        if (editable == null) {
+            et.setText(text)
+            return
+        }
+        var start = et.selectionStart
+        val end = et.selectionEnd
+        if (start < 0) start = editable.length
+        if (end > start) {
+            editable.replace(start, end, text)
+        } else {
+            editable.insert(start, text)
+        }
+        val caret = (start + text.length).coerceAtMost(editable.length)
+        et.setSelection(caret)
+    }
+
+    /** 收起回复弹窗里的表情/@/插入/高级面板 */
+    private fun hideReplyToolPanels() {
+        val panel = binding.containerReplyPanel
+        panel.findViewById<View>(R.id.ll_smiley_panel)?.visibility = View.GONE
+        panel.findViewById<View>(R.id.ll_at_panel)?.visibility = View.GONE
+        panel.findViewById<View>(R.id.ll_insert_panel)?.visibility = View.GONE
+        panel.findViewById<View>(R.id.ll_reply_advanced)?.visibility = View.GONE
+    }
+
+    private fun toggleReplyAdvancedPanel() {
+        val panel = binding.containerReplyPanel
+        val adv = panel.findViewById<View>(R.id.ll_reply_advanced) ?: return
+        val visible = adv.visibility == View.VISIBLE
+        hideReplyToolPanels()
+        if (!visible) adv.visibility = View.VISIBLE
+    }
+
+    private fun toggleReplyAtPanel() {
+        val panel = binding.containerReplyPanel
+        val atPanel = panel.findViewById<View>(R.id.ll_at_panel) ?: return
+        val visible = atPanel.visibility == View.VISIBLE
+        hideReplyToolPanels()
+        if (!visible) {
+            atPanel.visibility = View.VISIBLE
+            panel.findViewById<android.widget.EditText>(R.id.et_at_username)?.requestFocus()
+        }
+    }
+
+    /** 插入面板：与网页端一致的 9 项内容类型（链接/图片/音乐/视频/Flash/引用/代码/免费/隐藏） */
+    private fun toggleReplyInsertPanel() {
+        val panel = binding.containerReplyPanel
+        val insert = panel.findViewById<View>(R.id.ll_insert_panel) ?: return
+        val visible = insert.visibility == View.VISIBLE
+        hideReplyToolPanels()
+        if (visible) return
+        insert.visibility = View.VISIBLE
+        panel.findViewById<View>(R.id.ll_insert_input)?.visibility = View.GONE
+        panel.findViewById<View>(R.id.btn_ins_link)?.setOnClickListener { selectInsertType(panel, INSERT_LINK, true, false, "链接网址", "链接文字") }
+        panel.findViewById<View>(R.id.btn_ins_image)?.setOnClickListener { selectInsertType(panel, INSERT_IMAGE, true, false, "图片地址", "") }
+        panel.findViewById<View>(R.id.btn_ins_audio)?.setOnClickListener { selectInsertType(panel, INSERT_AUDIO, true, false, "音乐文件地址", "") }
+        panel.findViewById<View>(R.id.btn_ins_video)?.setOnClickListener { selectInsertType(panel, INSERT_VIDEO, true, false, "视频地址", "") }
+        panel.findViewById<View>(R.id.btn_ins_flash)?.setOnClickListener { selectInsertType(panel, INSERT_FLASH, true, false, "Flash 地址", "") }
+        panel.findViewById<View>(R.id.btn_ins_quote)?.setOnClickListener { selectInsertType(panel, INSERT_QUOTE, false, true, "", "") }
+        panel.findViewById<View>(R.id.btn_ins_code)?.setOnClickListener { selectInsertType(panel, INSERT_CODE, false, true, "", "") }
+        panel.findViewById<View>(R.id.btn_ins_free)?.setOnClickListener { selectInsertType(panel, INSERT_FREE, false, true, "", "") }
+        panel.findViewById<View>(R.id.btn_ins_hide)?.setOnClickListener { selectInsertType(panel, INSERT_HIDE, false, true, "", "") }
+    }
+
+    private fun selectInsertType(panel: View, type: Int, needUrl: Boolean, needText: Boolean, hint1: String, hint2: String) {
+        pendingInsertType = type
+        val input = panel.findViewById<View>(R.id.ll_insert_input) ?: return
+        val f1 = panel.findViewById<android.widget.EditText>(R.id.et_insert_field1)
+        val f2 = panel.findViewById<android.widget.EditText>(R.id.et_insert_field2)
+        val confirm = panel.findViewById<View>(R.id.btn_insert_confirm)
+        input.visibility = View.VISIBLE
+        f1?.setText("")
+        f2?.setText("")
+        f1?.hint = hint1
+        f1?.visibility = if (needUrl || needText) View.VISIBLE else View.GONE
+        f2?.hint = hint2
+        f2?.visibility = if (needUrl && needText && hint2.isNotEmpty()) View.VISIBLE else View.GONE
+        confirm?.setOnClickListener { applyInsert(type, f1?.text?.toString()?.trim() ?: "", f2?.text?.toString()?.trim() ?: "") }
+    }
+
+    private fun applyInsert(type: Int, field1: String, field2: String) {
+        if (type == INSERT_LINK && TextUtils.isEmpty(field1)) {
+            Toast.makeText(this, "请输入链接网址", Toast.LENGTH_SHORT).show()
+            return
+        }
+        if ((type == INSERT_IMAGE || type == INSERT_AUDIO || type == INSERT_VIDEO || type == INSERT_FLASH)
+            && TextUtils.isEmpty(field1)
+        ) {
+            Toast.makeText(this, "请输入地址", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val text = when (type) {
+            INSERT_LINK -> {
+                val label = if (TextUtils.isEmpty(field2)) field1 else field2
+                "[url=" + field1 + "]" + label + "[/url]"
+            }
+            INSERT_IMAGE -> "[img]" + field1 + "[/img]"
+            INSERT_AUDIO -> "[audio]" + field1 + "[/audio]"
+            INSERT_VIDEO -> "[media]" + field1 + "[/media]"
+            INSERT_FLASH -> "[flash]" + field1 + "[/flash]"
+            INSERT_QUOTE -> "\n[quote]请输入引用内容[/quote]\n"
+            INSERT_CODE -> "\n[code]请输入代码[/code]\n"
+            INSERT_FREE -> "\n[free]请输入免费公开内容[/free]\n"
+            INSERT_HIDE -> "\n[hide]请输入回复后可见的隐藏内容[/hide]\n"
+            else -> ""
+        }
+        if (text.isNotEmpty()) insertIntoReplyDialog(text)
+        hideReplyToolPanels()
+    }
+
+    // ---- 表情面板（论坛真实表情，取不到时为空提示） ----
+
+    private fun toggleReplySmileyPanel() {
+        val panel = binding.containerReplyPanel
+        val smiley = panel.findViewById<View>(R.id.ll_smiley_panel) ?: return
+        val visible = smiley.visibility == View.VISIBLE
+        hideReplyToolPanels()
+        if (visible) return
+        smiley.visibility = View.VISIBLE
+        loadReplySmileyCatalog()
+    }
+
+    private fun loadReplySmileyCatalog() {
+        val panel = binding.containerReplyPanel
+        val rv = panel.findViewById<RecyclerView>(R.id.rv_smiley) ?: return
+        val empty = panel.findViewById<TextView>(R.id.tv_smiley_empty)
+        val tabs = panel.findViewById<LinearLayout>(R.id.ll_smiley_tabs)
+        val cached = replySmileyCatalog
+        if (cached != null) {
+            showSmileySet(rv, tabs, cached, replySmileySetIndex, empty)
+            return
+        }
+        empty?.visibility = View.VISIBLE
+        empty?.text = "表情加载中…"
+        rv.visibility = View.GONE
+        tabs?.removeAllViews()
+        val tidValue = tid
+        val fidValue = postDetail?.forumFid ?: "39"
+        java.lang.Thread {
+            var catalog: MutableList<ForumParser.SmileySet> = ArrayList()
+            try {
+                if (!httpClient.isLoggedIn()) httpClient.syncFromCookieManager()
+                // 站点表情数据缓存文件（CDN 静态资源，名称固定，不触发 WAF），优先直接取
+                for (url in ForumParser.getSmileyScriptUrlCandidates()) {
+                    catalog = ForumParser.parseSmileyCatalog(httpClient.get(url))
+                    if (catalog.isNotEmpty()) break
+                }
+                if (catalog.isEmpty()) {
+                    val replyUrl = HttpClient.BASE_URL + "forum.php?mod=post&action=reply&fid=" +
+                        fidValue + "&tid=" + (tidValue ?: "")
+                    val desktopHtml = httpClient.getDesktop(replyUrl)
+                    catalog = ForumParser.parseSmileyCatalog(desktopHtml)
+                    // 编辑器页里可能外链表情脚本，抖出地址再抓一次
+                    if (catalog.isEmpty()) {
+                        for (scriptUrl in ForumParser.extractSmileyScriptUrls(desktopHtml)) {
+                            catalog = ForumParser.parseSmileyCatalog(httpClient.get(scriptUrl))
+                            if (catalog.isNotEmpty()) break
+                        }
+                    }
+                }
+                if (catalog.isEmpty()) {
+                    val newThreadUrl = HttpClient.BASE_URL + "forum.php?mod=post&action=newthread&fid=" + fidValue
+                    catalog = ForumParser.parseSmileyCatalog(httpClient.getDesktop(newThreadUrl))
+                }
+                if (catalog.isEmpty()) {
+                    val mobileHtml = httpClient.get(
+                        HttpClient.BASE_URL + "forum.php?mod=post&action=reply&fid=" +
+                            fidValue + "&tid=" + (tidValue ?: "") + "&mobile=2"
+                    )
+                    catalog = ForumParser.parseSmileyCatalog(mobileHtml)
+                }
+            } catch (ignored: Exception) {
+            }
+            val finalCatalog = catalog
+            runOnUiThread {
+                if (finalCatalog.isNotEmpty()) replySmileyCatalog = finalCatalog
+                showSmileySet(rv, tabs, finalCatalog, 0, empty)
+            }
+        }.start()
+    }
+
+    /** 取不到论坛表情时回退内置图标（点击插入 [标签]），保证表情按钮始终可用 */
+    private fun renderFallbackSmileyIcons(rv: RecyclerView, tabs: LinearLayout?) {
+        val iconIds = intArrayOf(
+            R.drawable.ic_smile, R.drawable.ic_heart, R.drawable.ic_thumbs_up,
+            R.drawable.ic_fire, R.drawable.ic_star_filled, R.drawable.ic_check,
+            R.drawable.ic_cross, R.drawable.ic_lightbulb, R.drawable.ic_pin
+        )
+        val labels = arrayOf("微笑", "爱心", "点赞", "火热", "收藏", "同意", "反对", "想法", "置顶")
+        rv.visibility = View.VISIBLE
+        rv.layoutManager = GridLayoutManager(this, 6)
+        rv.adapter = object : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
+            @NonNull
+            override fun onCreateViewHolder(@NonNull parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder {
+                val size = dpToPx(40)
+                val iv = ImageView(parent.context)
+                iv.layoutParams = RecyclerView.LayoutParams(size, size)
+                iv.setPadding(dpToPx(8), dpToPx(8), dpToPx(8), dpToPx(8))
+                iv.scaleType = ImageView.ScaleType.FIT_CENTER
+                iv.isClickable = true
+                iv.setBackgroundResource(android.R.drawable.list_selector_background)
+                return object : RecyclerView.ViewHolder(iv) {}
+            }
+
+            override fun onBindViewHolder(@NonNull holder: RecyclerView.ViewHolder, position: Int) {
+                val iv = holder.itemView as ImageView
+                iv.setImageResource(iconIds[position])
+                iv.setOnClickListener { insertIntoReplyDialog("[" + labels[position] + "]") }
+            }
+
+            override fun getItemCount(): Int = iconIds.size
+        }
+        tabs?.removeAllViews()
+    }
+
+    private fun showSmileySet(
+        rv: RecyclerView,
+        tabs: LinearLayout?,
+        catalog: MutableList<ForumParser.SmileySet>,
+        setIndex: Int,
+        empty: TextView?
+    ) {
+        if (catalog.isEmpty()) {
+            empty?.visibility = View.GONE
+            renderFallbackSmileyIcons(rv, tabs)
+            return
+        }
+        val idx = setIndex.coerceIn(0, catalog.size - 1)
+        replySmileySetIndex = idx
+        val items = catalog[idx].items
+        empty?.visibility = View.GONE
+        rv.visibility = View.VISIBLE
+        rv.layoutManager = GridLayoutManager(this, 6)
+        rv.adapter = object : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
+            @NonNull
+            override fun onCreateViewHolder(@NonNull parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder {
+                val size = dpToPx(40)
+                val iv = ImageView(parent.context)
+                iv.layoutParams = RecyclerView.LayoutParams(size, size)
+                iv.setPadding(dpToPx(4), dpToPx(4), dpToPx(4), dpToPx(4))
+                iv.scaleType = ImageView.ScaleType.FIT_CENTER
+                iv.isClickable = true
+                iv.setBackgroundResource(android.R.drawable.list_selector_background)
+                return object : RecyclerView.ViewHolder(iv) {}
+            }
+
+            override fun onBindViewHolder(@NonNull holder: RecyclerView.ViewHolder, position: Int) {
+                val iv = holder.itemView as ImageView
+                val smiley = items[position]
+                Glide.with(this@ThreadDetailActivity).load(smiley.url).into(iv)
+                iv.setOnClickListener { insertIntoReplyDialog(smiley.code) }
+            }
+
+            override fun getItemCount(): Int = items.size
+        }
+        tabs?.removeAllViews()
+        if (catalog.size > 1) {
+            for (i in catalog.indices) {
+                val dot = View(this)
+                val lp = LinearLayout.LayoutParams(dpToPx(7), dpToPx(7))
+                lp.marginStart = dpToPx(4)
+                lp.marginEnd = dpToPx(4)
+                dot.layoutParams = lp
+                dot.setBackgroundResource(
+                    if (i == idx) R.drawable.bg_segment_pill_selected else R.drawable.bg_page_indicator
+                )
+                dot.isClickable = true
+                dot.setOnClickListener { showSmileySet(rv, tabs, catalog, i, empty) }
+                tabs?.addView(dot)
+            }
+        }
+    }
+
+    // ---- 非图片附件 ----
+
+    private fun registerReplyFilePicker() {
+        if (replyFilePickerLauncher != null) return
+        replyFilePickerLauncher = registerForActivityResult(
+            ActivityResultContracts.OpenDocument()
+        ) { uri -> if (uri != null) uploadReplyFile(uri) }
+    }
+
+    private fun pickReplyFile() {
+        if (!httpClient.isLoggedIn()) {
+            httpClient.syncFromCookieManager()
+            if (!httpClient.isLoggedIn()) {
+                promptLogin()
+                return
+            }
+        }
+        replyFilePickerLauncher?.launch(arrayOf("*/*"))
+    }
+
+    private fun uploadReplyFile(uri: Uri) {
+        Toast.makeText(this, "正在上传附件...", Toast.LENGTH_SHORT).show()
+        java.lang.Thread {
+            try {
+                val name = buildUploadFileName(getDisplayNameFromUri(uri), contentResolver.getType(uri))
+                val temp = copyUriToTempFile(uri, name)
+                if (temp == null || !temp.exists()) {
+                    showUploadError("无法读取文件")
+                    return@Thread
+                }
+                if (!httpClient.isLoggedIn()) httpClient.syncFromCookieManager()
+                if (!httpClient.isLoggedIn()) {
+                    showUploadError("登录状态已失效，请重新登录")
+                    return@Thread
+                }
+                val detailHtml = httpClient.getDesktop(ForumParser.getThreadDetailUrl(tid))
+                var uid = extractUploadValue(detailHtml, "discuz_uid")
+                var hash = extractUploadValue(detailHtml, "hash")
+                if (!isValidUploadUid(uid)) uid = null
+                if (TextUtils.isEmpty(uid) || TextUtils.isEmpty(hash)) {
+                    val fid = extractForumFid(detailHtml) ?: "39"
+                    val postHtml = httpClient.getDesktop(
+                        HttpClient.BASE_URL + "forum.php?mod=post&action=newthread&fid=" + fid
+                    )
+                    if (TextUtils.isEmpty(uid)) uid = extractUploadValue(postHtml, "discuz_uid")
+                    if (!isValidUploadUid(uid)) uid = null
+                    if (TextUtils.isEmpty(hash)) hash = extractUploadValue(postHtml, "hash")
+                }
+                if (!isValidUploadUid(uid) || TextUtils.isEmpty(hash)) {
+                    showUploadError("获取附件上传授权失败，请重新登录后重试")
+                    return@Thread
+                }
+                val extra = HashMap<String, String>()
+                extra["uid"] = uid!!
+                extra["hash"] = hash!!
+                val url = HttpClient.BASE_URL + "misc.php?mod=swfupload&operation=upload" +
+                    "&type=attach&inajax=yes&infloat=yes&simple=2"
+                val result = httpClient.uploadFileWithUserAgent(
+                    url, temp, "Filedata", extra, HttpClient.DESKTOP_USER_AGENT, "application/octet-stream"
+                )
+                val aid = parseUploadAid(result)
+                if (TextUtils.isEmpty(aid)) {
+                    showUploadError(extractUploadError(result))
+                    return@Thread
+                }
+                val finalAid = aid!!
+                synchronized(pendingUploadAids) {
+                    if (!pendingUploadAids.contains(finalAid)) pendingUploadAids.add(finalAid)
+                }
+                runOnUiThread {
+                    replyAttachFiles.add(ReplyAttachFile(name, finalAid))
+                    updateReplyAttachList()
+                    insertIntoReplyDialog("\n[attach]" + finalAid + "[/attach]\n")
+                    Toast.makeText(this, "附件已上传: $name", Toast.LENGTH_SHORT).show()
+                }
+            } catch (e: Exception) {
+                showUploadError("附件上传失败: " + if (TextUtils.isEmpty(e.message)) "网络异常" else e.message)
+            }
+        }.start()
+    }
+
+    private fun updateReplyAttachList() {
+        val panel = binding.containerReplyPanel
+        val list = panel.findViewById<LinearLayout>(R.id.ll_attach_list) ?: return
+        list.removeAllViews()
+        if (replyAttachFiles.isEmpty()) {
+            list.visibility = View.GONE
+            return
+        }
+        list.visibility = View.VISIBLE
+        for (af in replyAttachFiles) {
+            val row = LinearLayout(this)
+            row.orientation = LinearLayout.HORIZONTAL
+            row.gravity = Gravity.CENTER_VERTICAL
+            row.setBackgroundResource(R.drawable.bg_post_panel)
+            row.setPadding(dpToPx(10), dpToPx(8), dpToPx(10), dpToPx(8))
+            val tv = TextView(this)
+            tv.layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+            tv.text = af.name
+            tv.textSize = 12f
+            tv.setTextColor(androidx.core.content.ContextCompat.getColor(this, R.color.text_secondary))
+            tv.maxLines = 1
+            tv.ellipsize = TextUtils.TruncateAt.MIDDLE
+            row.addView(tv)
+            val del = ImageButton(this)
+            del.layoutParams = LinearLayout.LayoutParams(dpToPx(22), dpToPx(22))
+            del.setImageResource(R.drawable.ic_cross)
+            del.setBackgroundColor(0)
+            del.setColorFilter(0xFFEF4444.toInt())
+            del.setOnClickListener {
+                replyAttachFiles.remove(af)
+                synchronized(pendingUploadAids) { pendingUploadAids.remove(af.aid) }
+                mEtReplyDialog?.let { et ->
+                    val tag = "[attach]" + af.aid + "[/attach]"
+                    et.setText(et.text.toString().replace(tag, ""))
+                }
+                updateReplyAttachList()
+            }
+            row.addView(del)
+            list.addView(row)
+        }
     }
 
     override fun dispatchKeyEvent(event: android.view.KeyEvent): Boolean {
@@ -974,6 +1408,7 @@ class ThreadDetailActivity : AppCompatActivity() {
         binding.root.requestFocus()
 
         replyBackPressedCallback?.isEnabled = false
+        hideReplyToolPanels()
 
         binding.vReplyMask.animate().cancel()
         binding.vReplyMask.visibility = View.GONE
@@ -1105,6 +1540,17 @@ class ThreadDetailActivity : AppCompatActivity() {
                         params["noticeauthor"] = noticeauthor!!
                     }
                     params["posttime"] = (System.currentTimeMillis() / 1000).toString()
+                    // 高级选项：签名默认开启，未勾选显式发 usesig=0；禁用表情/代码按勾选补 1
+                    val advPanel = binding.containerReplyPanel
+                    advPanel.findViewById<android.widget.CheckBox>(R.id.cb_reply_usesig)?.let {
+                        params["usesig"] = if (it.isChecked) "1" else "0"
+                    }
+                    advPanel.findViewById<android.widget.CheckBox>(R.id.cb_reply_smileyoff)?.let {
+                        if (it.isChecked) params["smileyoff"] = "1"
+                    }
+                    advPanel.findViewById<android.widget.CheckBox>(R.id.cb_reply_bbcodeoff)?.let {
+                        if (it.isChecked) params["bbcodeoff"] = "1"
+                    }
                     val fid = postDetail?.forumFid ?: ""
                     val replyUrl = "https://bbs.binmt.cc/forum.php?mod=post&action=reply&fid=" + fid +
                             "&tid=" + tid + "&extra=&replysubmit=yes&mobile=2&handlekey=fastpost&loc=1&inajax=1"
@@ -1165,6 +1611,8 @@ class ThreadDetailActivity : AppCompatActivity() {
             //          否则图片会一直留在回复栏里(已提交成功却看着像没发出去)
             pendingImageUris.clear()
             uploadedAidMap.clear()
+            replyAttachFiles.clear()
+            updateReplyAttachList()
             synchronized(pendingUploadAids) {
                 pendingUploadAids.clear()
             }
@@ -4190,6 +4638,17 @@ class ThreadDetailActivity : AppCompatActivity() {
         private const val PREF_LIKE_FAV = "thread_like_fav_state"
         private const val REQUEST_IMAGE_PICK = 1002
         private const val REQUEST_EDIT_THREAD = 1003 // build73: 编辑帖子
+
+        // 插入面板的内容类型
+        private const val INSERT_LINK = 1
+        private const val INSERT_IMAGE = 2
+        private const val INSERT_AUDIO = 3
+        private const val INSERT_VIDEO = 4
+        private const val INSERT_FLASH = 5
+        private const val INSERT_QUOTE = 6
+        private const val INSERT_CODE = 7
+        private const val INSERT_FREE = 8
+        private const val INSERT_HIDE = 9
 
         /** 进帖预取回复的最大页数，防止解析异常时无界翻页（串行请求会拖死首屏）。 */
         private const val MAX_PREFETCH_PAGES = 3

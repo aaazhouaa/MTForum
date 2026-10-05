@@ -341,7 +341,7 @@
         <LinearLayout
             android:id="@+id/ll_smiley_panel"
             android:layout_width="match_parent"
-            android:layout_height="130dp"
+            android:layout_height="wrap_content"
             android:background="@drawable/bg_post_panel"
             android:layout_marginHorizontal="12dp"
             android:layout_marginBottom="8dp"
@@ -351,7 +351,7 @@
 
             <HorizontalScrollView
                 android:layout_width="match_parent"
-                android:layout_height="match_parent"
+                android:layout_height="64dp"
                 android:scrollbars="none">
 
                 <LinearLayout
@@ -362,6 +362,14 @@
                     android:orientation="horizontal"
                     android:paddingHorizontal="6dp" />
             </HorizontalScrollView>
+
+            <LinearLayout
+                android:id="@+id/ll_smiley_tabs"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:orientation="horizontal"
+                android:paddingTop="4dp" />
         </LinearLayout>
 
         <!-- @朋友面板 (气泡卡片) -->
@@ -412,6 +420,108 @@
                 android:text="插入"
                 android:textColor="@color/white"
                 android:textSize="13sp" />
+        </LinearLayout>
+
+        <!-- 插入面板：与网页端一致的 9 项内容类型 + 动态输入区 -->
+        <LinearLayout
+            android:id="@+id/ll_insert_panel"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginHorizontal="12dp"
+            android:layout_marginBottom="8dp"
+            android:background="@drawable/bg_post_panel"
+            android:orientation="vertical"
+            android:padding="10dp"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <TextView android:id="@+id/btn_ins_link" android:layout_width="0dp" android:layout_height="34dp" android:layout_weight="1" android:layout_marginEnd="6dp" android:background="@drawable/bg_post_forum_chip" android:clickable="true" android:focusable="true" android:gravity="center" android:text="文字链接" android:textColor="@color/text_secondary" android:textSize="12sp" />
+
+                <TextView android:id="@+id/btn_ins_image" android:layout_width="0dp" android:layout_height="34dp" android:layout_weight="1" android:layout_marginEnd="6dp" android:background="@drawable/bg_post_forum_chip" android:clickable="true" android:focusable="true" android:gravity="center" android:text="网络图片" android:textColor="@color/text_secondary" android:textSize="12sp" />
+
+                <TextView android:id="@+id/btn_ins_audio" android:layout_width="0dp" android:layout_height="34dp" android:layout_weight="1" android:background="@drawable/bg_post_forum_chip" android:clickable="true" android:focusable="true" android:gravity="center" android:text="MP3 音乐" android:textColor="@color/text_secondary" android:textSize="12sp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:orientation="horizontal">
+
+                <TextView android:id="@+id/btn_ins_video" android:layout_width="0dp" android:layout_height="34dp" android:layout_weight="1" android:layout_marginEnd="6dp" android:background="@drawable/bg_post_forum_chip" android:clickable="true" android:focusable="true" android:gravity="center" android:text="网络视频" android:textColor="@color/text_secondary" android:textSize="12sp" />
+
+                <TextView android:id="@+id/btn_ins_flash" android:layout_width="0dp" android:layout_height="34dp" android:layout_weight="1" android:layout_marginEnd="6dp" android:background="@drawable/bg_post_forum_chip" android:clickable="true" android:focusable="true" android:gravity="center" android:text="Flash" android:textColor="@color/text_secondary" android:textSize="12sp" />
+
+                <TextView android:id="@+id/btn_ins_quote" android:layout_width="0dp" android:layout_height="34dp" android:layout_weight="1" android:background="@drawable/bg_post_forum_chip" android:clickable="true" android:focusable="true" android:gravity="center" android:text="引用" android:textColor="@color/text_secondary" android:textSize="12sp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:orientation="horizontal">
+
+                <TextView android:id="@+id/btn_ins_code" android:layout_width="0dp" android:layout_height="34dp" android:layout_weight="1" android:layout_marginEnd="6dp" android:background="@drawable/bg_post_forum_chip" android:clickable="true" android:focusable="true" android:gravity="center" android:text="代码" android:textColor="@color/text_secondary" android:textSize="12sp" />
+
+                <TextView android:id="@+id/btn_ins_free" android:layout_width="0dp" android:layout_height="34dp" android:layout_weight="1" android:layout_marginEnd="6dp" android:background="@drawable/bg_post_forum_chip" android:clickable="true" android:focusable="true" android:gravity="center" android:text="免费信息" android:textColor="@color/text_secondary" android:textSize="12sp" />
+
+                <TextView android:id="@+id/btn_ins_hide" android:layout_width="0dp" android:layout_height="34dp" android:layout_weight="1" android:background="@drawable/bg_post_forum_chip" android:clickable="true" android:focusable="true" android:gravity="center" android:text="隐藏内容" android:textColor="@color/text_secondary" android:textSize="12sp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/ll_insert_input"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:orientation="vertical"
+                android:visibility="gone">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/et_insert_field1"
+                    android:layout_width="match_parent"
+                    android:layout_height="38dp"
+                    android:background="@drawable/bg_spinner_border"
+                    android:hint="请输入"
+                    android:inputType="textUri"
+                    android:paddingHorizontal="12dp"
+                    android:paddingVertical="0dp"
+                    android:textColor="@color/text_primary"
+                    android:textColorHint="@color/text_hint"
+                    android:textSize="13sp" />
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/et_insert_field2"
+                    android:layout_width="match_parent"
+                    android:layout_height="38dp"
+                    android:layout_marginTop="6dp"
+                    android:background="@drawable/bg_spinner_border"
+                    android:hint="请输入"
+                    android:inputType="text"
+                    android:paddingHorizontal="12dp"
+                    android:paddingVertical="0dp"
+                    android:textColor="@color/text_primary"
+                    android:textColorHint="@color/text_hint"
+                    android:textSize="13sp"
+                    android:visibility="gone" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn_insert_confirm"
+                    android:layout_width="wrap_content"
+                    android:layout_height="34dp"
+                    android:layout_marginTop="8dp"
+                    android:minHeight="0dp"
+                    android:minWidth="0dp"
+                    android:paddingHorizontal="18dp"
+                    android:text="插入"
+                    android:textColor="@color/white"
+                    android:textSize="13sp"
+                    app:backgroundTint="?attr/colorPrimary"
+                    app:cornerRadius="17dp" />
+            </LinearLayout>
         </LinearLayout>
 
         <!-- 底部快捷工具栏（图标化现代工具条） -->

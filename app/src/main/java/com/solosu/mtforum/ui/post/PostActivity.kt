@@ -74,6 +74,8 @@ class PostActivity : AppCompatActivity() {
     private lateinit var llAdvancedOptions: LinearLayout
     private lateinit var llAttachList: LinearLayout
     private lateinit var llImagePreview: LinearLayout
+    private lateinit var llInsertPanel: LinearLayout
+    private lateinit var llInsertInput: LinearLayout
 
     // data
     private var selectedFid: String? = null
@@ -81,6 +83,10 @@ class PostActivity : AppCompatActivity() {
     private var currentFormhash: String? = null
     private var currentUid: String? = null
     private var currentHash: String? = null
+
+    /** 论坛真实表情集（从编辑器页解析后缓存） */
+    private var smileyCatalog: MutableList<ForumParser.SmileySet>? = null
+    private var postSmileySetIndex = 0
     private var draftId = 0L
     private var postedDone = false
 
@@ -154,6 +160,8 @@ class PostActivity : AppCompatActivity() {
         llAdvancedOptions = findViewById(R.id.ll_advanced_options)
         llAttachList = findViewById(R.id.ll_attach_list)
         llImagePreview = findViewById(R.id.ll_image_preview)
+        llInsertPanel = findViewById(R.id.ll_insert_panel)
+        llInsertInput = findViewById(R.id.ll_insert_input)
     }
 
     private fun setupTitleCounter() {
@@ -205,8 +213,7 @@ class PostActivity : AppCompatActivity() {
 
         // 3. 插入代码/引用/隐藏
         btnInsert.setOnClickListener {
-            hideAllPanels()
-            showInsertDialog()
+            toggleInsertPanel()
         }
 
         // 4. 表情
@@ -233,6 +240,52 @@ class PostActivity : AppCompatActivity() {
     }
 
     // ---- 表情功能 ----
+
+    /** 渲染论坛真实表情（当前分类 + 底部分类切换），点击插入对应表情代码 */
+    private fun renderPostSmileySet(catalog: MutableList<ForumParser.SmileySet>) {
+        val container = findViewById<LinearLayout>(R.id.ll_smiley_container) ?: return
+        val tabs = findViewById<LinearLayout>(R.id.ll_smiley_tabs)
+        container.removeAllViews()
+        val idx = postSmileySetIndex.coerceIn(0, catalog.size - 1)
+        postSmileySetIndex = idx
+        val density = resources.displayMetrics.density
+        val size = (40 * density).toInt()
+        val padding = (4 * density).toInt()
+        for (smiley in catalog[idx].items) {
+            val iv = ImageView(this)
+            iv.layoutParams = LinearLayout.LayoutParams(size, size)
+            iv.setPadding(padding, padding, padding, padding)
+            iv.scaleType = ImageView.ScaleType.FIT_CENTER
+            iv.setBackgroundResource(android.R.drawable.list_selector_background)
+            iv.isClickable = true
+            iv.isFocusable = true
+            Glide.with(this).load(smiley.url).into(iv)
+            iv.setOnClickListener { insertIntoContent(smiley.code) }
+            container.addView(iv)
+        }
+        tabs?.removeAllViews()
+        if (catalog.size <= 1 || tabs == null) return
+        for (i in catalog.indices) {
+            val tv = TextView(this)
+            tv.text = if (catalog[i].name.isEmpty()) "表情" + (i + 1) else catalog[i].name
+            tv.textSize = 12f
+            tv.setPadding((10 * density).toInt(), (4 * density).toInt(), (10 * density).toInt(), (4 * density).toInt())
+            tv.setTextColor(
+                androidx.core.content.ContextCompat.getColor(
+                    this,
+                    if (i == idx) R.color.text_primary else R.color.text_secondary
+                )
+            )
+            tv.isClickable = true
+            tv.isFocusable = true
+            tv.setOnClickListener {
+                postSmileySetIndex = i
+                renderPostSmileySet(catalog)
+            }
+            tabs.addView(tv)
+        }
+    }
+
     private fun toggleSmileyPanel() {
         // 自绘制快速回复图标,替代 emoji 表情
         hideAllPanelsExcept(llSmileyPanel)
@@ -243,6 +296,13 @@ class PostActivity : AppCompatActivity() {
         llSmileyPanel.visibility = View.VISIBLE
         val container = findViewById<LinearLayout>(R.id.ll_smiley_container) ?: return
         container.removeAllViews()
+
+        // 优先使用论坛真实表情（与回复弹窗同一套数据）；未取到时回退自绘图标
+        val catalog = smileyCatalog
+        if (catalog != null && catalog.isNotEmpty() && catalog[0].items.isNotEmpty()) {
+            renderPostSmileySet(catalog)
+            return
+        }
 
         val iconIds = intArrayOf(
             R.drawable.ic_smile, R.drawable.ic_heart, R.drawable.ic_thumbs_up,
@@ -296,43 +356,63 @@ class PostActivity : AppCompatActivity() {
         }
     }
 
-    // ---- 插入功能 ----
-    private fun showInsertDialog() {
+    // ---- 插入功能（9 项内容类型面板，与网页端一致）----
+    private fun toggleInsertPanel() {
+        val visible = llInsertPanel.visibility == View.VISIBLE
         hideAllPanels()
-        val items = arrayOf(
-            "引用 (Quote) · 引用他人观点或来源",
-            "代码块 (Code) · 保持程序代码缩进与排版",
-            "隐藏内容 (Hide) · 回复后可见此内容",
-            "免费信息 (Free) · 免费阅读公开区域"
-        )
-        val builder = AlertDialog.Builder(this)
-        builder.setTitle("插入特定排版内容")
-        builder.setItems(items) { dialog, which ->
-            var bbcode = ""
-            var name = ""
-            when (which) {
-                0 -> {
-                    bbcode = "\n[quote]请输入引用内容[/quote]\n"
-                    name = "引用"
-                }
-                1 -> {
-                    bbcode = "\n[code]请输入代码[/code]\n"
-                    name = "代码块"
-                }
-                2 -> {
-                    bbcode = "\n[hide]请输入回复后可见的隐藏内容[/hide]\n"
-                    name = "隐藏内容"
-                }
-                3 -> {
-                    bbcode = "\n[free]请输入免费公开内容[/free]\n"
-                    name = "免费信息"
-                }
-            }
-            insertIntoContent(bbcode)
-            Toast.makeText(this, "已插入 $name 代码块", Toast.LENGTH_SHORT).show()
+        if (visible) return
+        llInsertPanel.visibility = View.VISIBLE
+        llInsertInput.visibility = View.GONE
+        findViewById<View>(R.id.btn_ins_link)?.setOnClickListener { selectInsertType(INSERT_LINK, true, false, "链接网址", "链接文字") }
+        findViewById<View>(R.id.btn_ins_image)?.setOnClickListener { selectInsertType(INSERT_IMAGE, true, false, "图片地址", "") }
+        findViewById<View>(R.id.btn_ins_audio)?.setOnClickListener { selectInsertType(INSERT_AUDIO, true, false, "音乐文件地址", "") }
+        findViewById<View>(R.id.btn_ins_video)?.setOnClickListener { selectInsertType(INSERT_VIDEO, true, false, "视频地址", "") }
+        findViewById<View>(R.id.btn_ins_flash)?.setOnClickListener { selectInsertType(INSERT_FLASH, true, false, "Flash 地址", "") }
+        findViewById<View>(R.id.btn_ins_quote)?.setOnClickListener { selectInsertType(INSERT_QUOTE, false, true, "", "") }
+        findViewById<View>(R.id.btn_ins_code)?.setOnClickListener { selectInsertType(INSERT_CODE, false, true, "", "") }
+        findViewById<View>(R.id.btn_ins_free)?.setOnClickListener { selectInsertType(INSERT_FREE, false, true, "", "") }
+        findViewById<View>(R.id.btn_ins_hide)?.setOnClickListener { selectInsertType(INSERT_HIDE, false, true, "", "") }
+    }
+
+    private fun selectInsertType(type: Int, needUrl: Boolean, needText: Boolean, hint1: String, hint2: String) {
+        val f1 = findViewById<TextInputEditText>(R.id.et_insert_field1)
+        val f2 = findViewById<TextInputEditText>(R.id.et_insert_field2)
+        llInsertInput.visibility = View.VISIBLE
+        f1?.setText("")
+        f2?.setText("")
+        f1?.hint = hint1
+        f1?.visibility = if (needUrl || needText) View.VISIBLE else View.GONE
+        f2?.hint = hint2
+        f2?.visibility = if (needUrl && needText && hint2.isNotEmpty()) View.VISIBLE else View.GONE
+        findViewById<View>(R.id.btn_insert_confirm)?.setOnClickListener {
+            applyInsert(type, f1?.text?.toString()?.trim() ?: "", f2?.text?.toString()?.trim() ?: "")
         }
-        val alertDialog: android.app.Dialog = builder.show()
-        DialogHelper.applyToAlertDialog(alertDialog, this)
+    }
+
+    private fun applyInsert(type: Int, field1: String, field2: String) {
+        if ((type == INSERT_LINK || type == INSERT_IMAGE || type == INSERT_AUDIO ||
+                type == INSERT_VIDEO || type == INSERT_FLASH) && TextUtils.isEmpty(field1)
+        ) {
+            Toast.makeText(this, "请输入地址", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val text = when (type) {
+            INSERT_LINK -> {
+                val label = if (TextUtils.isEmpty(field2)) field1 else field2
+                "[url=" + field1 + "]" + label + "[/url]"
+            }
+            INSERT_IMAGE -> "[img]" + field1 + "[/img]"
+            INSERT_AUDIO -> "[audio]" + field1 + "[/audio]"
+            INSERT_VIDEO -> "[media]" + field1 + "[/media]"
+            INSERT_FLASH -> "[flash]" + field1 + "[/flash]"
+            INSERT_QUOTE -> "\n[quote]请输入引用内容[/quote]\n"
+            INSERT_CODE -> "\n[code]请输入代码[/code]\n"
+            INSERT_FREE -> "\n[free]请输入免费公开内容[/free]\n"
+            INSERT_HIDE -> "\n[hide]请输入回复后可见的隐藏内容[/hide]\n"
+            else -> ""
+        }
+        insertIntoContent(text)
+        hideAllPanels()
     }
 
     private fun updateSelectedForumUI() {
@@ -873,12 +953,14 @@ class PostActivity : AppCompatActivity() {
         llSmileyPanel.visibility = View.GONE
         llAtPanel.visibility = View.GONE
         llAdvancedOptions.visibility = View.GONE
+        llInsertPanel.visibility = View.GONE
     }
 
     private fun hideAllPanelsExcept(except: View) {
         if (except !== llSmileyPanel) llSmileyPanel.visibility = View.GONE
         if (except !== llAtPanel) llAtPanel.visibility = View.GONE
         if (except !== llAdvancedOptions) llAdvancedOptions.visibility = View.GONE
+        if (except !== llInsertPanel) llInsertPanel.visibility = View.GONE
     }
 
     // 插入内容到正文
@@ -1092,10 +1174,31 @@ class PostActivity : AppCompatActivity() {
                 if (desktopHtml != null) {
                     if (currentFormhash == null) currentFormhash = ForumParser.parseFormhash(desktopHtml)
                     extractUidAndHash(desktopHtml)
+                    cacheSmileyCatalog(desktopHtml)
                 }
             } catch (ignored: Exception) {
             }
         }.start()
+    }
+
+    /** 桌面编辑器页内联了论坛表情数据，从中解析并缓存，供表情面板使用 */
+    private fun cacheSmileyCatalog(html: String?) {
+        if (smileyCatalog != null) return
+        var parsed: MutableList<ForumParser.SmileySet> = ArrayList()
+        for (url in ForumParser.getSmileyScriptUrlCandidates()) {
+            parsed = ForumParser.parseSmileyCatalog(HttpClient.getInstance().get(url))
+            if (parsed.isNotEmpty()) break
+        }
+        if (parsed.isEmpty()) {
+            parsed = ForumParser.parseSmileyCatalog(html)
+            if (parsed.isEmpty()) {
+                for (url in ForumParser.extractSmileyScriptUrls(html)) {
+                    parsed = ForumParser.parseSmileyCatalog(HttpClient.getInstance().get(url))
+                    if (parsed.isNotEmpty()) break
+                }
+            }
+        }
+        if (parsed.isNotEmpty()) smileyCatalog = parsed
     }
 
     private fun loadFormhashSync() {
@@ -1113,6 +1216,7 @@ class PostActivity : AppCompatActivity() {
             if (desktopHtml != null) {
                 if (currentFormhash == null) currentFormhash = ForumParser.parseFormhash(desktopHtml)
                 extractUidAndHash(desktopHtml)
+                cacheSmileyCatalog(desktopHtml)
             }
         } catch (ignored: Exception) {
         }
@@ -1550,5 +1654,16 @@ class PostActivity : AppCompatActivity() {
     companion object {
         private const val REQUEST_FILE_PICK = 1001
         private const val REQUEST_IMAGE_PICK = 1002
+
+        // 插入面板的内容类型
+        private const val INSERT_LINK = 1
+        private const val INSERT_IMAGE = 2
+        private const val INSERT_AUDIO = 3
+        private const val INSERT_VIDEO = 4
+        private const val INSERT_FLASH = 5
+        private const val INSERT_QUOTE = 6
+        private const val INSERT_CODE = 7
+        private const val INSERT_FREE = 8
+        private const val INSERT_HIDE = 9
     }
 }

@@ -3279,4 +3279,169 @@ object ForumParser {
         var forums: MutableList<ForumCategory.Forum> = ArrayList<ForumCategory.Forum>()
         var categories: MutableList<ForumCategory> = ArrayList<ForumCategory>()
     }
+
+    // ==================== 论坛表情表 ====================
+
+    /** 一套论坛表情(以表情分类为一个集合，集合内按分页顺序排列)。 */
+    class SmileySet {
+        var name: String = ""
+        var items: MutableList<Smiley> = ArrayList<Smiley>()
+    }
+
+    /** 单个表情：可插入编辑器的代码与图片绝对地址。 */
+    class Smiley {
+        var code: String = ""
+        var url: String = ""
+    }
+
+    /**
+     * 解析编辑器页面里的表情数据，返回「分类 -> 表情(代码 + 图片地址)」。
+     *
+     * 数据源优先取 Discuz 编辑器内联的 smilies_var.js（smilies_type 分类数组 + smilies_array
+     * 表情数组），这是唯一能同时拿到「可插入代码」与「图片名」的结构；取不到时再退回扫描
+     * 表情弹层的 <img src=".../smiley/..."> 与邻近 onclick 里的代码。两种都拿不到时返回空列表，
+     * 由调用方决定降级（回退内置图标）。
+     */
+    @JvmStatic
+    fun parseSmileyCatalog(html: String?): MutableList<SmileySet> {
+        val result = ArrayList<SmileySet>()
+        if (TextUtils.isEmpty(html)) return result
+        try {
+            val src = html!!
+            // smilies_type['_12'] = ['默认', 'qq'] —— 键可能带前导下划线
+            val typeNames = HashMap<String, String>()
+            val typeDirs = HashMap<String, String>()
+            val tm = Pattern.compile(
+                "smilies_type\\s*\\[\\s*['\"]?(\\w+)['\"]?\\s*\\]\\s*=\\s*\\[\\s*'([^']*)'(?:\\s*,\\s*'([^']*)')?"
+            ).matcher(src)
+            while (tm.find()) {
+                val idx = tm.group(1)?.trimStart('_') ?: continue
+                typeNames[idx] = tm.group(2) ?: ""
+                typeDirs[idx] = tm.group(3) ?: ""
+            }
+            if (typeNames.isEmpty()) return result
+            // smilies_array[12][1] = [['1240','[呵呵]','qq001.gif',...], ...]
+            // 即「分类 -> 页 -> 表情数组」，一个分类可能多页；这里把同一分类的各页合并。
+            val bySet = LinkedHashMap<String, SmileySet>()
+            val blockRe = Pattern.compile(
+                "smilies_array\\s*\\[\\s*['\"]?(\\w+)['\"]?\\s*\\]\\s*\\[\\s*['\"]?(\\w+)['\"]?\\s*\\]\\s*=\\s*\\[([\\s\\S]*?)\\]\\s*;"
+            ).matcher(src)
+            while (blockRe.find()) {
+                val setId = blockRe.group(1)?.trimStart('_') ?: continue
+                val set = bySet.getOrPut(setId) {
+                    val s = SmileySet()
+                    s.name = typeNames[setId] ?: ""
+                    s
+                }
+                val itemRe = Pattern.compile("\\[\\s*'([^']*)'\\s*,\\s*'([^']*)'\\s*,\\s*'([^']*)'").matcher(blockRe.group(3) ?: "")
+                while (itemRe.find()) {
+                    val code = itemRe.group(2) ?: ""
+                    val image = itemRe.group(3) ?: ""
+                    if (code.isEmpty() || image.isEmpty()) continue
+                    val smiley = Smiley()
+                    smiley.code = code
+                    smiley.url = resolveSmileyUrl(image, typeDirs[setId])
+                    set.items.add(smiley)
+                }
+            }
+            for (set in bySet.values) {
+                if (set.items.isNotEmpty()) result.add(set)
+            }
+        } catch (ignored: Exception) {
+        }
+        if (result.isEmpty()) {
+            parseSmileyCatalogFromHtml(html, result)
+        }
+        return result
+    }
+
+    /** 兜底：从表情弹层 HTML 里按 <img src=.../smiley/...> 与邻近 onclick 代码配对。 */
+    private fun parseSmileyCatalogFromHtml(html: String?, out: MutableList<SmileySet>) {
+        if (TextUtils.isEmpty(html)) return
+        try {
+            val doc = Jsoup.parse(html!!)
+            val imgs = doc.select("img[src*=smiley], img[src*=emoticon]")
+            if (imgs.isEmpty()) return
+            val set = SmileySet()
+            set.name = "表情"
+            for (img in imgs) {
+                val src = img.attr("src")
+                if (TextUtils.isEmpty(src)) continue
+                val onclick = img.parent()?.attr("onclick") ?: ""
+                val code = extractSmileyCode(onclick + " " + img.attr("alt") + " " + img.attr("data-code"))
+                if (TextUtils.isEmpty(code)) continue
+                val smiley = Smiley()
+                smiley.code = code!!
+                smiley.url = resolveSmileyUrl(src, null)
+                set.items.add(smiley)
+            }
+            if (set.items.isNotEmpty()) out.add(set)
+        } catch (ignored: Exception) {
+        }
+    }
+
+    /** 从文本中抽取 Discuz 表情代码（{:4_96:} 或 [em:01:]）。 */
+    private fun extractSmileyCode(text: String?): String? {
+        if (TextUtils.isEmpty(text)) return null
+        var m = Pattern.compile("\\{:\\d+_\\d+:\\}").matcher(text!!)
+        if (m.find()) return m.group()
+        m = Pattern.compile("\\[em:\\d+:\\]").matcher(text)
+        if (m.find()) return m.group()
+        return null
+    }
+
+    /** 表情图片根地址：本站静态资源走 CDN（bbs 域名会重定向） */
+    private const val SMILEY_CDN_BASE = "https://cdn.binmt.cc/"
+
+    /** 把表情图片名/相对路径补成绝对地址。 */
+    private fun resolveSmileyUrl(image: String, dir: String?): String {
+        if (image.startsWith("http://") || image.startsWith("https://")) return image
+        if (image.startsWith("/")) return SMILEY_CDN_BASE.trimEnd('/') + image
+        val folder = if (TextUtils.isEmpty(dir)) "" else dir!!.trim('/') + "/"
+        return SMILEY_CDN_BASE + "static/image/smiley/" + folder + image
+    }
+
+    /**
+     * 站点表情数据缓存文件的固定地址（Discuz 标准文件名）。
+     *
+     * 该文件由后台刷新缓存时生成，名称固定，且为 CDN 静态资源不会触发 WAF；
+     * 换模板等特殊情况下取不到时，再由调用方从编辑器/帖子页提取脚本地址兜底。
+     */
+    @JvmStatic
+    fun getSmileyScriptUrlCandidates(): MutableList<String> {
+        val list = ArrayList<String>()
+        list.add(SMILEY_CDN_BASE + "data/cache/common_smilies_var.js")
+        return list
+    }
+
+    /**
+     * 从编辑器页 HTML 里找出可能承载表情数据的脚本地址。
+     *
+     * 部分 Discuz 站点不内联 smilies_var.js，而是像 common_postimg.js 那样以 data/cache 下的 js
+     * 外链引入，故把页内 src 含 smiley/smilies 的脚本都拿来试。
+     */
+    @JvmStatic
+    fun extractSmileyScriptUrls(html: String?): MutableList<String> {
+        val result = ArrayList<String>()
+        if (TextUtils.isEmpty(html)) return result
+        try {
+            val m = Pattern.compile(
+                "<script[^>]+src\\s*=\\s*['\"]([^'\"]+?)(?:\\?[^'\"]*)?['\"]",
+                Pattern.CASE_INSENSITIVE
+            ).matcher(html!!)
+            while (m.find()) {
+                val src = m.group(1) ?: continue
+                val lower = src.lowercase(Locale.ROOT)
+                if (!(lower.contains("smiley") || lower.contains("smilies"))) continue
+                val url = when {
+                    src.startsWith("http") -> src
+                    src.startsWith("/") -> SMILEY_CDN_BASE.trimEnd('/') + src
+                    else -> SMILEY_CDN_BASE + src
+                }
+                if (!result.contains(url)) result.add(url)
+            }
+        } catch (ignored: Exception) {
+        }
+        return result
+    }
 }
